@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
+/* Calm, focused color palette - warm neutrals with soft accents */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --background: #faf9f7;
+  --foreground: #1c1917;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-surface: #ffffff;
+  --color-surface-elevated: #ffffff;
+
+  --color-border: #e7e5e4;
+  --color-border-soft: #f5f5f4;
+
+  --color-primary: #57534e;
+  --color-primary-soft: #a8a29e;
+
+  --color-accent: #78716c;
+  --color-accent-soft: #d6d3d1;
+
+  --color-success: #5c7a57;
+  --color-warning: #8a7247;
+  --color-error: #a5786a;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #1c1917;
+    --foreground: #faf9f7;
+
+    --color-surface: #292524;
+    --color-surface-elevated: #2d2a28;
+
+    --color-border: #44403c;
+    --color-border-soft: #292524;
+
+    --color-primary: #d6d3d1;
+    --color-primary-soft: #78716c;
+
+    --color-accent: #a8a29e;
+    --color-accent-soft: #57534e;
+
+    --color-success: #7a9a75;
+    --color-warning: #a88f67;
+    --color-error: #c58a7a;
   }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+}
+
+* {
+  transition-property: color, background-color, border-color;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Softer focus states */
+:focus-visible {
+  outline: 2px solid var(--color-accent-soft);
+  outline-offset: 2px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-accent-soft);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
 }

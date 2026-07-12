@@ -1,0 +1,154 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String?
+  email       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  resumes     Resume[]
+  jobs        Job[]
+  settings    UserSettings?
+  credentials PlatformCredential[]
+  profiles    PlatformProfile[]
+}
+
+model PlatformCredential {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  platform        String   // 'linkedin' or 'stepstone'
+  email           String
+  encryptedPassword String
+  twoFactorEnabled Boolean @default(false)
+  lastSyncAt      DateTime?
+  syncStatus      String   @default("never") // never, success, failed
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model PlatformProfile {
+  id              String   @id @default(cuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  platform        String   // 'linkedin' or 'stepstone'
+  profileId       String   // Platform-specific profile ID
+
+  name            String
+  headline        String?
+  about           String?
+  location        String?
+  experience      String?  // JSON
+  education       String?  // JSON
+  skills          String?  // JSON
+
+  optimization    String?  // JSON - AI suggestions
+
+  lastSyncAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([platform, profileId])
+}
+
+model UserSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  geminiApiKey    String?
+  openaiApiKey    String?
+  ollamaUrl       String?  @default("http://localhost:11434")
+  aiProvider      String   @default("ollama")
+  aiModel         String?  @default("gemini-2.5-flash")
+
+  targetTitles    String?  // JSON array of job titles
+  targetLocations String?  // JSON array of locations
+  minSalary       Int?
+  remote          Boolean  @default(false)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Resume {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  name        String
+  content     String   // Markdown content
+  fileUrl     String?  // PDF upload
+
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Job {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  company     String?
+  location    String?
+  description String
+  url         String   @unique
+
+  status      JobStatus @default(DISCOVERED)
+  score       Int?     // 1-10 AI score
+  scoreReason String?  // AI explanation
+
+  appliedAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activities  Activity[]
+}
+
+model Activity {
+  id          String   @id @default(cuid())
+  jobId       String
+  job         Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  type        ActivityType
+  description String
+  metadata    String?  // JSON for extra data
+
+  createdAt   DateTime @default(now())
+}
+
+enum JobStatus {
+  DISCOVERED     // Found by scraper
+  SCORED         // AI scored
+  HIGH_MATCH     // Score >= 7
+  APPLIED        // Applied
+  INTERVIEW      // Interview scheduled
+  OFFER          // Offer received
+  REJECTED       // Rejected
+  ARCHIVED       // Not interested
+}
+
+enum ActivityType {
+  STATUS_CHANGE
+  EMAIL_SENT
+  INTERVIEW_SCHEDULED
+  FOLLOW_UP
+  NOTE
+}
