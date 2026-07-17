@@ -74,8 +74,8 @@ model UserSettings {
   geminiApiKey    String?
   openaiApiKey    String?
   ollamaUrl       String?  @default("http://localhost:11434")
-  aiProvider      String   @default("ollama")
-  aiModel         String?  @default("gemini-2.5-flash")
+  aiProvider      String   @default("mistral")
+  aiModel         String?  @default("mistral-small-latest")
 
   targetTitles    String?  // JSON array of job titles
   targetLocations String?  // JSON array of locations

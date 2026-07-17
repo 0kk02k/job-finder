@@ -343,14 +343,11 @@ export interface ProfileOptimization {
 export async function optimizeProfile(
   profile: LinkedInProfile | StepStoneProfile,
   targetJobs: string[],
-  aiProvider: string = 'ollama'
+  aiProvider: string = 'mistral'
 ): Promise<ProfileOptimization> {
-  const { createOpenAI } = await import('@ai-sdk/openai')
+  const { getAIClient, defaultModel } = await import('./ai')
   const { generateText } = await import('ai')
-  const ai = createOpenAI({
-    baseURL: aiProvider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
-    apiKey: aiProvider === 'ollama' ? 'ollama' : undefined,
-  })
+  const ai = getAIClient(aiProvider)
 
   const profileText = JSON.stringify(profile, null, 2)
   const jobsText = targetJobs.join(', ')
@@ -388,7 +385,7 @@ Fokus auf:
 
   try {
     const { text } = await generateText({
-      model: ai('llama3.2'),
+      model: ai(defaultModel(aiProvider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -412,14 +409,11 @@ export async function generateOptimizedSection(
   section: 'headline' | 'about' | 'experience' | 'skills',
   currentContent: string,
   targetJobs: string[],
-  aiProvider: string = 'ollama'
+  aiProvider: string = 'mistral'
 ): Promise<string> {
-  const { createOpenAI } = await import('@ai-sdk/openai')
+  const { getAIClient, defaultModel } = await import('./ai')
   const { generateText } = await import('ai')
-  const ai = createOpenAI({
-    baseURL: aiProvider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
-    apiKey: aiProvider === 'ollama' ? 'ollama' : undefined,
-  })
+  const ai = getAIClient(aiProvider)
 
   const prompts = {
     headline: `Erstelle einen optimierten LinkedIn/StepStone Headline basierend auf:
@@ -469,7 +463,7 @@ Gib 10-15 relevante Skills zurück, getrennt durch Kommas.
 
   try {
     const { text } = await generateText({
-      model: ai('llama3.2'),
+      model: ai(defaultModel(aiProvider)),
       messages: [{ role: 'user', content: prompts[section] }],
     })
 

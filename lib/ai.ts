@@ -42,11 +42,18 @@ export interface ExtractedJob {
 }
 
 // Get AI client based on provider
-function getAIClient(provider: string, apiKey?: string, baseUrl?: string) {
+export function getAIClient(provider: string, apiKey?: string, baseUrl?: string) {
   if (provider === 'ollama') {
     return createOpenAI({
       baseURL: baseUrl || 'http://localhost:11434/v1',
       apiKey: 'ollama',
+    })
+  }
+
+  if (provider === 'mistral') {
+    return createOpenAI({
+      baseURL: 'https://api.mistral.ai/v1',
+      apiKey: apiKey || process.env.MISTRAL_API_KEY,
     })
   }
 
@@ -69,8 +76,15 @@ function getAIClient(provider: string, apiKey?: string, baseUrl?: string) {
   })
 }
 
+// Default model per provider
+export function defaultModel(provider: string): string {
+  if (provider === 'ollama') return 'llama3.2'
+  if (provider === 'mistral') return 'mistral-small-latest'
+  return 'gpt-4o-mini'
+}
+
 // AI-powered job extraction from unstructured HTML
-export async function extractJobFromHTML(html: string, url: string, provider: string = 'ollama'): Promise<ExtractedJob | null> {
+export async function extractJobFromHTML(html: string, url: string, provider: string = 'mistral'): Promise<ExtractedJob | null> {
   const ai = getAIClient(provider)
 
   const prompt = `Du bist ein Job-Extraktions-Experte. Extrahiere strukturierte Job-Daten aus dieser unstrukturierten HTML/Text-Seite.
@@ -97,7 +111,7 @@ Wenn kein Job gefunden wird, gib null zurück.`
 
   try {
     const { text } = await generateText({
-      model: ai(provider === 'ollama' ? 'llama3.2' : 'gpt-4o-mini'),
+      model: ai(defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -117,7 +131,7 @@ export async function semanticJobSearch(
   resume: string,
   searchQuery: string,
   availableJobs: SemanticJob[],
-  provider: string = 'ollama'
+  provider: string = 'mistral'
 ): Promise<SemanticSearchResult> {
   const ai = getAIClient(provider)
 
@@ -158,7 +172,7 @@ Nur Jobs mit relevanceScore >= 0.6 aufnehmen.`
 
   try {
     const { text } = await generateText({
-      model: ai(provider === 'ollama' ? 'llama3.2' : 'gpt-4o'),
+      model: ai(defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -174,7 +188,7 @@ Nur Jobs mit relevanceScore >= 0.6 aufnehmen.`
 export async function scoreJob(
   jobDescription: string,
   resume: string,
-  provider: string = 'ollama',
+  provider: string = 'mistral',
   model?: string,
   apiKey?: string,
   baseUrl?: string
@@ -207,7 +221,7 @@ Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lü
 
   try {
     const { text } = await generateText({
-      model: ai(model || (provider === 'ollama' ? 'llama3.2' : 'gpt-4o-mini')),
+      model: ai(model || (defaultModel(provider))),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -228,7 +242,7 @@ Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lü
 export async function generateSearchQueries(
   resume: string,
   originalQuery: string,
-  provider: string = 'ollama'
+  provider: string = 'mistral'
 ): Promise<string[]> {
   const ai = getAIClient(provider)
 
@@ -252,7 +266,7 @@ Berücksichtige:
 
   try {
     const { text } = await generateText({
-      model: ai('llama3.2'),
+      model: ai(defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -268,7 +282,7 @@ Berücksichtige:
 export async function tailorResume(
   resume: string,
   jobDescription: string,
-  provider: string = 'ollama',
+  provider: string = 'mistral',
   model?: string
 ): Promise<string> {
   const ai = getAIClient(provider)
@@ -291,7 +305,7 @@ Fokus auf:
 
   try {
     const { text } = await generateText({
-      model: ai(model || 'llama3.2'),
+      model: ai(model || defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -306,7 +320,7 @@ export async function generateCoverLetter(
   resume: string,
   jobDescription: string,
   company: string,
-  provider: string = 'ollama'
+  provider: string = 'mistral'
 ): Promise<string> {
   const ai = getAIClient(provider)
 
@@ -328,7 +342,7 @@ Struktur:
 
   try {
     const { text } = await generateText({
-      model: ai('llama3.2'),
+      model: ai(defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
