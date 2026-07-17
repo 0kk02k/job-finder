@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generateCoverLetterFromJob } from '@/lib/pdf'
-import { path as appPath } from '@cererium/path'
 import { writeFile, unlink } from 'fs/promises'
 import { existsSync } from 'fs'
 

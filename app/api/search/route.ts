@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { searchJobs, semanticSearch } from '@/lib/scrapers'
+import { searchJobs, semanticSearch, type ScrapedJob } from '@/lib/scrapers'
 import { scoreJob, generateSearchQueries } from '@/lib/ai'
 
 // POST /api/search - AI-powered job search with semantic matching
@@ -101,7 +101,15 @@ export async function POST(request: NextRequest) {
   )
 
   // Save high matches
-  const highMatches = scoredJobs.filter(job => (job.aiScore || 0) >= 7)
+  type ScoredJob = ScrapedJob & {
+    aiScore: number
+    aiReason: string
+    gaps: string[]
+    strengths: string[]
+  }
+  const highMatches = scoredJobs.filter(
+    (job): job is ScoredJob => 'aiScore' in job && job.aiScore >= 7
+  )
 
   for (const job of highMatches) {
     try {

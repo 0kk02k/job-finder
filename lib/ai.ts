@@ -2,6 +2,7 @@
 // Supports: Ollama (local), Gemini (cloud), OpenRouter (multi-provider)
 
 import { createOpenAI } from '@ai-sdk/openai'
+import { generateText } from 'ai'
 
 export interface ScoreResult {
   score: number // 1-10
@@ -95,13 +96,12 @@ Gib zurück als JSON mit diesen Feldern:
 Wenn kein Job gefunden wird, gib null zurück.`
 
   try {
-    const response = await ai.chat.completions.create({
-      model: provider === 'ollama' ? 'llama3.2' : 'gpt-4o-mini',
+    const { text } = await generateText({
+      model: ai(provider === 'ollama' ? 'llama3.2' : 'gpt-4o-mini'),
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
     })
 
-    const content = response.choices[0]?.message?.content || '{}'
+    const content = text || '{}'
     const result = JSON.parse(content)
 
     if (result.confidence < 0.5) return null
@@ -157,13 +157,12 @@ Gib zurück als JSON:
 Nur Jobs mit relevanceScore >= 0.6 aufnehmen.`
 
   try {
-    const response = await ai.chat.completions.create({
-      model: provider === 'ollama' ? 'llama3.2' : 'gpt-4o',
+    const { text } = await generateText({
+      model: ai(provider === 'ollama' ? 'llama3.2' : 'gpt-4o'),
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
     })
 
-    const content = response.choices[0]?.message?.content || '{}'
+    const content = text || '{}'
     return JSON.parse(content) as SemanticSearchResult
   } catch (error) {
     console.error('Semantic search error:', error)
@@ -207,13 +206,12 @@ Gib zurück als JSON:
 Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lücken. 5 oder weniger bedeutet großer Gap.`
 
   try {
-    const response = await ai.chat.completions.create({
-      model: model || (provider === 'ollama' ? 'llama3.2' : 'gpt-4o-mini'),
+    const { text } = await generateText({
+      model: ai(model || (provider === 'ollama' ? 'llama3.2' : 'gpt-4o-mini')),
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
     })
 
-    const content = response.choices[0]?.message?.content || '{}'
+    const content = text || '{}'
     return JSON.parse(content) as ScoreResult
   } catch (error) {
     console.error('AI scoring error:', error)
@@ -253,13 +251,12 @@ Berücksichtige:
 - Seniority-Level Variationen`
 
   try {
-    const response = await ai.chat.completions.create({
-      model: 'llama3.2',
+    const { text } = await generateText({
+      model: ai('llama3.2'),
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
     })
 
-    const content = response.choices[0]?.message?.content || '{}'
+    const content = text || '{}'
     const result = JSON.parse(content)
     return result.queries || []
   } catch {
@@ -293,12 +290,12 @@ Fokus auf:
 4. Quantifizierbare Ergebnisse behoben`
 
   try {
-    const response = await ai.chat.completions.create({
-      model: model || 'llama3.2',
+    const { text } = await generateText({
+      model: ai(model || 'llama3.2'),
       messages: [{ role: 'user', content: prompt }],
     })
 
-    return response.choices[0]?.message?.content || resume
+    return text || resume
   } catch {
     return resume
   }
@@ -330,12 +327,12 @@ Struktur:
 4. Abschluss`
 
   try {
-    const response = await ai.chat.completions.create({
-      model: 'llama3.2',
+    const { text } = await generateText({
+      model: ai('llama3.2'),
       messages: [{ role: 'user', content: prompt }],
     })
 
-    return response.choices[0]?.message?.content || ''
+    return text || ''
   } catch {
     return ''
   }

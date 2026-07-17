@@ -24,7 +24,7 @@ export interface LinkedInProfile {
     endDate?: string
   }>
   skills: string[]
-  recommendations: string[]
+  recommendations?: string[]
 }
 
 export interface XINGProfile {
@@ -166,7 +166,10 @@ export async function syncLinkedInProfile(credentials: PlatformCredentials): Pro
 
       const skillTags = await page.$$('[data-anonymize="skill"]')
       profile.skills = await Promise.all(
-        skillTags.map(el => el.textContent?.trim() || '')
+        skillTags.map(async el => {
+          const text = await el.textContent()
+          return text?.trim() || ''
+        })
       )
     } catch {}
 
@@ -340,6 +343,7 @@ export async function optimizeProfile(
   aiProvider: string = 'ollama'
 ): Promise<ProfileOptimization> {
   const { createOpenAI } = await import('@ai-sdk/openai')
+  const { generateText } = await import('ai')
   const ai = createOpenAI({
     baseURL: aiProvider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
     apiKey: aiProvider === 'ollama' ? 'ollama' : undefined,
@@ -380,13 +384,12 @@ Fokus auf:
 4. Professionelle Sprache`
 
   try {
-    const response = await ai.chat.completions.create({
-      model: 'llama3.2',
+    const { text } = await generateText({
+      model: ai('llama3.2'),
       messages: [{ role: 'user', content: prompt }],
-      response_format: { type: 'json_object' },
     })
 
-    const content = response.choices[0]?.message?.content || '{}'
+    const content = text || '{}'
     return JSON.parse(content) as ProfileOptimization
   } catch (error) {
     console.error('Profile optimization error:', error)
@@ -409,6 +412,7 @@ export async function generateOptimizedSection(
   aiProvider: string = 'ollama'
 ): Promise<string> {
   const { createOpenAI } = await import('@ai-sdk/openai')
+  const { generateText } = await import('ai')
   const ai = createOpenAI({
     baseURL: aiProvider === 'ollama' ? 'http://localhost:11434/v1' : undefined,
     apiKey: aiProvider === 'ollama' ? 'ollama' : undefined,
@@ -461,12 +465,12 @@ Gib 10-15 relevante Skills zurück, getrennt durch Kommas.
   }
 
   try {
-    const response = await ai.chat.completions.create({
-      model: 'llama3.2',
+    const { text } = await generateText({
+      model: ai('llama3.2'),
       messages: [{ role: 'user', content: prompts[section] }],
     })
 
-    return response.choices[0]?.message?.content || currentContent
+    return text || currentContent
   } catch {
     return currentContent
   }

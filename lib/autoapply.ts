@@ -147,7 +147,7 @@ export async function applyGeneric(jobUrl: string, config: AutoApplyConfig): Pro
     await page.goto(jobUrl, { waitUntil: 'networkidle' })
 
     // Try to find apply button
-    const applyButtons = await page.$$('a, button').filter(async btn => {
+    const applyButtons = (await page.$$('a, button')).filter(async btn => {
       const text = await btn.textContent()
       return text?.toLowerCase().includes('apply') || text?.toLowerCase().includes('bewerben')
     })

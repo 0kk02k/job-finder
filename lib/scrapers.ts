@@ -15,6 +15,27 @@ export interface ScrapedJob {
   platform: string
 }
 
+// ponytail: simple URL scraper for single job posting
+export async function scrapeJobUrl(url: string): Promise<Partial<ScrapedJob> | null> {
+  const browser = await chromium.launch({ headless: true })
+  const page = await browser.newPage()
+
+  try {
+    await page.goto(url, { waitUntil: 'networkidle' })
+    await page.waitForTimeout(2000)
+
+    const html = await page.content()
+    const extracted = await extractJobFromHTML(html, url, 'ollama')
+
+    return extracted
+  } catch (error) {
+    console.error('Scrape error:', error)
+    return null
+  } finally {
+    await browser.close()
+  }
+}
+
 // Indeed search with AI fallback
 export async function searchIndeed(params: {
   query: string
@@ -99,7 +120,6 @@ export async function searchLinkedIn(params: {
       location: params.location || '',
     })
 
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
     await page.goto(`${baseUrl}?${searchParams.toString()}`, { waitUntil: 'networkidle' })
 
     // Try to wait for job cards with timeout
@@ -155,7 +175,6 @@ export async function searchGlassdoor(params: {
     const searchSlug = params.query.toLowerCase().replace(/\s+/g, '-')
     const url = `https://www.glassdoor.de/Job/${searchSlug}-jobs-SRCH_${params.location || 'DE'}.htm`
 
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
     await page.goto(url, { waitUntil: 'networkidle' })
 
     try {
@@ -204,7 +223,6 @@ export async function enrichJobAI(job: ScrapedJob, provider: string = 'ollama'):
   const page = await browser.newPage()
 
   try {
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
     await page.goto(job.url, { waitUntil: 'networkidle' })
     await page.waitForTimeout(2000)
 

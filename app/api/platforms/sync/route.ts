@@ -55,6 +55,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to sync profile' }, { status: 500 })
     }
 
+    // Normalize profile fields for storage (StepStone has different shape)
+    const profileName = 'firstName' in profile
+      ? `${profile.firstName} ${profile.lastName}`.trim()
+      : profile.name
+    const profileHeadline = 'firstName' in profile ? '' : profile.headline || ''
+    const profileAbout = 'firstName' in profile ? '' : profile.about || ''
+    const profileExperience = 'firstName' in profile ? profile.experiences : profile.experience || []
+
     // Save profile
     await prisma.platformProfile.upsert({
       where: {
@@ -64,11 +72,11 @@ export async function POST(request: NextRequest) {
         },
       },
       update: {
-        name: profile.name,
-        headline: profile.headline || '',
-        about: profile.about || '',
+        name: profileName,
+        headline: profileHeadline,
+        about: profileAbout,
         location: profile.location || '',
-        experience: JSON.stringify(profile.experience || []),
+        experience: JSON.stringify(profileExperience),
         education: JSON.stringify(profile.education || []),
         skills: JSON.stringify(profile.skills || []),
         lastSyncAt: new Date(),
@@ -78,11 +86,11 @@ export async function POST(request: NextRequest) {
         userId,
         platform,
         profileId: profile.id || 'unknown',
-        name: profile.name,
-        headline: profile.headline || '',
-        about: profile.about || '',
+        name: profileName,
+        headline: profileHeadline,
+        about: profileAbout,
         location: profile.location || '',
-        experience: JSON.stringify(profile.experience || []),
+        experience: JSON.stringify(profileExperience),
         education: JSON.stringify(profile.education || []),
         skills: JSON.stringify(profile.skills || []),
         lastSyncAt: new Date(),
