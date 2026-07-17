@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 import { applyIndeed, applyGeneric, batchApply } from '@/lib/autoapply'
 
 // POST /api/autoapply - apply to a job automatically
 export async function POST(request: NextRequest) {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
   const { jobId, dryRun = false } = body

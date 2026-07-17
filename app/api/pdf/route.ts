@@ -1,17 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generateCoverLetterFromJob } from '@/lib/pdf'
-import { writeFile, unlink } from 'fs/promises'
-import { existsSync } from 'fs'
 
-// POST /api/pdf/resume - generate resume PDF
-export async function POSTResume(request: NextRequest) {
-  const userId = 'default'
+// POST /api/pdf - generate resume or cover letter PDF
+export async function POST(request: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
-  const { resumeId } = body
+  const { type } = body
 
-  // Get resume
+  if (type === 'resume') {
+    return generateResume(userId)
+  } else if (type === 'coverletter') {
+    return generateCoverLetter(userId, body.jobId)
+  }
+
+  return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
+}
+
+async function generateResume(userId: string) {
   const resume = await prisma.resume.findFirst({
     where: { userId, isActive: true },
   })
@@ -21,21 +31,10 @@ export async function POSTResume(request: NextRequest) {
   }
 
   try {
-    // Parse markdown to structured data
     const resumeData = parseResumeMarkdown(resume.content)
+    const pdfBuffer = await generateResumePDF(resumeData)
 
-    // Generate PDF
-    const outputPath = `/tmp/resume_${Date.now()}.pdf`
-    await generateResumePDF(resumeData, outputPath)
-
-    // Read PDF and return as base64
-    const pdfBuffer = await import('fs').then(fs => fs.readFileSync(outputPath))
-
-    // Clean up
-    await unlink(outputPath)
-
-    // Return PDF
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${resume.name.replace(/\s+/g, '_')}_Resume.pdf"`,
@@ -47,14 +46,7 @@ export async function POSTResume(request: NextRequest) {
   }
 }
 
-// POST /api/pdf/coverletter - generate cover letter PDF
-export async function POSTCoverLetter(request: NextRequest) {
-  const userId = 'default'
-
-  const body = await request.json()
-  const { jobId } = body
-
-  // Get resume
+async function generateCoverLetter(userId: string, jobId: string) {
   const resume = await prisma.resume.findFirst({
     where: { userId, isActive: true },
   })
@@ -63,7 +55,6 @@ export async function POSTCoverLetter(request: NextRequest) {
     return NextResponse.json({ error: 'No resume found' }, { status: 404 })
   }
 
-  // Get job
   const job = await prisma.job.findUnique({
     where: { id: jobId },
   })
@@ -73,24 +64,11 @@ export async function POSTCoverLetter(request: NextRequest) {
   }
 
   try {
-    // Parse resume
     const resumeData = parseResumeMarkdown(resume.content)
-
-    // Generate cover letter
     const coverLetterData = generateCoverLetterFromJob(resumeData, job.description, job.company || 'Firma')
+    const pdfBuffer = await generateCoverLetterPDF(coverLetterData)
 
-    // Generate PDF
-    const outputPath = `/tmp/cover_${Date.now()}.pdf`
-    await generateCoverLetterPDF(coverLetterData, outputPath)
-
-    // Read PDF
-    const pdfBuffer = await import('fs').then(fs => fs.readFileSync(outputPath))
-
-    // Clean up
-    await unlink(outputPath)
-
-    // Return PDF
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="Cover_Letter_${job.company?.replace(/\s+/g, '_')}.pdf"`,
@@ -102,28 +80,12 @@ export async function POSTCoverLetter(request: NextRequest) {
   }
 }
 
-// Main route handler
-export async function POST(request: NextRequest) {
-  const body = await request.json()
-  const { type } = body
-
-  if (type === 'resume') {
-    return POSTResume(request)
-  } else if (type === 'coverletter') {
-    return POSTCoverLetter(request)
-  }
-
-  return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
-}
-
-// GET /api/pdf - get available PDFs
+// GET /api/pdf - get available PDF templates
 export async function GET() {
-  // List available PDF templates
   return NextResponse.json({
     templates: [
       { id: 'modern', name: 'Modern Single Column' },
       { id: 'classic', name: 'Classic Single Column' },
-      { id: 'two-column', name: 'Two Column' },
     ],
   })
 }

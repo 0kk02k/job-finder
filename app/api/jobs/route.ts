@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 import { scrapeJobUrl } from '@/lib/scrapers'
 import { scoreJob } from '@/lib/ai'
 
 // GET /api/jobs - list all jobs for user
 export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const userId = searchParams.get('userId') || 'default' // ponytail: simple auth
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const jobs = await prisma.job.findMany({
     where: { userId },
@@ -18,7 +20,9 @@ export async function GET(request: NextRequest) {
 
 // POST /api/jobs - add new job (URL or manual)
 export async function POST(request: NextRequest) {
-  const userId = 'default' // ponytail: simple auth
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
   const { url, title, company, location, description } = body

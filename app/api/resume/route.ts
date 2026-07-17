@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 
 // GET /api/resume - get active resume
 export async function GET() {
-  const userId = 'default' // ponytail: simple auth
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const resume = await prisma.resume.findFirst({
     where: { userId, isActive: true },
@@ -14,7 +17,9 @@ export async function GET() {
 
 // POST /api/resume - create/update resume
 export async function POST(request: NextRequest) {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
   const { name, content } = body

@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 import { optimizeProfile, generateOptimizedSection } from '@/lib/platforms'
 
 // POST /api/platforms/optimize - get AI profile optimization suggestions
 export async function POST(request: NextRequest) {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
   const { platform, targetJobs } = body
@@ -63,7 +66,9 @@ export async function POST(request: NextRequest) {
 
 // PATCH /api/platforms/optimize/section - generate optimized section
 export async function PATCH(request: NextRequest) {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
   const { platform, section, targetJobs } = body
@@ -117,7 +122,9 @@ export async function PATCH(request: NextRequest) {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const platform = searchParams.get('platform')
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   if (!platform) {
     return NextResponse.json({ error: 'Platform required' }, { status: 400 })

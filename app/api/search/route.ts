@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 import { searchJobs, semanticSearch, type ScrapedJob } from '@/lib/scrapers'
 import { scoreJob, generateSearchQueries } from '@/lib/ai'
 
 // POST /api/search - AI-powered job search with semantic matching
 export async function POST(request: NextRequest) {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
   const { query, location, remote, platforms, useAI, semantic } = body
@@ -148,7 +151,9 @@ export async function POST(request: NextRequest) {
 // GET /api/search - get alternative search queries via AI
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
   const query = searchParams.get('query')
 
   if (!query) {

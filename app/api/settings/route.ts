@@ -1,9 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 
 // GET /api/settings - get user settings
 export async function GET() {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   let settings = await prisma.userSettings.findUnique({
     where: { userId },
@@ -21,7 +24,9 @@ export async function GET() {
 
 // PUT /api/settings - update settings
 export async function PUT(request: NextRequest) {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
   const body = await request.json()
 
   const settings = await prisma.userSettings.upsert({

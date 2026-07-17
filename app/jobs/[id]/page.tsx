@@ -22,7 +22,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
-  const [applying, setApplying] = useState(false)
   const [downloading, setDownloading] = useState(false)
 
   useEffect(() => {
@@ -40,57 +39,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
       console.error('Failed to fetch job:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function handleAutoApply() {
-    if (!job) return
-
-    if (!confirm(`Möchtest du dich automatisch für "${job.title}" bei ${job.company} bewerben?`)) {
-      return
-    }
-
-    setApplying(true)
-    try {
-      const response = await fetch('/api/autoapply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id }),
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        alert('Bewerbung erfolgreich eingereicht!')
-        fetchJob(job.id)
-      } else {
-        alert(`Bewerbung fehlgeschlagen: ${result.error}`)
-      }
-    } catch (error) {
-      alert('Fehler: ' + error)
-    } finally {
-      setApplying(false)
-    }
-  }
-
-  async function handleDryRun() {
-    if (!job) return
-
-    setApplying(true)
-    try {
-      const response = await fetch('/api/autoapply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id, dryRun: true }),
-      })
-
-      const result = await response.json()
-
-      alert(`Dry Run:\n\nSteps:\n${result.steps?.join('\n')}\n\n${result.message}`)
-    } catch (error) {
-      alert('Fehler: ' + error)
-    } finally {
-      setApplying(false)
     }
   }
 
@@ -213,29 +161,9 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
             Aktionen
           </h2>
 
-          <div className="grid md:grid-cols-2 gap-4">
-            {/* Auto-Apply */}
-            <div className="space-y-2">
-              <h3 className="font-medium text-zinc-900 dark:text-zinc-50">Auto-Apply</h3>
-              <button
-                onClick={handleDryRun}
-                disabled={applying}
-                className="w-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                🧪 Testlauf (Dry Run)
-              </button>
-              <button
-                onClick={handleAutoApply}
-                disabled={applying}
-                className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                {applying ? 'Wird beworben...' : '🚀 Jetzt Bewerben'}
-              </button>
-            </div>
-
-            {/* PDF Export */}
-            <div className="space-y-2">
-              <h3 className="font-medium text-zinc-900 dark:text-zinc-50">PDF Export</h3>
+          <div className="space-y-4">
+            <h3 className="font-medium text-zinc-900 dark:text-zinc-50">PDF Export</h3>
+            <div className="grid md:grid-cols-2 gap-4">
               <button
                 onClick={() => handleDownloadPDF('resume')}
                 disabled={downloading}

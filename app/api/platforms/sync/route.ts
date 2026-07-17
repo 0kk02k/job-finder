@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { auth } from '@/auth'
 import { syncLinkedInProfile, syncXINGProfile, syncStepStoneProfile } from '@/lib/platforms'
 
 // POST /api/platforms/sync - sync profile from LinkedIn or StepStone
 export async function POST(request: NextRequest) {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const body = await request.json()
   const { platform, credentials } = body
@@ -120,7 +123,9 @@ export async function POST(request: NextRequest) {
 
 // GET /api/platforms/sync - get sync status
 export async function GET() {
-  const userId = 'default'
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session.user.id
 
   const credentials = await prisma.platformCredential.findMany({
     where: { userId },

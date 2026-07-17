@@ -1,5 +1,7 @@
 // PDF Export for Resumes and Cover Letters
-// Uses Playwright to render HTML to PDF
+// Uses @react-pdf/renderer (pure JS, no browser needed)
+
+import { renderResumePDF, renderCoverLetterPDF } from './pdf-documents'
 
 export interface ResumeData {
   name: string
@@ -34,278 +36,11 @@ export interface CoverLetterData {
   closing: string
 }
 
-// Generate HTML for modern resume template
-function generateResumeHTML(data: ResumeData): string {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      line-height: 1.6;
-      color: #1a1a1a;
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 40px;
-    }
-    .header {
-      border-bottom: 2px solid #2563eb;
-      padding-bottom: 20px;
-      margin-bottom: 30px;
-    }
-    .name {
-      font-size: 32px;
-      font-weight: 700;
-      color: #1e3a8a;
-      margin-bottom: 5px;
-    }
-    .title {
-      font-size: 18px;
-      color: #64748b;
-      margin-bottom: 15px;
-    }
-    .contact {
-      display: flex;
-      gap: 20px;
-      font-size: 14px;
-      color: #64748b;
-    }
-    .section {
-      margin-bottom: 30px;
-    }
-    .section-title {
-      font-size: 18px;
-      font-weight: 600;
-      color: #1e3a8a;
-      margin-bottom: 15px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .experience-item, .education-item {
-      margin-bottom: 20px;
-    }
-    .item-header {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 5px;
-    }
-    .company, .school {
-      font-weight: 600;
-      color: #1a1a1a;
-    }
-    .date {
-      color: #64748b;
-      font-size: 14px;
-    }
-    .item-title {
-      font-weight: 500;
-      color: #475569;
-      margin-bottom: 8px;
-    }
-    .description-list {
-      list-style: none;
-      padding-left: 0;
-    }
-    .description-list li {
-      padding-left: 20px;
-      position: relative;
-      margin-bottom: 5px;
-      font-size: 14px;
-    }
-    .description-list li:before {
-      content: "•";
-      position: absolute;
-      left: 0;
-      color: #2563eb;
-    }
-    .skills-grid {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .skill-tag {
-      background: #dbeafe;
-      color: #1e40af;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    @media print {
-      body { padding: 20px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="name">${data.name}</div>
-    <div class="title">${data.title}</div>
-    <div class="contact">
-      <span>📧 ${data.email}</span>
-      <span>📱 ${data.phone}</span>
-      <span>📍 ${data.location}</span>
-    </div>
-  </div>
+// Generate resume PDF as buffer
+export const generateResumePDF = renderResumePDF
 
-  ${data.summary ? `
-  <div class="section">
-    <div class="section-title">Profil</div>
-    <p>${data.summary}</p>
-  </div>
-  ` : ''}
-
-  <div class="section">
-    <div class="section-title">Berufserfahrung</div>
-    ${data.experience.map(exp => `
-      <div class="experience-item">
-        <div class="item-header">
-          <div class="company">${exp.company}</div>
-          <div class="date">${exp.startDate} – ${exp.endDate || 'Heute'}</div>
-        </div>
-        <div class="item-title">${exp.title}</div>
-        <ul class="description-list">
-          ${exp.description.map(item => `<li>${item}</li>`).join('')}
-        </ul>
-      </div>
-    `).join('')}
-  </div>
-
-  <div class="section">
-    <div class="section-title">Ausbildung</div>
-    ${data.education.map(edu => `
-      <div class="education-item">
-        <div class="item-header">
-          <div class="school">${edu.school}</div>
-          <div class="date">${edu.graduationYear}</div>
-        </div>
-        <div class="item-title">${edu.degree}</div>
-      </div>
-    `).join('')}
-  </div>
-
-  <div class="section">
-    <div class="section-title">Skills</div>
-    <div class="skills-grid">
-      ${data.skills.map(skill => `<span class="skill-tag">${skill}</span>`).join('')}
-    </div>
-  </div>
-</body>
-</html>
-  `
-}
-
-// Generate HTML for cover letter
-function generateCoverLetterHTML(data: CoverLetterData): string {
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Georgia', serif;
-      line-height: 1.8;
-      color: #1a1a1a;
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 60px 40px;
-    }
-    .header {
-      margin-bottom: 40px;
-    }
-    .sender {
-      margin-bottom: 5px;
-      font-weight: 600;
-    }
-    .date {
-      color: #64748b;
-      margin-bottom: 20px;
-    }
-    .recipient {
-      margin-bottom: 5px;
-    }
-    .salutation {
-      margin-bottom: 20px;
-    }
-    .body {
-      margin-bottom: 30px;
-    }
-    .body p {
-      margin-bottom: 15px;
-      text-align: justify;
-    }
-    .closing {
-      margin-bottom: 10px;
-    }
-    .signature {
-      margin-top: 40px;
-    }
-    @media print {
-      body { padding: 40px 30px; }
-    }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="sender">${data.name}</div>
-    <div class="date">${data.date}</div>
-    <div class="recipient">
-      ${data.recipientName ? `${data.recipientName}<br>` : ''}
-      ${data.recipientTitle ? `${data.recipientTitle}<br>` : ''}
-      ${data.recipientCompany}
-    </div>
-  </div>
-
-  <div class="salutation">${data.salutation}</div>
-
-  <div class="body">
-    ${data.body.map(para => `<p>${para}</p>`).join('')}
-  </div>
-
-  <div class="closing">${data.closing}</div>
-  <div class="signature">${data.name}</div>
-</body>
-</html>
-  `
-}
-
-// Convert HTML to PDF using Playwright
-export async function htmlToPDF(html: string, outputPath: string): Promise<void> {
-  const { chromium } = await import("playwright")
-  const browser = await chromium.launch()
-  const page = await browser.newPage()
-
-  await page.setContent(html)
-  await page.pdf({
-    path: outputPath,
-    format: 'A4',
-    printBackground: true,
-    margin: {
-      top: '20px',
-      right: '20px',
-      bottom: '20px',
-      left: '20px',
-    },
-  })
-
-  await browser.close()
-}
-
-// Generate resume PDF
-export async function generateResumePDF(data: ResumeData, outputPath: string): Promise<void> {
-  const html = generateResumeHTML(data)
-  await htmlToPDF(html, outputPath)
-}
-
-// Generate cover letter PDF
-export async function generateCoverLetterPDF(data: CoverLetterData, outputPath: string): Promise<void> {
-  const html = generateCoverLetterHTML(data)
-  await htmlToPDF(html, outputPath)
-}
+// Generate cover letter PDF as buffer
+export const generateCoverLetterPDF = renderCoverLetterPDF
 
 // Parse resume markdown to structured data
 export function parseResumeMarkdown(markdown: string): ResumeData {
@@ -326,7 +61,6 @@ export function parseResumeMarkdown(markdown: string): ResumeData {
   let currentItem: any = null
 
   for (const line of lines) {
-    // Headers
     if (line.startsWith('# ')) {
       data.name = line.substring(2).trim()
     } else if (line.startsWith('## ')) {
@@ -348,7 +82,6 @@ export function parseResumeMarkdown(markdown: string): ResumeData {
         currentItem.description.push(content)
       }
     } else if (line.trim()) {
-      // Contact info
       if (line.includes('@') && !data.email) {
         data.email = line.trim()
       } else if (line.includes('+') && !data.phone) {
@@ -356,7 +89,6 @@ export function parseResumeMarkdown(markdown: string): ResumeData {
       } else if (line.includes('📍') && !data.location) {
         data.location = line.replace('📍', '').trim()
       }
-      // Experience details
       if (currentItem && currentSection === 'erfahrung') {
         if (line.includes('|')) {
           const parts = line.split('|').map(p => p.trim())
