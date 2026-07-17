@@ -1,7 +1,7 @@
 // Auto-Apply System with Playwright
 // Supports: Indeed, LinkedIn, Glassdoor, generic forms
 
-import { chromium, Browser, Page, BrowserContext } from 'playwright'
+import type { Browser, Page, BrowserContext } from 'playwright'
 
 export interface AutoApplyConfig {
   resumePath: string
@@ -39,6 +39,7 @@ export interface AutoApplyResult {
 // Indeed Auto-Apply
 export async function applyIndeed(jobUrl: string, config: AutoApplyConfig): Promise<AutoApplyResult> {
   const steps: string[] = []
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: false }) // Show browser for human-in-the-loop
 
   try {
@@ -139,6 +140,7 @@ export async function applyIndeed(jobUrl: string, config: AutoApplyConfig): Prom
 // Generic form filler for unknown platforms
 export async function applyGeneric(jobUrl: string, config: AutoApplyConfig): Promise<AutoApplyResult> {
   const steps: string[] = []
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: false })
 
   try {

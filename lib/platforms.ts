@@ -1,8 +1,6 @@
 // Platform Integration: LinkedIn, XING, StepStone, Indeed, Glassdoor
 // OAuth, Profile Sync, AI-Enhanced Profile Management
 
-import { chromium } from 'playwright'
-
 export interface LinkedInProfile {
   id: string
   name: string
@@ -86,6 +84,7 @@ export interface PlatformCredentials {
 
 // Sync LinkedIn profile via Playwright (LinkedIn API requires OAuth partnership)
 export async function syncLinkedInProfile(credentials: PlatformCredentials): Promise<LinkedInProfile | null> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 
@@ -184,6 +183,7 @@ export async function syncLinkedInProfile(credentials: PlatformCredentials): Pro
 
 // Sync StepStone profile via Playwright
 export async function syncStepStoneProfile(credentials: PlatformCredentials): Promise<StepStoneProfile | null> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 
@@ -234,6 +234,7 @@ export async function syncStepStoneProfile(credentials: PlatformCredentials): Pr
 
 // Sync XING profile via Playwright
 export async function syncXINGProfile(credentials: PlatformCredentials): Promise<XINGProfile | null> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 
@@ -276,6 +277,7 @@ export async function syncXINGProfile(credentials: PlatformCredentials): Promise
 
 // Indeed job search (no profile sync, just search capability)
 export async function searchIndeedJobs(query: string, location: string): Promise<any[]> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 
@@ -303,6 +305,7 @@ export async function searchIndeedJobs(query: string, location: string): Promise
 
 // Glassdoor company info (no profile sync)
 export async function getGlassdoorCompanyInfo(companyName: string): Promise<any> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 

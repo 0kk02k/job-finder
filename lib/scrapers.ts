@@ -1,7 +1,6 @@
 // AI-powered job scrapers for major platforms
 // Uses AI for extraction from unstructured pages and semantic matching
 
-import { chromium } from 'playwright'
 import { extractJobFromHTML, semanticJobSearch } from './ai'
 
 export interface ScrapedJob {
@@ -17,6 +16,7 @@ export interface ScrapedJob {
 
 // ponytail: simple URL scraper for single job posting
 export async function scrapeJobUrl(url: string): Promise<Partial<ScrapedJob> | null> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 
@@ -43,6 +43,7 @@ export async function searchIndeed(params: {
   remote?: boolean
   useAI?: boolean
 }): Promise<ScrapedJob[]> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
   const jobs: ScrapedJob[] = []
@@ -109,6 +110,7 @@ export async function searchLinkedIn(params: {
   location?: string
   remote?: boolean
 }): Promise<ScrapedJob[]> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
   const jobs: ScrapedJob[] = []
@@ -167,6 +169,7 @@ export async function searchGlassdoor(params: {
   query: string
   location?: string
 }): Promise<ScrapedJob[]> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
   const jobs: ScrapedJob[] = []
@@ -219,6 +222,7 @@ export async function searchGlassdoor(params: {
 export async function enrichJobAI(job: ScrapedJob, provider: string = 'ollama'): Promise<ScrapedJob> {
   if (job.description && job.description.length > 100) return job
 
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch({ headless: true })
   const page = await browser.newPage()
 

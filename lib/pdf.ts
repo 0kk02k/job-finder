@@ -1,8 +1,6 @@
 // PDF Export for Resumes and Cover Letters
 // Uses Playwright to render HTML to PDF
 
-import { chromium } from 'playwright'
-
 export interface ResumeData {
   name: string
   title: string
@@ -277,6 +275,7 @@ function generateCoverLetterHTML(data: CoverLetterData): string {
 
 // Convert HTML to PDF using Playwright
 export async function htmlToPDF(html: string, outputPath: string): Promise<void> {
+  const { chromium } = await import("playwright")
   const browser = await chromium.launch()
   const page = await browser.newPage()
 
