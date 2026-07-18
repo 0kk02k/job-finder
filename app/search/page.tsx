@@ -71,20 +71,6 @@ export default function SearchPage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      {/* Navigation */}
-      <nav className="border-b border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-5">
-          <div className="flex items-center justify-between">
-            <Link href="/" className="text-xl font-medium text-[var(--color-foreground)]">
-              Job Finder
-            </Link>
-            <div className="flex items-center gap-8">
-              <NavLink href="/jobs">Jobs</NavLink>
-              <NavLink href="/resume">Resume</NavLink>
-            </div>
-          </div>
-        </div>
-      </nav>
 
       <main className="max-w-5xl mx-auto px-6 py-16">
         {/* Header */}

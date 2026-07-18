@@ -3,22 +3,6 @@ import Link from 'next/link'
 export default function Dashboard() {
   return (
     <div className="min-h-screen bg-[var(--background)]">
-      {/* Navigation */}
-      <nav className="border-b border-[var(--color-border)] bg-[var(--color-surface)] backdrop-blur-sm sticky top-0 z-10">
-        <div className="max-w-5xl mx-auto px-6 py-5">
-          <div className="flex items-center justify-between">
-            <h1 className="text-xl font-medium text-[var(--color-foreground)]">
-              Job Finder
-            </h1>
-            <div className="flex items-center gap-8">
-              <NavLink href="/search">Suchen</NavLink>
-              <NavLink href="/jobs">Jobs</NavLink>
-              <NavLink href="/resume">Resume</NavLink>
-              <NavLink href="/settings">Einstellungen</NavLink>
-            </div>
-          </div>
-        </div>
-      </nav>
 
       <main className="max-w-5xl mx-auto px-6 py-16">
         {/* Welcome Section */}

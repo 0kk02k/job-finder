@@ -17,19 +17,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Query required' }, { status: 400 })
   }
 
-  // Get active resume
+  // Get active resume (optional — AI scoring requires it, search works without)
   const resume = await prisma.resume.findFirst({
     where: { userId, isActive: true },
   })
 
-  if (!resume) {
-    return NextResponse.json({ error: 'Resume required for AI search' }, { status: 400 })
-  }
-
   let jobs: any[] = []
 
-  // Semantic search - AI-powered matching
-  if (semantic) {
+  // Semantic search - AI-powered matching (requires resume)
+  if (semantic && resume) {
     try {
       jobs = await semanticSearch({
         resume: resume.content,
@@ -82,12 +78,14 @@ export async function POST(request: NextRequest) {
   // Traditional search with AI enrichment
   const rawJobs = await searchJobs({ query, location, remote, platforms, useAI: true })
 
-  // Score jobs with AI
+  // Score jobs with AI (requires resume)
+  const resumeContent = resume?.content
   const scoredJobs = await Promise.all(
     rawJobs.map(async (job) => {
+      if (!resumeContent) return job
       try {
         if (job.description) {
-          const scoreResult = await scoreJob(job.description, resume.content)
+          const scoreResult = await scoreJob(job.description, resumeContent)
           return {
             ...job,
             aiScore: scoreResult.score,

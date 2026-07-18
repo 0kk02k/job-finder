@@ -108,14 +108,6 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <nav className="bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <Link href="/jobs" className="text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-50">
-            ← Zurück
-          </Link>
-        </div>
-      </nav>
-
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="flex items-start justify-between mb-6">
           <div>
