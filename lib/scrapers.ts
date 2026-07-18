@@ -114,17 +114,30 @@ export async function searchJobs(params: {
   platforms?: string[]
   useAI?: boolean
   resume?: string
+  apifyToken?: string | null
 }): Promise<ScrapedJob[]> {
-  const [jooble, remotive, arbeitnow] = await Promise.allSettled([
+  const { searchLinkedInJobs } = await import('./apify')
+
+  const sources: Promise<ScrapedJob[]>[] = [
     searchJooble(params.query, params.location),
     searchRemotive(params.query),
     searchArbeitnow(params.query),
-  ])
+  ]
+
+  // Add LinkedIn via Apify when token is available
+  if (params.apifyToken) {
+    sources.push(
+      searchLinkedInJobs(params.query, params.location, params.apifyToken)
+        .then(jobs => jobs.map(j => ({ ...j, platform: 'linkedin' })))
+    )
+  }
+
+  const results = await Promise.allSettled(sources)
 
   const allJobs: ScrapedJob[] = []
-  if (jooble.status === 'fulfilled') allJobs.push(...jooble.value)
-  if (remotive.status === 'fulfilled') allJobs.push(...remotive.value)
-  if (arbeitnow.status === 'fulfilled') allJobs.push(...arbeitnow.value)
+  for (const r of results) {
+    if (r.status === 'fulfilled') allJobs.push(...r.value)
+  }
 
   // Deduplicate by URL
   const seen = new Set<string>()
@@ -142,12 +155,14 @@ export async function semanticSearch(params: {
   location?: string
   remote?: boolean
   provider?: string
+  apifyToken?: string | null
 }): Promise<any[]> {
   const rawJobs = await searchJobs({
     query: params.query,
     location: params.location,
     remote: params.remote,
     useAI: true,
+    apifyToken: params.apifyToken,
   })
 
   const semanticJobs = rawJobs.map(job => ({

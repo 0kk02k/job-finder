@@ -74,6 +74,7 @@ model UserSettings {
 
   geminiApiKey    String?
   openaiApiKey    String?
+  apifyApiKey     String?
   ollamaUrl       String?  @default("http://localhost:11434")
   aiProvider      String   @default("mistral")
   aiModel         String?  @default("mistral-small-latest")

@@ -22,6 +22,10 @@ export async function POST(request: NextRequest) {
     where: { userId, isActive: true },
   })
 
+  // Get user settings for Apify token
+  const settings = await prisma.userSettings.findUnique({ where: { userId } })
+  const apifyToken = settings?.apifyApiKey || null
+
   let jobs: any[] = []
 
   // Semantic search - AI-powered matching (requires resume)
@@ -32,6 +36,7 @@ export async function POST(request: NextRequest) {
         query,
         location,
         remote,
+        apifyToken,
       })
 
       // Save high matches
@@ -76,7 +81,14 @@ export async function POST(request: NextRequest) {
   }
 
   // Traditional search with AI enrichment
-  const rawJobs = await searchJobs({ query, location, remote, platforms, useAI: true })
+  const rawJobs = await searchJobs({
+    query,
+    location,
+    remote,
+    platforms,
+    useAI: true,
+    apifyToken,
+  })
 
   // Score jobs with AI (requires resume)
   const resumeContent = resume?.content

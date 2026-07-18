@@ -7,6 +7,7 @@ interface Settings {
   id: string
   aiProvider: string
   aiModel: string | null
+  apifyApiKey: string | null
   ollamaUrl: string | null
   geminiApiKey: string | null
   openaiApiKey: string | null
@@ -16,29 +17,24 @@ interface Settings {
   remote: boolean
 }
 
-interface PlatformCredential {
-  platform: string
-  email: string
-  syncStatus: string
-  lastSyncAt: string | null
-}
-
 export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
 
-  const [platformCreds, setPlatformCreds] = useState<Record<string, { email: string; password: string }>>({
-    linkedin: { email: '', password: '' },
-    xing: { email: '', password: '' },
-    stepstone: { email: '', password: '' },
-  })
-  const [syncing, setSyncing] = useState<Record<string, boolean>>({})
-  const [platformStatus, setPlatformStatus] = useState<Record<string, PlatformCredential>>({})
+  // Profile state
+  const [profilePlatform, setProfilePlatform] = useState('linkedin')
+  const [profileName, setProfileName] = useState('')
+  const [profileHeadline, setProfileHeadline] = useState('')
+  const [profileAbout, setProfileAbout] = useState('')
+  const [profileLocation, setProfileLocation] = useState('')
+  const [profileSkills, setProfileSkills] = useState('')
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [optimizing, setOptimizing] = useState(false)
+  const [optimization, setOptimization] = useState<any>(null)
 
   useEffect(() => {
     fetchSettings()
-    fetchPlatformStatus()
   }, [])
 
   async function fetchSettings() {
@@ -46,31 +42,10 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings')
       const data = await response.json()
       setSettings(data)
-    } catch (error) {
-      console.error('Failed to fetch settings:', error)
+    } catch {
+      console.error('Failed to fetch settings')
     } finally {
       setLoading(false)
-    }
-  }
-
-  async function fetchPlatformStatus() {
-    try {
-      const response = await fetch('/api/platforms/sync')
-      const data = await response.json()
-      const statusMap: Record<string, PlatformCredential> = {}
-      data.credentials?.forEach((c: PlatformCredential) => {
-        statusMap[c.platform] = c
-      })
-      setPlatformStatus(statusMap)
-      const newCreds = { ...platformCreds }
-      Object.entries(statusMap).forEach(([platform, cred]) => {
-        if (newCreds[platform]) {
-          newCreds[platform].email = cred.email
-        }
-      })
-      setPlatformCreds(newCreds)
-    } catch (error) {
-      console.error('Failed to fetch platform status:', error)
     }
   }
 
@@ -83,41 +58,64 @@ export default function SettingsPage() {
         body: JSON.stringify(settings),
       })
       alert('Einstellungen gespeichert!')
-    } catch (error) {
+    } catch {
       alert('Fehler beim Speichern')
     } finally {
       setSaving(false)
     }
   }
 
-  async function syncPlatform(platform: 'linkedin' | 'xing' | 'stepstone') {
-    const creds = platformCreds[platform]
-    if (!creds.email || !creds.password) {
-      alert('Bitte Email und Passwort eingeben')
-      return
-    }
-
-    setSyncing({ ...syncing, [platform]: true })
+  async function saveProfile() {
+    setSavingProfile(true)
     try {
-      const response = await fetch('/api/platforms/sync', {
+      const response = await fetch('/api/platforms/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: profilePlatform,
+          name: profileName,
+          headline: profileHeadline,
+          about: profileAbout,
+          location: profileLocation,
+          skills: profileSkills.split(',').map(s => s.trim()).filter(Boolean),
+        }),
+      })
+
+      if (response.ok) {
+        alert('Profil gespeichert!')
+      } else {
+        alert('Fehler beim Speichern')
+      }
+    } catch {
+      alert('Fehler beim Speichern')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  async function optimizeProfile() {
+    setOptimizing(true)
+    setOptimization(null)
+    try {
+      const response = await fetch('/api/platforms/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          platform,
-          credentials: { email: creds.email, password: creds.password },
+          platform: profilePlatform,
+          targetJobs: settings?.targetTitles?.split(',').map(s => s.trim()) || ['Software Engineer'],
         }),
       })
+
       const data = await response.json()
       if (response.ok) {
-        alert(`Profil erfolgreich von ${platform} synchronisiert!`)
-        fetchPlatformStatus()
+        setOptimization(data.optimization)
       } else {
-        alert(`Fehler: ${data.error || 'Sync fehlgeschlagen'}`)
+        alert(data.error || 'Optimierung fehlgeschlagen')
       }
-    } catch (error) {
-      alert('Fehler beim Synchronisieren')
+    } catch {
+      alert('Fehler bei der Optimierung')
     } finally {
-      setSyncing({ ...syncing, [platform]: false })
+      setOptimizing(false)
     }
   }
 
@@ -131,136 +129,206 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-[var(--background)]">
-
-      <main className="max-w-5xl mx-auto px-6 py-16">
-        <h1 className="text-3xl font-light text-[var(--color-foreground)] mb-12">
-          Einstellungen
-        </h1>
+      <main className="max-w-3xl mx-auto px-6 py-16">
+        <h1 className="text-3xl font-light text-[var(--color-foreground)] mb-12">Einstellungen</h1>
 
         <div className="space-y-12">
           {/* AI Settings */}
-          <Section title="KI-Einstellungen" description="Wähle deinen KI-Provider und Konfiguration">
+          <Section title="KI-Einstellungen" description="Provider und API-Keys für KI-Features">
             <div className="space-y-6">
-              <SelectField
-                label="KI-Provider"
-                value={settings.aiProvider}
-                onChange={(value) => setSettings({ ...settings, aiProvider: value })}
-                options={[
-                  { value: 'ollama', label: 'Ollama (Lokal)' },
-                  { value: 'gemini', label: 'Google Gemini' },
-                  { value: 'openrouter', label: 'OpenRouter' },
-                ]}
+              <InputField
+                label="Apify API Key (optional)"
+                type="password"
+                value={settings.apifyApiKey || ''}
+                onChange={(v) => setSettings({ ...settings, apifyApiKey: v })}
+                placeholder="Für LinkedIn/XING Job-Suche und Profil-Sync"
+                help="Kostenlos auf apify.com — ermöglicht automatisierte LinkedIn-Suche"
               />
-
-              {settings.aiProvider === 'ollama' && (
-                <InputField
-                  label="Ollama URL"
-                  type="text"
-                  value={settings.ollamaUrl || ''}
-                  onChange={(value) => setSettings({ ...settings, ollamaUrl: value })}
-                  placeholder="http://localhost:11434"
-                />
-              )}
-
-              {settings.aiProvider === 'gemini' && (
-                <InputField
-                  label="Gemini API Key"
-                  type="password"
-                  value={settings.geminiApiKey || ''}
-                  onChange={(value) => setSettings({ ...settings, geminiApiKey: value })}
-                  placeholder="AIza..."
-                />
-              )}
 
               <InputField
                 label="KI-Modell (optional)"
                 type="text"
                 value={settings.aiModel || ''}
-                onChange={(value) => setSettings({ ...settings, aiModel: value })}
-                placeholder="llama3.2 oder gpt-4o-mini"
+                onChange={(v) => setSettings({ ...settings, aiModel: v })}
+                placeholder="mistral-small-latest"
               />
             </div>
           </Section>
 
+          {/* Profile Optimization */}
+          <Section title="Profil-Optimierung" description="Dein LinkedIn/XING/StepStone Profil für KI-Analyse">
+            <div className="space-y-6">
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">Plattform</label>
+                <select
+                  value={profilePlatform}
+                  onChange={(e) => setProfilePlatform(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] focus:border-[var(--color-accent)] focus:outline-none"
+                >
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="xing">XING</option>
+                  <option value="stepstone">StepStone</option>
+                </select>
+              </div>
+
+              <InputField
+                label="Name"
+                type="text"
+                value={profileName}
+                onChange={setProfileName}
+                placeholder="Max Mustermann"
+              />
+
+              <InputField
+                label="Headline"
+                type="text"
+                value={profileHeadline}
+                onChange={setProfileHeadline}
+                placeholder="Senior Software Engineer | React, Node.js, TypeScript"
+              />
+
+              <InputField
+                label="Location"
+                type="text"
+                value={profileLocation}
+                onChange={setProfileLocation}
+                placeholder="Berlin, Deutschland"
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">Über mich</label>
+                <textarea
+                  value={profileAbout}
+                  onChange={(e) => setProfileAbout(e.target.value)}
+                  rows={4}
+                  placeholder="Kurze Beschreibung deiner Erfahrung und Schwerpunkte..."
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] text-sm focus:border-[var(--color-accent)] focus:outline-none resize-none"
+                />
+              </div>
+
+              <InputField
+                label="Skills (kommagetrennt)"
+                type="text"
+                value={profileSkills}
+                onChange={setProfileSkills}
+                placeholder="React, TypeScript, Node.js, Python, AWS"
+              />
+
+              <div className="flex gap-3">
+                <button
+                  onClick={saveProfile}
+                  disabled={savingProfile || !profileName}
+                  className="px-6 py-3 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+                >
+                  {savingProfile ? 'Speichert...' : 'Profil speichern'}
+                </button>
+                <button
+                  onClick={optimizeProfile}
+                  disabled={optimizing || !profileName}
+                  className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+                >
+                  {optimizing ? 'Optimiert...' : '🤖 KI-Optimierung'}
+                </button>
+              </div>
+
+              {/* Optimization Results */}
+              {optimization && (
+                <div className="mt-6 space-y-4 p-6 bg-[var(--background)] rounded-xl border border-[var(--color-border-soft)]">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl font-light text-[var(--color-primary)]">{optimization.overallScore}</span>
+                    <span className="text-sm text-[var(--color-primary-soft)]">/ 100 Profil-Score</span>
+                  </div>
+
+                  {optimization.strengths?.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--color-success)] mb-2">Stärken</h4>
+                      <ul className="space-y-1">
+                        {optimization.strengths.map((s: string, i: number) => (
+                          <li key={i} className="text-sm text-[var(--color-foreground)]">✓ {s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {optimization.weaknesses?.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--color-error)] mb-2">Schwächen</h4>
+                      <ul className="space-y-1">
+                        {optimization.weaknesses.map((w: string, i: number) => (
+                          <li key={i} className="text-sm text-[var(--color-foreground)]">• {w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {optimization.suggestions?.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--color-foreground)] mb-2">Verbesserungsvorschläge</h4>
+                      <div className="space-y-3">
+                        {optimization.suggestions.map((s: any, i: number) => (
+                          <div key={i} className="p-4 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border-soft)]">
+                            <p className="text-xs font-medium text-[var(--color-primary)] mb-1">{s.section}</p>
+                            <p className="text-xs text-[var(--color-primary-soft)] line-through mb-1">{s.current}</p>
+                            <p className="text-sm text-[var(--color-foreground)]">{s.suggested}</p>
+                            <p className="text-xs text-[var(--color-primary-soft)] mt-1">{s.reason}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {optimization.missingSkills?.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-[var(--color-foreground)] mb-2">Fehlende Skills</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {optimization.missingSkills.map((s: string, i: number) => (
+                          <span key={i} className="text-xs bg-[var(--color-border-soft)] text-[var(--color-foreground)] px-3 py-1.5 rounded-full">{s}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </Section>
+
           {/* Job Preferences */}
-          <Section title="Job-Präferenzen" description="Definiere deine Suchkriterien">
+          <Section title="Job-Präferenzen" description="Deine Suchkriterien">
             <div className="space-y-6">
               <InputField
                 label="Ziel-Job-Titles"
                 type="text"
                 value={settings.targetTitles || ''}
-                onChange={(value) => setSettings({ ...settings, targetTitles: value })}
-                placeholder="Software Engineer, Frontend Developer, Full Stack"
+                onChange={(v) => setSettings({ ...settings, targetTitles: v })}
+                placeholder="Software Engineer, Frontend Developer"
                 help="Kommagetrennte Liste"
               />
-
               <InputField
                 label="Ziel-Locations"
                 type="text"
                 value={settings.targetLocations || ''}
-                onChange={(value) => setSettings({ ...settings, targetLocations: value })}
+                onChange={(v) => setSettings({ ...settings, targetLocations: v })}
                 placeholder="Berlin, Remote, München"
                 help="Kommagetrennte Liste"
               />
-
-              <ToggleField
-                label="Nur Remote-Jobs"
-                checked={settings.remote}
-                onChange={(checked) => setSettings({ ...settings, remote: checked })}
-              />
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={settings.remote}
+                  onChange={(e) => setSettings({ ...settings, remote: e.target.checked })}
+                  className="w-5 h-5 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+                />
+                <span className="text-sm text-[var(--color-foreground)]">Nur Remote-Jobs</span>
+              </label>
             </div>
           </Section>
 
-          {/* Platform Credentials */}
-          <Section title="Plattform-Credentials" description="Verbinde deine Konten für Profil-Sync und KI-Optimierung">
-            <div className="space-y-8">
-              {/* LinkedIn */}
-              <PlatformCard
-                name="LinkedIn"
-                status={platformStatus.linkedin?.syncStatus}
-                email={platformCreds.linkedin.email}
-                password={platformCreds.linkedin.password}
-                onEmailChange={(email) => setPlatformCreds({ ...platformCreds, linkedin: { ...platformCreds.linkedin, email } })}
-                onPasswordChange={(password) => setPlatformCreds({ ...platformCreds, linkedin: { ...platformCreds.linkedin, password } })}
-                onSync={() => syncPlatform('linkedin')}
-                syncing={syncing.linkedin}
-                color="blue"
-              />
-
-              {/* XING */}
-              <PlatformCard
-                name="XING"
-                status={platformStatus.xing?.syncStatus}
-                email={platformCreds.xing.email}
-                password={platformCreds.xing.password}
-                onEmailChange={(email) => setPlatformCreds({ ...platformCreds, xing: { ...platformCreds.xing, email } })}
-                onPasswordChange={(password) => setPlatformCreds({ ...platformCreds, xing: { ...platformCreds.xing, password } })}
-                onSync={() => syncPlatform('xing')}
-                syncing={syncing.xing}
-                color="teal"
-              />
-
-              {/* StepStone */}
-              <PlatformCard
-                name="StepStone"
-                status={platformStatus.stepstone?.syncStatus}
-                email={platformCreds.stepstone.email}
-                password={platformCreds.stepstone.password}
-                onEmailChange={(email) => setPlatformCreds({ ...platformCreds, stepstone: { ...platformCreds.stepstone, email } })}
-                onPasswordChange={(password) => setPlatformCreds({ ...platformCreds, stepstone: { ...platformCreds.stepstone, password } })}
-                onSync={() => syncPlatform('stepstone')}
-                syncing={syncing.stepstone}
-                color="red"
-              />
-            </div>
-          </Section>
-
-          {/* Save Button */}
-          <div className="flex justify-end pt-4">
+          {/* Save */}
+          <div className="flex justify-end">
             <button
               onClick={saveSettings}
               disabled={saving}
-              className="inline-flex items-center justify-center px-8 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+              className="px-8 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
             >
               {saving ? 'Wird gespeichert...' : 'Einstellungen speichern'}
             </button>
@@ -271,23 +339,11 @@ export default function SettingsPage() {
   )
 }
 
-// Helper Components
-function NavLink({ href, children }: { href: string; children: string }) {
-  return (
-    <Link
-      href={href}
-      className="text-[var(--color-primary-soft)] hover:text-[var(--color-foreground)] text-sm font-medium transition-colors"
-    >
-      {children}
-    </Link>
-  )
-}
-
 function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[var(--color-surface)] rounded-2xl p-10 border border-[var(--color-border)] shadow-sm">
-      <div className="mb-8">
-        <h2 className="text-xl font-medium text-[var(--color-foreground)] mb-2">{title}</h2>
+    <div className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm">
+      <div className="mb-6">
+        <h2 className="text-xl font-medium text-[var(--color-foreground)] mb-1">{title}</h2>
         <p className="text-sm text-[var(--color-primary-soft)]">{description}</p>
       </div>
       {children}
@@ -314,105 +370,6 @@ function InputField({ label, type, value, onChange, placeholder, help }: {
         className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
       />
       {help && <p className="mt-2 text-xs text-[var(--color-primary-soft)]">{help}</p>}
-    </div>
-  )
-}
-
-function SelectField({ label, value, onChange, options }: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: { value: string; label: string }[]
-}) {
-  return (
-    <div>
-      <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">{label}</label>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] focus:border-[var(--color-accent)] focus:outline-none"
-      >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
-        ))}
-      </select>
-    </div>
-  )
-}
-
-function ToggleField({ label, checked, onChange }: {
-  label: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-}) {
-  return (
-    <label className="flex items-center gap-3 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-5 h-5 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
-      />
-      <span className="text-sm text-[var(--color-foreground)]">{label}</span>
-    </label>
-  )
-}
-
-function PlatformCard({ name, status, email, password, onEmailChange, onPasswordChange, onSync, syncing, color }: {
-  name: string
-  status?: string
-  email: string
-  password: string
-  onEmailChange: (email: string) => void
-  onPasswordChange: (password: string) => void
-  onSync: () => void
-  syncing?: boolean
-  color: 'blue' | 'teal' | 'red'
-}) {
-  const colorClasses = {
-    blue: 'bg-[#5c7a57] hover:bg-[#4a6345]',
-    teal: 'bg-[#5a7a6a] hover:bg-[#4a6355]',
-    red: 'bg-[#8a5a5a] hover:bg-[#734a4a]',
-  }
-
-  return (
-    <div className="border-b border-[var(--color-border-soft)] pb-8 last:border-0 last:pb-0">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="font-medium text-[var(--color-foreground)]">{name}</h3>
-        {status === 'success' && (
-          <span className="text-xs bg-[var(--color-success)] text-white px-3 py-1.5 rounded-full">
-            Verbunden
-          </span>
-        )}
-        {status === 'failed' && (
-          <span className="text-xs bg-[var(--color-error)] text-white px-3 py-1.5 rounded-full">
-            Fehler
-          </span>
-        )}
-      </div>
-      <div className="space-y-3">
-        <input
-          type="email"
-          placeholder={`${name} Email`}
-          value={email}
-          onChange={(e) => onEmailChange(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
-        />
-        <input
-          type="password"
-          placeholder={`${name} Passwort`}
-          value={password}
-          onChange={(e) => onPasswordChange(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
-        />
-        <button
-          onClick={onSync}
-          disabled={syncing}
-          className={`w-full py-3 rounded-xl font-medium transition-colors text-white disabled:opacity-50 ${colorClasses[color]}`}
-        >
-          {syncing ? 'Synchronisiere...' : `${name} Profil synchronisieren`}
-        </button>
-      </div>
     </div>
   )
 }
