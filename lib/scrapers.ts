@@ -1,4 +1,4 @@
-// Job search via Jooble API + AI-powered single-URL extraction
+// Job search via multiple APIs + AI-powered single-URL extraction
 
 import { extractJobFromHTML, semanticJobSearch } from './ai'
 
@@ -28,36 +28,20 @@ export async function scrapeJobUrl(url: string): Promise<Partial<ScrapedJob> | n
   }
 }
 
-// Search jobs via Jooble API
-export async function searchJobs(params: {
-  query: string
-  location?: string
-  remote?: boolean
-  platforms?: string[]
-  useAI?: boolean
-  resume?: string
-}): Promise<ScrapedJob[]> {
+// --- Source: Jooble ---
+async function searchJooble(query: string, location?: string): Promise<ScrapedJob[]> {
   const apiKey = process.env.JOOBLE_API_KEY
-
-  if (!apiKey) {
-    console.error('JOOBLE_API_KEY not set')
-    return []
-  }
+  if (!apiKey) return []
 
   try {
     const response = await fetch(`https://jooble.org/api/${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        keywords: params.query,
-        location: params.location || '',
-        page: '1',
-      }),
+      body: JSON.stringify({ keywords: query, location: location || '', page: '1' }),
     })
-
     const data = await response.json()
 
-    const jobs: ScrapedJob[] = (data.jobs || []).map((job: any) => ({
+    return (data.jobs || []).map((job: any): ScrapedJob => ({
       title: job.title || '',
       company: job.company || '',
       location: job.location || '',
@@ -67,12 +51,88 @@ export async function searchJobs(params: {
       salary: job.salary || undefined,
       platform: job.source || 'jooble',
     }))
-
-    return jobs
-  } catch (error) {
-    console.error('Jooble search error:', error)
+  } catch {
     return []
   }
+}
+
+// --- Source: Remotive (remote jobs, no API key) ---
+async function searchRemotive(query: string): Promise<ScrapedJob[]> {
+  try {
+    const response = await fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=25`)
+    const data = await response.json()
+
+    return (data.jobs || []).map((job: any): ScrapedJob => ({
+      title: job.title || '',
+      company: job.company_name || '',
+      location: job.candidate_required_location || 'Remote',
+      description: (job.description || '').replace(/<[^>]+>/g, '').trim().substring(0, 2000),
+      url: job.url || '',
+      postedAt: job.publication_date ? new Date(job.publication_date) : undefined,
+      salary: job.salary || undefined,
+      platform: 'remotive',
+    }))
+  } catch {
+    return []
+  }
+}
+
+// --- Source: Arbeitnow (EU jobs, no API key) ---
+async function searchArbeitnow(query: string): Promise<ScrapedJob[]> {
+  try {
+    const response = await fetch('https://www.arbeitnow.com/api/job-board-api')
+    const data = await response.json()
+
+    const keywords = query.toLowerCase().split(/\s+/).filter(Boolean)
+
+    return (data.data || [])
+      .filter((job: any) => {
+        const haystack = `${job.title} ${job.tags?.join(' ') || ''}`.toLowerCase()
+        return keywords.some(kw => haystack.includes(kw))
+      })
+      .slice(0, 25)
+      .map((job: any): ScrapedJob => ({
+        title: job.title || '',
+        company: job.company_name || '',
+        location: job.location || '',
+        description: (job.description || '').replace(/<[^>]+>/g, '').trim().substring(0, 2000),
+        url: job.url || '',
+        postedAt: job.created_at ? new Date(job.created_at * 1000) : undefined,
+        salary: undefined,
+        platform: 'arbeitnow',
+      }))
+  } catch {
+    return []
+  }
+}
+
+// Aggregated search across all sources
+export async function searchJobs(params: {
+  query: string
+  location?: string
+  remote?: boolean
+  platforms?: string[]
+  useAI?: boolean
+  resume?: string
+}): Promise<ScrapedJob[]> {
+  const [jooble, remotive, arbeitnow] = await Promise.allSettled([
+    searchJooble(params.query, params.location),
+    searchRemotive(params.query),
+    searchArbeitnow(params.query),
+  ])
+
+  const allJobs: ScrapedJob[] = []
+  if (jooble.status === 'fulfilled') allJobs.push(...jooble.value)
+  if (remotive.status === 'fulfilled') allJobs.push(...remotive.value)
+  if (arbeitnow.status === 'fulfilled') allJobs.push(...arbeitnow.value)
+
+  // Deduplicate by URL
+  const seen = new Set<string>()
+  return allJobs.filter(job => {
+    if (!job.url || seen.has(job.url)) return false
+    seen.add(job.url)
+    return true
+  })
 }
 
 // Semantic search - finds jobs that match even with different titles

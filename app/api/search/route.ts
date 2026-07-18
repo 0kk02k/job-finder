@@ -101,25 +101,18 @@ export async function POST(request: NextRequest) {
     })
   )
 
-  // Save high matches
-  type ScoredJob = ScrapedJob & {
-    aiScore: number
-    aiReason: string
-    gaps: string[]
-    strengths: string[]
-  }
-  const highMatches = scoredJobs.filter(
-    (job): job is ScoredJob => 'aiScore' in job && job.aiScore >= 7
-  )
-
-  for (const job of highMatches) {
+  // Auto-save all results to job list
+  for (const job of scoredJobs) {
     try {
+      const hasScore = 'aiScore' in job
+      const score = hasScore ? (job as any).aiScore : null
+      const scoreReason = hasScore ? (job as any).aiReason : null
+      const status = hasScore ? (score >= 7 ? 'HIGH_MATCH' : 'SCORED') : 'DISCOVERED'
+
       await prisma.job.upsert({
         where: { url: job.url },
         update: {
-          score: job.aiScore,
-          scoreReason: job.aiReason,
-          status: 'HIGH_MATCH',
+          ...(score !== null && { score, scoreReason, status }),
         },
         create: {
           userId,
@@ -128,19 +121,19 @@ export async function POST(request: NextRequest) {
           location: job.location,
           description: job.description,
           url: job.url,
-          score: job.aiScore,
-          scoreReason: job.aiReason,
-          status: 'HIGH_MATCH',
+          ...(score !== null && { score, scoreReason, status }),
         },
       })
-    } catch (e) {
+    } catch {
       continue
     }
   }
 
+  const highMatchCount = scoredJobs.filter(j => 'aiScore' in j && (j as any).aiScore >= 7).length
+
   return NextResponse.json({
     total: scoredJobs.length,
-    highMatches: highMatches.length,
+    highMatches: highMatchCount,
     jobs: scoredJobs,
     semantic: false,
   })
