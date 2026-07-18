@@ -45,24 +45,23 @@ export default function ResumePage() {
 
     setUploading(true)
     try {
-      const text = await file.text()
-      const response = await fetch('/api/resume', {
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const response = await fetch('/api/resume/upload', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: file.name.replace(/\.[^.]+$/, ''),
-          content: text,
-        }),
+        body: formData,
       })
 
       if (response.ok) {
         setMode('view')
         fetchResume()
       } else {
-        alert('Fehler beim Speichern')
+        const data = await response.json().catch(() => ({}))
+        alert(data.error || 'Fehler beim Speichern')
       }
     } catch {
-      alert('Datei konnte nicht gelesen werden')
+      alert('Datei konnte nicht hochgeladen werden')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -163,7 +162,7 @@ export default function ResumePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".txt,.md,.markdown"
+                accept=".pdf,.txt,.md,.markdown"
                 onChange={handleFileUpload}
                 className="hidden"
               />
@@ -176,7 +175,7 @@ export default function ResumePage() {
                     Datei hochladen
                   </p>
                   <p className="text-sm text-[var(--color-primary-soft)]">
-                    Klicken und .txt oder .md Datei wählen
+                    Klicken und PDF, .txt oder .md Datei wählen
                   </p>
                 </>
               )}
