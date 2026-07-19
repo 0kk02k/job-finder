@@ -5,7 +5,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
 
 export interface ScoreResult {
-  score: number // 1-10
+  score: number | null // 1-10, null wenn die KI nicht bewerten konnte
   reason: string
   gaps: string[]
   strengths: string[]
@@ -59,7 +59,7 @@ export function getAIClient(provider: string, apiKey?: string, baseUrl?: string)
 
   if (provider === 'gemini') {
     return createOpenAI({
-      baseURL: 'https://generativelanguage.googleapis.com/v1beta',
+      baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai/',
       apiKey: apiKey || process.env.GEMINI_API_KEY,
     })
   }
@@ -80,7 +80,21 @@ export function getAIClient(provider: string, apiKey?: string, baseUrl?: string)
 export function defaultModel(provider: string): string {
   if (provider === 'ollama') return 'llama3.2'
   if (provider === 'mistral') return 'mistral-small-latest'
+  if (provider === 'gemini') return 'gemini-2.0-flash'
+  if (provider === 'openrouter') return 'openai/gpt-4o-mini'
   return 'gpt-4o-mini'
+}
+
+// Parse JSON from model output, tolerating markdown code fences and prose around it
+function parseJsonFromText(text: string) {
+  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+  try {
+    return JSON.parse(cleaned)
+  } catch {
+    const match = cleaned.match(/[{[][\s\S]*[}\]]/)
+    if (!match) throw new Error('Kein JSON in der KI-Antwort gefunden')
+    return JSON.parse(match[0])
+  }
 }
 
 // AI-powered job extraction from unstructured HTML
@@ -116,7 +130,7 @@ Wenn kein Job gefunden wird, gib null zurück.`
     })
 
     const content = text || '{}'
-    const result = JSON.parse(content)
+    const result = parseJsonFromText(content)
 
     if (result.confidence < 0.5) return null
     return result as ExtractedJob
@@ -131,12 +145,17 @@ export async function semanticJobSearch(
   resume: string,
   searchQuery: string,
   availableJobs: SemanticJob[],
-  provider: string = 'mistral'
+  provider: string = 'mistral',
+  model?: string,
+  apiKey?: string,
+  baseUrl?: string
 ): Promise<SemanticSearchResult> {
-  const ai = getAIClient(provider)
+  const ai = getAIClient(provider, apiKey, baseUrl)
 
-  const jobsSummary = availableJobs.map(j =>
-    `TITLE: ${j.title}\nCOMPANY: ${j.company}\nDESC: ${j.description.substring(0, 200)}`
+  // Numbered summary — the model only returns indices, never URLs or platforms.
+  // (Asking it for those fields would make it hallucinate them.)
+  const jobsSummary = availableJobs.map((j, i) =>
+    `[${i}] TITLE: ${j.title}\nCOMPANY: ${j.company}\nLOCATION: ${j.location}\nDESC: ${j.description.substring(0, 200)}`
   ).join('\n\n---\n\n')
 
   const prompt = `Du bist ein Karriere-Matching-Experte. Finde Jobs, die semantisch passen, auch wenn die Titel nicht genau übereinstimmen.
@@ -146,38 +165,54 @@ ${resume.substring(0, 1000)}
 
 SUCH-QUERY: ${searchQuery}
 
-VERFÜGBARE JOBS:
+VERFÜGBARE JOBS (nummeriert):
 ${jobsSummary}
 
 Gib zurück als JSON:
 {
-  "query": "ursprüngliche Suchanfrage",
-  "jobs": [
+  "matches": [
     {
-      "title": "Job Titel",
-      "company": "Firma",
-      "location": "Standort",
-      "description": "Beschreibung",
-      "url": "URL",
-      "platform": "Plattform",
+      "index": 0,
       "relevanceScore": 0.85,
       "matchReason": "Warum dieser Job passt (Transferable Skills, Industrie, etc.)",
       "transferableSkills": ["Skill1", "Skill2"]
     }
   ],
-  "fuzzyMatches": ["Job Titel der vielleicht passt", "Alternative Suchbegriffe"]
+  "fuzzyMatches": ["Alternative Suchbegriffe"]
 }
 
-Nur Jobs mit relevanceScore >= 0.6 aufnehmen.`
+"index" ist die Nummer des Jobs aus der Liste oben. Nur Jobs mit relevanceScore >= 0.6 aufnehmen.`
 
   try {
     const { text } = await generateText({
-      model: ai(defaultModel(provider)),
+      model: ai(model || defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
-    const content = text || '{}'
-    return JSON.parse(content) as SemanticSearchResult
+    const result = parseJsonFromText(text || '{}')
+    const matches = (Array.isArray(result.matches) ? result.matches : []) as {
+      index: number
+      relevanceScore?: number
+      matchReason?: string
+      transferableSkills?: string[]
+    }[]
+
+    // Map model indices back to the real jobs — URLs/platforms come from the
+    // scraped data, never from the model
+    const jobs = matches
+      .filter(m => Number.isInteger(m?.index) && m.index >= 0 && m.index < availableJobs.length)
+      .map(m => ({
+        ...availableJobs[m.index],
+        relevanceScore: typeof m.relevanceScore === 'number' ? m.relevanceScore : 0,
+        matchReason: typeof m.matchReason === 'string' ? m.matchReason : '',
+        transferableSkills: Array.isArray(m.transferableSkills) ? m.transferableSkills : [],
+      }))
+
+    return {
+      query: searchQuery,
+      jobs,
+      fuzzyMatches: Array.isArray(result.fuzzyMatches) ? result.fuzzyMatches : [],
+    }
   } catch (error) {
     console.error('Semantic search error:', error)
     return { query: searchQuery, jobs: [], fuzzyMatches: [] }
@@ -226,12 +261,16 @@ Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lü
     })
 
     const content = text || '{}'
-    return JSON.parse(content) as ScoreResult
+    const result = parseJsonFromText(content) as ScoreResult
+    if (typeof result.score !== 'number') {
+      throw new Error('KI-Antwort ohne numerischen Score')
+    }
+    return result
   } catch (error) {
     console.error('AI scoring error:', error)
     return {
-      score: 5,
-      reason: 'AI-Fehler: Konnte nicht bewerten',
+      score: null,
+      reason: 'KI nicht erreichbar — Job konnte nicht bewertet werden',
       gaps: [],
       strengths: [],
     }
@@ -271,7 +310,7 @@ Berücksichtige:
     })
 
     const content = text || '{}'
-    const result = JSON.parse(content)
+    const result = parseJsonFromText(content)
     return result.queries || []
   } catch {
     return []

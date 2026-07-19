@@ -55,8 +55,8 @@ async function generateCoverLetter(userId: string, jobId: string) {
     return NextResponse.json({ error: 'No resume found' }, { status: 404 })
   }
 
-  const job = await prisma.job.findUnique({
-    where: { id: jobId },
+  const job = await prisma.job.findFirst({
+    where: { id: jobId, userId },
   })
 
   if (!job) {
@@ -71,7 +71,7 @@ async function generateCoverLetter(userId: string, jobId: string) {
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Cover_Letter_${job.company?.replace(/\s+/g, '_')}.pdf"`,
+        'Content-Disposition': `attachment; filename="Cover_Letter_${(job.company || 'Anschreiben').replace(/\s+/g, '_').replace(/["\\]/g, '')}.pdf"`,
       },
     })
   } catch (error) {

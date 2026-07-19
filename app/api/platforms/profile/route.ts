@@ -33,7 +33,7 @@ export async function PUT(request: NextRequest) {
   const profileId = `manual-${userId}`
 
   await prisma.platformProfile.upsert({
-    where: { platform_profileId: { platform, profileId } },
+    where: { userId_platform_profileId: { userId, platform, profileId } },
     update: {
       name,
       headline: headline || null,

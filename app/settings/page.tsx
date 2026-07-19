@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import Link from 'next/link'
 
 interface Settings {
   id: string
@@ -15,6 +14,14 @@ interface Settings {
   targetLocations: string | null
   minSalary: number | null
   remote: boolean
+}
+
+interface ProfileOptimization {
+  overallScore: number
+  strengths: string[]
+  weaknesses: string[]
+  suggestions: { section: string; current: string; suggested: string; reason: string }[]
+  missingSkills: string[]
 }
 
 export default function SettingsPage() {
@@ -31,11 +38,7 @@ export default function SettingsPage() {
   const [profileSkills, setProfileSkills] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
-  const [optimization, setOptimization] = useState<any>(null)
-
-  useEffect(() => {
-    fetchSettings()
-  }, [])
+  const [optimization, setOptimization] = useState<ProfileOptimization | null>(null)
 
   async function fetchSettings() {
     try {
@@ -49,13 +52,30 @@ export default function SettingsPage() {
     }
   }
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initialer Daten-Fetch; setState läuft erst nach dem await
+    void fetchSettings()
+  }, [])
+
   async function saveSettings() {
+    if (!settings) return
     setSaving(true)
     try {
       await fetch('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          aiProvider: settings.aiProvider,
+          aiModel: settings.aiModel,
+          ollamaUrl: settings.ollamaUrl,
+          geminiApiKey: settings.geminiApiKey,
+          openaiApiKey: settings.openaiApiKey,
+          apifyApiKey: settings.apifyApiKey,
+          targetTitles: settings.targetTitles,
+          targetLocations: settings.targetLocations,
+          minSalary: settings.minSalary,
+          remote: settings.remote,
+        }),
       })
       alert('Einstellungen gespeichert!')
     } catch {
@@ -108,7 +128,14 @@ export default function SettingsPage() {
 
       const data = await response.json()
       if (response.ok) {
-        setOptimization(data.optimization)
+        const opt = data.optimization
+        setOptimization({
+          overallScore: opt?.overallScore ?? 0,
+          strengths: opt?.strengths ?? [],
+          weaknesses: opt?.weaknesses ?? [],
+          suggestions: opt?.suggestions ?? [],
+          missingSkills: opt?.missingSkills ?? [],
+        })
       } else {
         alert(data.error || 'Optimierung fehlgeschlagen')
       }
@@ -136,14 +163,21 @@ export default function SettingsPage() {
           {/* AI Settings */}
           <Section title="KI-Einstellungen" description="Provider und API-Keys für KI-Features">
             <div className="space-y-6">
-              <InputField
-                label="Apify API Key (optional)"
-                type="password"
-                value={settings.apifyApiKey || ''}
-                onChange={(v) => setSettings({ ...settings, apifyApiKey: v })}
-                placeholder="Für LinkedIn/XING Job-Suche und Profil-Sync"
-                help="Kostenlos auf apify.com — ermöglicht automatisierte LinkedIn-Suche"
-              />
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">KI-Anbieter</label>
+                <select
+                  value={settings.aiProvider || 'mistral'}
+                  onChange={(e) => setSettings({ ...settings, aiProvider: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] focus:border-[var(--color-accent)] focus:outline-none"
+                >
+                  <option value="mistral">Mistral</option>
+                  <option value="ollama">Ollama (lokal)</option>
+                  <option value="gemini">Google Gemini</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="openrouter">OpenRouter</option>
+                </select>
+                <p className="mt-2 text-xs text-[var(--color-primary-soft)]">Bestimmt, welcher Dienst für KI-Suche und Job-Bewertung genutzt wird.</p>
+              </div>
 
               <InputField
                 label="KI-Modell (optional)"
@@ -151,6 +185,42 @@ export default function SettingsPage() {
                 value={settings.aiModel || ''}
                 onChange={(v) => setSettings({ ...settings, aiModel: v })}
                 placeholder="mistral-small-latest"
+              />
+
+              {settings.aiProvider === 'ollama' && (
+                <InputField
+                  label="Ollama-URL"
+                  type="text"
+                  value={settings.ollamaUrl || ''}
+                  onChange={(v) => setSettings({ ...settings, ollamaUrl: v })}
+                  placeholder="http://localhost:11434"
+                  help="Ollama muss lokal laufen — kostenlos und ohne API-Key, aber langsamer."
+                />
+              )}
+
+              <InputField
+                label="Gemini API Key (optional)"
+                type="password"
+                value={settings.geminiApiKey || ''}
+                onChange={(v) => setSettings({ ...settings, geminiApiKey: v })}
+                placeholder="Nur nötig bei Anbieter Google Gemini"
+              />
+
+              <InputField
+                label="OpenAI API Key (optional)"
+                type="password"
+                value={settings.openaiApiKey || ''}
+                onChange={(v) => setSettings({ ...settings, openaiApiKey: v })}
+                placeholder="Nur nötig bei Anbieter OpenAI"
+              />
+
+              <InputField
+                label="Apify API Key (optional)"
+                type="password"
+                value={settings.apifyApiKey || ''}
+                onChange={(v) => setSettings({ ...settings, apifyApiKey: v })}
+                placeholder="Für LinkedIn/XING Job-Suche und Profil-Sync"
+                help="Kostenlos auf apify.com — ermöglicht automatisierte LinkedIn-Suche"
               />
             </div>
           </Section>
@@ -265,7 +335,7 @@ export default function SettingsPage() {
                     <div>
                       <h4 className="text-sm font-medium text-[var(--color-foreground)] mb-2">Verbesserungsvorschläge</h4>
                       <div className="space-y-3">
-                        {optimization.suggestions.map((s: any, i: number) => (
+                        {optimization.suggestions.map((s, i) => (
                           <div key={i} className="p-4 bg-[var(--color-surface)] rounded-lg border border-[var(--color-border-soft)]">
                             <p className="text-xs font-medium text-[var(--color-primary)] mb-1">{s.section}</p>
                             <p className="text-xs text-[var(--color-primary-soft)] line-through mb-1">{s.current}</p>

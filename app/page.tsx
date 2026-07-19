@@ -1,6 +1,35 @@
+'use client'
+
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
+interface Job {
+  status: string
+  score: number | null
+}
+
 export default function Dashboard() {
+  const [stats, setStats] = useState<{ total: number; highMatches: number; applied: number } | null>(null)
+
+  useEffect(() => {
+    async function loadStats() {
+      try {
+        const response = await fetch('/api/jobs')
+        if (!response.ok) return
+        const jobs = await response.json()
+        if (!Array.isArray(jobs)) return
+        setStats({
+          total: jobs.length,
+          highMatches: jobs.filter((j: Job) => j.status === 'HIGH_MATCH' || (j.score ?? 0) >= 7).length,
+          applied: jobs.filter((j: Job) => ['APPLIED', 'INTERVIEW', 'OFFER'].includes(j.status)).length,
+        })
+      } catch {
+        // Stats bleiben im Ladezustand
+      }
+    }
+    loadStats()
+  }, [])
+
   return (
     <div className="min-h-screen bg-[var(--background)]">
 
@@ -17,9 +46,9 @@ export default function Dashboard() {
 
         {/* Stats Overview */}
         <section className="grid sm:grid-cols-3 gap-6 mb-16">
-          <StatCard title="Jobs gefunden" value="0" subtitle="Noch keine Suche" />
-          <StatCard title="Matches" value="0" subtitle="High score ≥ 7" />
-          <StatCard title="Beworben" value="0" subtitle="Erfolgreich gesendet" />
+          <StatCard title="Jobs gefunden" value={stats ? String(stats.total) : '–'} subtitle="Gesamt gespeichert" />
+          <StatCard title="Matches" value={stats ? String(stats.highMatches) : '–'} subtitle="High score ≥ 7" />
+          <StatCard title="Beworben" value={stats ? String(stats.applied) : '–'} subtitle="Erfolgreich gesendet" />
         </section>
 
         {/* Getting Started */}
@@ -41,17 +70,6 @@ export default function Dashboard() {
         </section>
       </main>
     </div>
-  )
-}
-
-function NavLink({ href, children }: { href: string; children: string }) {
-  return (
-    <Link
-      href={href}
-      className="text-[var(--color-primary-soft)] hover:text-[var(--color-foreground)] text-sm font-medium transition-colors"
-    >
-      {children}
-    </Link>
   )
 }
 

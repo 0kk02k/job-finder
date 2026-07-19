@@ -40,6 +40,8 @@ model PlatformCredential {
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@unique([userId, platform])
 }
 
 model PlatformProfile {
@@ -64,7 +66,7 @@ model PlatformProfile {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  @@unique([platform, profileId])
+  @@unique([userId, platform, profileId])
 }
 
 model UserSettings {
@@ -111,7 +113,7 @@ model Job {
   company     String?
   location    String?
   description String
-  url         String   @unique
+  url         String
 
   status      JobStatus @default(DISCOVERED)
   score       Int?     // 1-10 AI score
@@ -122,6 +124,8 @@ model Job {
   updatedAt   DateTime @updatedAt
 
   activities  Activity[]
+
+  @@unique([userId, url])
 }
 
 model Activity {

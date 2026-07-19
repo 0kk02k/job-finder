@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 
 interface Job {
   id: string
@@ -18,29 +17,39 @@ interface Job {
   createdAt: string
 }
 
-export default function JobDetailPage({ params }: { params: { id: string } }) {
+export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const router = useRouter()
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [downloading, setDownloading] = useState(false)
 
-  useEffect(() => {
-    if (params.id) {
-      fetchJob(params.id)
-    }
-  }, [params.id])
-
-  async function fetchJob(id: string) {
+  async function fetchJob(jobId: string) {
     try {
-      const response = await fetch(`/api/jobs/${id}`)
+      const response = await fetch(`/api/jobs/${jobId}`)
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push('/login')
+          return
+        }
+        setError(response.status === 404 ? 'Job nicht gefunden' : 'Job konnte nicht geladen werden')
+        return
+      }
       const data = await response.json()
       setJob(data)
     } catch (error) {
       console.error('Failed to fetch job:', error)
+      setError('Job konnte nicht geladen werden')
     } finally {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initialer Daten-Fetch; setState läuft erst nach dem await
+    void fetchJob(id)
+  }, [id])
 
   async function handleDownloadPDF(type: 'resume' | 'coverletter') {
     if (!job) return
@@ -98,10 +107,18 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
     )
   }
 
-  if (!job) {
+  if (error || !job) {
     return (
       <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-        <p className="text-zinc-600 dark:text-zinc-400">Job nicht gefunden</p>
+        <div className="text-center">
+          <p className="text-zinc-600 dark:text-zinc-400 mb-4">{error || 'Job nicht gefunden'}</p>
+          <button
+            onClick={() => router.push('/jobs')}
+            className="text-sm text-zinc-500 dark:text-zinc-400 underline hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
+          >
+            Zurück zur Job-Übersicht
+          </button>
+        </div>
       </div>
     )
   }

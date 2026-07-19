@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 
 interface Job {
@@ -15,6 +16,7 @@ interface Job {
 }
 
 export default function JobsPage() {
+  const router = useRouter()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -25,6 +27,13 @@ export default function JobsPage() {
   async function fetchJobs() {
     try {
       const response = await fetch('/api/jobs')
+      if (!response.ok) {
+        if (response.status === 401) {
+          router.push('/login')
+        }
+        setJobs([])
+        return
+      }
       const data = await response.json()
       setJobs(data)
     } catch (error) {
@@ -35,12 +44,20 @@ export default function JobsPage() {
   }
 
   async function updateStatus(jobId: string, status: string) {
-    await fetch(`/api/jobs/${jobId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    })
-    fetchJobs()
+    try {
+      const response = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!response.ok) {
+        alert('Status konnte nicht aktualisiert werden')
+        return
+      }
+      fetchJobs()
+    } catch {
+      alert('Status konnte nicht aktualisiert werden')
+    }
   }
 
   function getStatusBadge(status: string) {
@@ -175,17 +192,6 @@ export default function JobsPage() {
         )}
       </main>
     </div>
-  )
-}
-
-function NavLink({ href, children }: { href: string; children: string }) {
-  return (
-    <Link
-      href={href}
-      className="text-[var(--color-primary-soft)] hover:text-[var(--color-foreground)] text-sm font-medium transition-colors"
-    >
-      {children}
-    </Link>
   )
 }
 

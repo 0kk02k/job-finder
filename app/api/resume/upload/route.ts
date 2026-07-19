@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
-import { extractText } from 'unpdf'
 
 export async function POST(request: NextRequest) {
   const session = await auth()
@@ -15,19 +14,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Keine Datei' }, { status: 400 })
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer())
+  const bytes = new Uint8Array(await file.arrayBuffer())
   const fileName = file.name.replace(/\.[^.]+$/, '')
   let text = ''
 
-  try {
-    if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-      const result = await extractText(buffer, { mergePages: true })
+  if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+    try {
+      const { extractText } = await import('unpdf')
+      const result = await extractText(bytes, { mergePages: true })
       text = result.text
-    } else {
-      text = buffer.toString('utf-8')
+    } catch (err) {
+      console.error('PDF extraction error:', err)
+      return NextResponse.json({
+        error: `PDF konnte nicht gelesen werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`,
+      }, { status: 422 })
     }
-  } catch {
-    return NextResponse.json({ error: 'Datei konnte nicht gelesen werden' }, { status: 422 })
+  } else {
+    text = new TextDecoder().decode(bytes)
   }
 
   if (!text.trim()) {

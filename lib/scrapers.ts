@@ -139,9 +139,14 @@ export async function searchJobs(params: {
     if (r.status === 'fulfilled') allJobs.push(...r.value)
   }
 
+  // Remote filter — Remotive is remote-only by design, others are matched on location/title
+  const filtered = params.remote
+    ? allJobs.filter(j => j.platform === 'remotive' || /remote|home\s?office/i.test(`${j.location} ${j.title}`))
+    : allJobs
+
   // Deduplicate by URL
   const seen = new Set<string>()
-  return allJobs.filter(job => {
+  return filtered.filter(job => {
     if (!job.url || seen.has(job.url)) return false
     seen.add(job.url)
     return true
@@ -155,6 +160,9 @@ export async function semanticSearch(params: {
   location?: string
   remote?: boolean
   provider?: string
+  model?: string
+  apiKey?: string
+  baseUrl?: string
   apifyToken?: string | null
 }): Promise<any[]> {
   const rawJobs = await searchJobs({
@@ -176,7 +184,10 @@ export async function semanticSearch(params: {
     params.resume,
     params.query,
     semanticJobs,
-    params.provider || 'mistral'
+    params.provider || 'mistral',
+    params.model,
+    params.apiKey,
+    params.baseUrl
   )
 
   return result.jobs.filter(job => job.relevanceScore >= 0.6)

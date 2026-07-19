@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 
 interface SearchResult {
   title: string
@@ -26,11 +25,14 @@ export default function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([])
   const [stats, setStats] = useState({ total: 0, highMatches: 0 })
   const [isSemantic, setIsSemantic] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [searched, setSearched] = useState(false)
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
     setResults([])
+    setError(null)
 
     try {
       const response = await fetch('/api/search', {
@@ -40,11 +42,18 @@ export default function SearchPage() {
       })
 
       const data = await response.json()
+      if (!response.ok) {
+        setError(data.error || 'Suche fehlgeschlagen')
+        setResults([])
+        return
+      }
       setResults(data.jobs || [])
       setStats({ total: data.total, highMatches: data.highMatches })
       setIsSemantic(data.semantic || false)
-    } catch (error) {
-      alert('Fehler bei der Suche')
+      setSearched(true)
+    } catch {
+      setError('Suche fehlgeschlagen — bitte später erneut versuchen.')
+      setResults([])
     } finally {
       setLoading(false)
     }
@@ -145,6 +154,13 @@ export default function SearchPage() {
           </form>
         </section>
 
+        {/* Error State */}
+        {error && (
+          <section className="mb-8 p-4 bg-[var(--color-error)]/10 rounded-xl border border-[var(--color-error)]/20">
+            <p className="text-sm text-[var(--color-error)]">{error}</p>
+          </section>
+        )}
+
         {/* Stats */}
         {!loading && results.length > 0 && (
           <section className="grid sm:grid-cols-2 gap-4 mb-8">
@@ -162,6 +178,15 @@ export default function SearchPage() {
           </section>
         )}
 
+        {/* No Results State */}
+        {!loading && !error && searched && results.length === 0 && (
+          <section className="bg-[var(--color-surface)] rounded-2xl p-16 text-center border border-[var(--color-border)]">
+            <p className="text-[var(--color-primary-soft)]">
+              Keine Jobs gefunden — versuch andere Suchbegriffe oder Orte.
+            </p>
+          </section>
+        )}
+
         {/* Empty State */}
         {!loading && results.length === 0 && query === '' && (
           <section className="bg-[var(--color-surface)] rounded-2xl p-16 text-center border border-[var(--color-border)]">
@@ -175,17 +200,6 @@ export default function SearchPage() {
         )}
       </main>
     </div>
-  )
-}
-
-function NavLink({ href, children }: { href: string; children: string }) {
-  return (
-    <Link
-      href={href}
-      className="text-[var(--color-primary-soft)] hover:text-[var(--color-foreground)] text-sm font-medium transition-colors"
-    >
-      {children}
-    </Link>
   )
 }
 

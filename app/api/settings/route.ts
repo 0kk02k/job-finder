@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
+import { z } from 'zod'
+
+// Whitelist of updatable settings fields. Unknown keys (id, userId, ...) are stripped —
+// deliberately not .strict(), because the settings UI sends back the full object incl. id.
+const settingsSchema = z.object({
+  geminiApiKey: z.string().nullable(),
+  openaiApiKey: z.string().nullable(),
+  apifyApiKey: z.string().nullable(),
+  ollamaUrl: z.string().nullable(),
+  aiProvider: z.string(),
+  aiModel: z.string().nullable(),
+  targetTitles: z.string().nullable(),
+  targetLocations: z.string().nullable(),
+  minSalary: z.number().int().nullable(),
+  remote: z.boolean(),
+}).partial()
 
 // GET /api/settings - get user settings
 export async function GET() {
@@ -29,10 +45,19 @@ export async function PUT(request: NextRequest) {
   const userId = session.user.id
   const body = await request.json()
 
+  const parsed = settingsSchema.safeParse(body)
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path.join('.')
+    return NextResponse.json(
+      { error: field ? `Ungültiger Wert für Feld "${field}"` : 'Ungültige Einstellungen' },
+      { status: 400 }
+    )
+  }
+
   const settings = await prisma.userSettings.upsert({
     where: { userId },
-    update: body,
-    create: { userId, ...body },
+    update: parsed.data,
+    create: { userId, ...parsed.data },
   })
 
   return NextResponse.json(settings)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
+import { encrypt } from '@/lib/crypto'
 import { syncLinkedInProfile, syncXINGProfile, syncStepStoneProfile } from '@/lib/platforms'
 
 // POST /api/platforms/sync - sync profile from LinkedIn or StepStone
@@ -16,21 +17,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Platform and credentials required' }, { status: 400 })
   }
 
-  // Save credentials (in real app, encrypt password!)
+  // Save credentials (password encrypted at rest)
   const savedCreds = await prisma.platformCredential.upsert({
     where: {
-      id: `${userId}-${platform}`, // Simple composite key
+      userId_platform: { userId, platform },
     },
     update: {
       email: credentials.email,
-      encryptedPassword: credentials.password, // TODO: Encrypt!
+      encryptedPassword: encrypt(credentials.password),
       updatedAt: new Date(),
     },
     create: {
       userId,
       platform,
       email: credentials.email,
-      encryptedPassword: credentials.password,
+      encryptedPassword: encrypt(credentials.password),
     },
   })
 
@@ -69,7 +70,8 @@ export async function POST(request: NextRequest) {
     // Save profile
     await prisma.platformProfile.upsert({
       where: {
-        platform_profileId: {
+        userId_platform_profileId: {
+          userId,
           platform,
           profileId: profile.id || 'unknown',
         },
@@ -129,6 +131,18 @@ export async function GET() {
 
   const credentials = await prisma.platformCredential.findMany({
     where: { userId },
+    select: {
+      id: true,
+      userId: true,
+      platform: true,
+      email: true,
+      twoFactorEnabled: true,
+      lastSyncAt: true,
+      syncStatus: true,
+      createdAt: true,
+      updatedAt: true,
+      // encryptedPassword wird nie ans Frontend gesendet
+    },
   })
 
   const profiles = await prisma.platformProfile.findMany({
