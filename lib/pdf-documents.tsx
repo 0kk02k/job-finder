@@ -104,7 +104,7 @@ const letterStyles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 50,
     paddingHorizontal: 50,
-    fontFamily: 'Georgia',
+    fontFamily: 'Times-Roman',
     fontSize: 11,
     lineHeight: 1.6,
     color: '#1a1a1a',

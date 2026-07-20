@@ -76,6 +76,8 @@ job-finder/
 - 2FA-Unterstützung für Platform-Sync
 - Rate-Limiting auf Auth- und KI-Routen
 - Automatisiertes Testsetup
+- **Auf Mistral vereinheitlichen:** `/api/platforms/optimize` ist noch hart auf `ollama` verdrahtet (Fallback ebenfalls) — auf User-Settings umstellen (Default: Mistral), damit alle KI-Features denselben Provider nutzen
+- **Idee: kleiner KI-Chatbot** — immer erreichbarer Assistent für Fragen zu Jobs, Resume und Bewerbung (nutzt den konfigurierten Provider des Users)
 
 ## Audit & Fixes (2026-07-18)
 
@@ -102,7 +104,8 @@ job-finder/
 - Dashboard-Stats zeigen echte Zahlen statt hardcodierter 0
 
 **Bekannte Restpunkte:**
-- `dev.db` war ins Git committed (bcrypt-Hashes!) — ist jetzt in `.gitignore`, muss aber noch aus dem Tracking: `git rm --cached dev.db` (History ggf. säubern, Passwörter rotieren)
+- E2E-Testrunde 2026-07-20 (PLAN.md-Stufen 1–7): Gespeicherte Suchen (CRUD, Upsert, Ownership, newJobs-Zähler, lastRunAt), PDF-Export Resume + Anschreiben, Settings-Felder, Status-Validierung, Cross-User-IDOR (404) — alles verifiziert. Ein Bug gefunden + gefixt: Anschreiben-PDF nutzte Font "Georgia" (nicht registriert) → jetzt "Times-Roman"
+- `dev.db` war ins Git committed (bcrypt-Hashes!) — ist jetzt in `.gitignore`, Tracking entfernt. History enthält sie weiterhin → Passwort-Rotation empfohlen
 - Playwright-Sync (LinkedIn/XING/StepStone) weiterhin ungetestet
 - ~20 pre-existing Lint-Fehler (`no-explicit-any` in lib/platforms.ts, lib/autoapply.ts, lib/pdf*.ts)
 - Build (`npm run build`) und Typecheck sind sauber
