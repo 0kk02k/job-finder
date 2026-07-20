@@ -1,21 +1,25 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
+import { useToast } from '../components/Toast'
 
 interface Resume {
   id: string
   name: string
   content: string
   createdAt: string
+  updatedAt: string
 }
 
 export default function ResumePage() {
+  const toast = useToast()
   const [resume, setResume] = useState<Resume | null>(null)
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const [mode, setMode] = useState<'view' | 'upload' | 'edit'>('view')
   const [content, setContent] = useState('')
   const [pastedText, setPastedText] = useState('')
+  const [downloading, setDownloading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -58,10 +62,10 @@ export default function ResumePage() {
         fetchResume()
       } else {
         const data = await response.json().catch(() => ({}))
-        alert(data.error || 'Fehler beim Speichern')
+        toast.error(data.error || 'Fehler beim Speichern')
       }
     } catch {
-      alert('Datei konnte nicht hochgeladen werden')
+      toast.error('Datei konnte nicht hochgeladen werden')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -88,7 +92,7 @@ export default function ResumePage() {
         fetchResume()
       }
     } catch {
-      alert('Fehler beim Speichern')
+      toast.error('Fehler beim Speichern')
     } finally {
       setLoading(false)
     }
@@ -107,9 +111,37 @@ export default function ResumePage() {
         fetchResume()
       }
     } catch {
-      alert('Fehler beim Speichern')
+      toast.error('Fehler beim Speichern')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDownloadPDF() {
+    setDownloading(true)
+    try {
+      const response = await fetch('/api/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'resume' }),
+      })
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'Resume.pdf'
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } else {
+        toast.error('PDF Generierung fehlgeschlagen')
+      }
+    } catch {
+      toast.error('PDF Generierung fehlgeschlagen')
+    } finally {
+      setDownloading(false)
     }
   }
 
@@ -135,6 +167,13 @@ export default function ResumePage() {
           </div>
           {resume && mode === 'view' && (
             <div className="flex gap-3">
+              <button
+                onClick={handleDownloadPDF}
+                disabled={downloading}
+                className="px-5 py-2.5 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+              >
+                {downloading ? '…' : '📄 Als PDF'}
+              </button>
               <button
                 onClick={() => setMode('edit')}
                 className="px-5 py-2.5 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium text-sm transition-colors"
@@ -246,14 +285,19 @@ export default function ResumePage() {
 
         {/* View Mode */}
         {mode === 'view' && resume && (
+          <>
+          {resume.updatedAt && (
+            <p className="text-sm text-[var(--color-primary-soft)] mb-4">
+              Zuletzt aktualisiert: {new Date(resume.updatedAt).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}
+            </p>
+          )}
           <section className="bg-[var(--color-surface)] rounded-2xl p-10 border border-[var(--color-border)] shadow-sm mb-6">
             <h2 className="text-xl font-medium text-[var(--color-foreground)] mb-6">
               {resume.name}
             </h2>
-            <div className="whitespace-pre-wrap text-[var(--color-foreground)] leading-relaxed text-sm">
-              {content}
-            </div>
+            <MarkdownContent content={content} />
           </section>
+          </>
         )}
 
         {/* Tip */}
@@ -269,4 +313,59 @@ export default function ResumePage() {
       </main>
     </div>
   )
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  const lines = content.split('\n')
+  const elements: React.ReactNode[] = []
+  let listItems: string[] = []
+
+  function flushList(key: number) {
+    if (listItems.length === 0) return
+    elements.push(
+      <ul key={`list-${key}`} className="list-disc pl-5 space-y-1 mb-3 text-[var(--color-foreground)] text-sm">
+        {listItems.map((item, i) => (
+          <li key={i}>{renderInline(item)}</li>
+        ))}
+      </ul>
+    )
+    listItems = []
+  }
+
+  lines.forEach((line, i) => {
+    const trimmed = line.trim()
+
+    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      listItems.push(trimmed.slice(2))
+      return
+    }
+
+    flushList(i)
+
+    if (trimmed.startsWith('### ')) {
+      elements.push(<h4 key={i} className="text-sm font-medium text-[var(--color-foreground)] mt-4 mb-2">{renderInline(trimmed.slice(4))}</h4>)
+    } else if (trimmed.startsWith('## ')) {
+      elements.push(<h3 key={i} className="text-base font-medium text-[var(--color-foreground)] mt-5 mb-2">{renderInline(trimmed.slice(3))}</h3>)
+    } else if (trimmed.startsWith('# ')) {
+      elements.push(<h2 key={i} className="text-lg font-medium text-[var(--color-foreground)] mt-6 mb-3">{renderInline(trimmed.slice(2))}</h2>)
+    } else if (trimmed === '') {
+      // skip empty lines
+    } else {
+      elements.push(<p key={i} className="text-[var(--color-foreground)] text-sm leading-relaxed mb-3">{renderInline(trimmed)}</p>)
+    }
+  })
+
+  flushList(lines.length)
+
+  return <div>{elements}</div>
+}
+
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i}>{part.slice(2, -2)}</strong>
+    }
+    return part
+  })
 }

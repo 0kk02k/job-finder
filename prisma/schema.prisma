@@ -24,6 +24,7 @@ model User {
   settings    UserSettings?
   credentials PlatformCredential[]
   profiles    PlatformProfile[]
+  savedSearches SavedSearch[]
 }
 
 model PlatformCredential {
@@ -76,6 +77,8 @@ model UserSettings {
 
   geminiApiKey    String?
   openaiApiKey    String?
+  mistralApiKey   String?
+  openrouterApiKey String?
   apifyApiKey     String?
   ollamaUrl       String?  @default("http://localhost:11434")
   aiProvider      String   @default("mistral")
@@ -118,6 +121,7 @@ model Job {
   status      JobStatus @default(DISCOVERED)
   score       Int?     // 1-10 AI score
   scoreReason String?  // AI explanation
+  matchDetails String? // JSON: { strengths?, gaps?, transferableSkills? }
 
   appliedAt   DateTime?
   createdAt   DateTime @default(now())
@@ -157,4 +161,20 @@ enum ActivityType {
   INTERVIEW_SCHEDULED
   FOLLOW_UP
   NOTE
+}
+
+model SavedSearch {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  query     String
+  location  String?
+  remote    Boolean  @default(false)
+  semantic  Boolean  @default(true)
+
+  lastRunAt DateTime?
+  createdAt DateTime @default(now())
+
+  @@unique([userId, query, location])
 }

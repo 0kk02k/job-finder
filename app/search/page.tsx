@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 interface SearchResult {
   title: string
@@ -11,34 +12,88 @@ interface SearchResult {
   platform: string
   aiScore?: number
   aiReason?: string
+  strengths?: string[]
+  gaps?: string[]
   relevanceScore?: number
   matchReason?: string
   transferableSkills?: string[]
 }
 
-export default function SearchPage() {
+interface SavedSearch {
+  id: string
+  query: string
+  location: string | null
+  remote: boolean
+  semantic: boolean
+  lastRunAt: string | null
+}
+
+function SearchPageContent() {
+  const searchParams = useSearchParams()
+  const savedId = searchParams.get('saved')
+
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const [remote, setRemote] = useState(false)
   const [semantic, setSemantic] = useState(true)
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])
-  const [stats, setStats] = useState({ total: 0, highMatches: 0 })
-  const [isSemantic, setIsSemantic] = useState(false)
+  const [stats, setStats] = useState({ total: 0, highMatches: 0, newJobs: 0 })
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
+  const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
+  const [justSaved, setJustSaved] = useState(false)
 
-  async function handleSearch(e: React.FormEvent) {
-    e.preventDefault()
+  const autoRanRef = useRef(false)
+
+  useEffect(() => {
+    fetchSavedSearches()
+  }, [])
+
+  // Auto-run a saved search when arriving via ?saved=<id>
+  useEffect(() => {
+    if (!savedId || autoRanRef.current || savedSearches.length === 0) return
+    const saved = savedSearches.find((s) => s.id === savedId)
+    if (!saved) return
+    autoRanRef.current = true
+    // Populate form from saved search params — one-time sync on page load
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setQuery(saved.query)
+    setLocation(saved.location || '')
+    setRemote(saved.remote)
+    setSemantic(saved.semantic)
+    runSearch(saved.query, saved.location || '', saved.remote, saved.semantic, saved.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedId, savedSearches])
+
+  async function fetchSavedSearches() {
+    try {
+      const res = await fetch('/api/searches')
+      if (res.ok) {
+        setSavedSearches(await res.json())
+      }
+    } catch {
+      // silently ignore
+    }
+  }
+
+  async function runSearch(
+    q: string,
+    loc: string,
+    rem: boolean,
+    sem: boolean,
+    savedSearchId?: string
+  ) {
     setLoading(true)
     setResults([])
     setError(null)
+    setJustSaved(false)
 
     try {
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, location, remote, semantic }),
+        body: JSON.stringify({ query: q, location: loc, remote: rem, semantic: sem }),
       })
 
       const data = await response.json()
@@ -48,15 +103,57 @@ export default function SearchPage() {
         return
       }
       setResults(data.jobs || [])
-      setStats({ total: data.total, highMatches: data.highMatches })
-      setIsSemantic(data.semantic || false)
+      setStats({
+        total: data.total,
+        highMatches: data.highMatches,
+        newJobs: data.newJobs || 0,
+      })
       setSearched(true)
+
+      // Update lastRunAt if this was a saved search
+      if (savedSearchId) {
+        fetch(`/api/searches/${savedSearchId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({}),
+        }).catch(() => {})
+        fetchSavedSearches()
+      }
     } catch {
       setError('Suche fehlgeschlagen — bitte später erneut versuchen.')
       setResults([])
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleSearch(e: React.FormEvent) {
+    e.preventDefault()
+    await runSearch(query, location, remote, semantic)
+  }
+
+  async function saveCurrentSearch() {
+    try {
+      const res = await fetch('/api/searches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, location, remote, semantic }),
+      })
+      if (res.ok) {
+        setJustSaved(true)
+        fetchSavedSearches()
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  function loadSavedSearch(saved: SavedSearch) {
+    setQuery(saved.query)
+    setLocation(saved.location || '')
+    setRemote(saved.remote)
+    setSemantic(saved.semantic)
+    runSearch(saved.query, saved.location || '', saved.remote, saved.semantic, saved.id)
   }
 
   function getScoreColor(score?: number) {
@@ -88,6 +185,28 @@ export default function SearchPage() {
             KI-gestützte semantische Suche findet Jobs, die auch mit anderen Titeln passen.
           </p>
         </section>
+
+        {/* Saved Searches */}
+        {savedSearches.length > 0 && (
+          <section className="mb-6">
+            <p className="text-sm font-medium text-[var(--color-foreground)] mb-3">
+              Gespeicherte Suchen
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {savedSearches.map((saved) => (
+                <button
+                  key={saved.id}
+                  onClick={() => loadSavedSearch(saved)}
+                  className="text-sm px-4 py-2 rounded-xl bg-[var(--color-border-soft)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors border border-[var(--color-border)]"
+                >
+                  {saved.query}
+                  {saved.location ? ` · ${saved.location}` : ''}
+                  {saved.remote ? ' · Remote' : ''}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* Search Form */}
         <section className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm mb-8">
@@ -161,6 +280,26 @@ export default function SearchPage() {
           </section>
         )}
 
+        {/* New Jobs Banner */}
+        {!loading && searched && stats.newJobs > 0 && (
+          <section className="mb-8 p-4 bg-[var(--color-success)]/10 rounded-xl border border-[var(--color-success)]/20 flex items-center justify-between">
+            <p className="text-sm text-[var(--color-success)]">
+              {stats.newJobs} {stats.newJobs === 1 ? 'neuer Job' : 'neue Jobs'} zu deiner Liste hinzugefügt
+            </p>
+            {!justSaved && (
+              <button
+                onClick={saveCurrentSearch}
+                className="text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors"
+              >
+                + Suche speichern
+              </button>
+            )}
+            {justSaved && (
+              <span className="text-sm text-[var(--color-primary-soft)]">✓ Gespeichert</span>
+            )}
+          </section>
+        )}
+
         {/* Stats */}
         {!loading && results.length > 0 && (
           <section className="grid sm:grid-cols-2 gap-4 mb-8">
@@ -188,7 +327,7 @@ export default function SearchPage() {
         )}
 
         {/* Empty State */}
-        {!loading && results.length === 0 && query === '' && (
+        {!loading && results.length === 0 && query === '' && !searched && (
           <section className="bg-[var(--color-surface)] rounded-2xl p-16 text-center border border-[var(--color-border)]">
             <p className="text-[var(--color-primary-soft)] mb-2">
               Gib einen Suchbegriff ein, um Jobs zu finden.
@@ -200,6 +339,14 @@ export default function SearchPage() {
         )}
       </main>
     </div>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={null}>
+      <SearchPageContent />
+    </Suspense>
   )
 }
 
@@ -263,6 +410,39 @@ function JobCard({
         <div className="mb-4 p-4 bg-[var(--color-success)]/10 rounded-xl border border-[var(--color-success)]/20">
           <p className="text-sm font-medium text-[var(--color-success)] mb-1">Warum dieser Job passt:</p>
           <p className="text-sm text-[var(--color-foreground)]">{job.matchReason}</p>
+        </div>
+      )}
+
+      {job.aiReason && !job.matchReason && (
+        <div className="mb-4 p-4 bg-[var(--color-success)]/10 rounded-xl border border-[var(--color-success)]/20">
+          <p className="text-sm font-medium text-[var(--color-success)] mb-1">KI-Einschätzung:</p>
+          <p className="text-sm text-[var(--color-foreground)]">{job.aiReason}</p>
+        </div>
+      )}
+
+      {job.strengths && job.strengths.length > 0 && (
+        <div className="mb-4">
+          <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Passt gut:</p>
+          <div className="flex flex-wrap gap-2">
+            {job.strengths.map((skill, i) => (
+              <span key={i} className="px-3 py-1 bg-[var(--color-success)]/10 text-[var(--color-success)] text-sm rounded-full border border-[var(--color-success)]/20">
+                {skill}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {job.gaps && job.gaps.length > 0 && (
+        <div className="mb-4">
+          <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Fehlt:</p>
+          <div className="flex flex-wrap gap-2">
+            {job.gaps.map((gap, i) => (
+              <span key={i} className="px-3 py-1 bg-[var(--color-error)]/10 text-[var(--color-error)] text-sm rounded-full border border-[var(--color-error)]/20">
+                {gap}
+              </span>
+            ))}
+          </div>
         </div>
       )}
 

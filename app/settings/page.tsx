@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useToast } from '../components/Toast'
 
 interface Settings {
   id: string
@@ -10,6 +11,8 @@ interface Settings {
   ollamaUrl: string | null
   geminiApiKey: string | null
   openaiApiKey: string | null
+  mistralApiKey: string | null
+  openrouterApiKey: string | null
   targetTitles: string | null
   targetLocations: string | null
   minSalary: number | null
@@ -25,6 +28,7 @@ interface ProfileOptimization {
 }
 
 export default function SettingsPage() {
+  const toast = useToast()
   const [settings, setSettings] = useState<Settings | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -39,6 +43,13 @@ export default function SettingsPage() {
   const [savingProfile, setSavingProfile] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
   const [optimization, setOptimization] = useState<ProfileOptimization | null>(null)
+
+  // Sync state
+  const [syncPlatform, setSyncPlatform] = useState('linkedin')
+  const [syncEmail, setSyncEmail] = useState('')
+  const [syncPassword, setSyncPassword] = useState('')
+  const [syncing, setSyncing] = useState(false)
+  const [syncStatuses, setSyncStatuses] = useState<{ platform: string; email: string; syncStatus: string; lastSyncAt: string | null }[]>([])
 
   async function fetchSettings() {
     try {
@@ -55,7 +66,81 @@ export default function SettingsPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initialer Daten-Fetch; setState läuft erst nach dem await
     void fetchSettings()
+    void fetchSyncStatus()
   }, [])
+
+  async function fetchSyncStatus() {
+    try {
+      const response = await fetch('/api/platforms/sync')
+      if (!response.ok) return
+      const data = await response.json()
+      if (Array.isArray(data.credentials)) setSyncStatuses(data.credentials)
+    } catch {
+      // Sync-Status kann nicht geladen werden
+    }
+  }
+
+  async function handleSync() {
+    if (!syncEmail || !syncPassword) return
+    setSyncing(true)
+    try {
+      const response = await fetch('/api/platforms/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          platform: syncPlatform,
+          credentials: { email: syncEmail, password: syncPassword },
+        }),
+      })
+      const data = await response.json()
+      if (response.ok) {
+        toast.success('Profil synchronisiert')
+        setSyncPassword('')
+        fetchSyncStatus()
+      } else {
+        toast.error(data.error || 'Sync fehlgeschlagen')
+      }
+    } catch {
+      toast.error('Sync fehlgeschlagen — bitte später erneut versuchen')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  async function fetchProfile() {
+    try {
+      const response = await fetch(`/api/platforms/profile?platform=${profilePlatform}`)
+      if (!response.ok) return
+      const profiles = await response.json()
+      const profile = Array.isArray(profiles) ? profiles[0] : null
+      if (profile) {
+        setProfileName(profile.name || '')
+        setProfileHeadline(profile.headline || '')
+        setProfileAbout(profile.about || '')
+        setProfileLocation(profile.location || '')
+        try {
+          const skills = profile.skills ? JSON.parse(profile.skills) : []
+          setProfileSkills(Array.isArray(skills) ? skills.join(', ') : '')
+        } catch {
+          setProfileSkills('')
+        }
+      } else {
+        setProfileName('')
+        setProfileHeadline('')
+        setProfileAbout('')
+        setProfileLocation('')
+        setProfileSkills('')
+      }
+    } catch {
+      // Profil kann nicht geladen werden — Felder bleiben leer
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchProfile()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profilePlatform])
 
   async function saveSettings() {
     if (!settings) return
@@ -70,6 +155,8 @@ export default function SettingsPage() {
           ollamaUrl: settings.ollamaUrl,
           geminiApiKey: settings.geminiApiKey,
           openaiApiKey: settings.openaiApiKey,
+          mistralApiKey: settings.mistralApiKey,
+          openrouterApiKey: settings.openrouterApiKey,
           apifyApiKey: settings.apifyApiKey,
           targetTitles: settings.targetTitles,
           targetLocations: settings.targetLocations,
@@ -77,9 +164,9 @@ export default function SettingsPage() {
           remote: settings.remote,
         }),
       })
-      alert('Einstellungen gespeichert!')
+      toast.success('Einstellungen gespeichert')
     } catch {
-      alert('Fehler beim Speichern')
+      toast.error('Fehler beim Speichern')
     } finally {
       setSaving(false)
     }
@@ -102,12 +189,12 @@ export default function SettingsPage() {
       })
 
       if (response.ok) {
-        alert('Profil gespeichert!')
+        toast.success('Profil gespeichert')
       } else {
-        alert('Fehler beim Speichern')
+        toast.error('Fehler beim Speichern')
       }
     } catch {
-      alert('Fehler beim Speichern')
+      toast.error('Fehler beim Speichern')
     } finally {
       setSavingProfile(false)
     }
@@ -137,10 +224,10 @@ export default function SettingsPage() {
           missingSkills: opt?.missingSkills ?? [],
         })
       } else {
-        alert(data.error || 'Optimierung fehlgeschlagen')
+        toast.error(data.error || 'Optimierung fehlgeschlagen')
       }
     } catch {
-      alert('Fehler bei der Optimierung')
+      toast.error('Fehler bei der Optimierung')
     } finally {
       setOptimizing(false)
     }
@@ -212,6 +299,22 @@ export default function SettingsPage() {
                 value={settings.openaiApiKey || ''}
                 onChange={(v) => setSettings({ ...settings, openaiApiKey: v })}
                 placeholder="Nur nötig bei Anbieter OpenAI"
+              />
+
+              <InputField
+                label="Mistral API Key (optional)"
+                type="password"
+                value={settings.mistralApiKey || ''}
+                onChange={(v) => setSettings({ ...settings, mistralApiKey: v })}
+                placeholder="Nur nötig bei Anbieter Mistral"
+              />
+
+              <InputField
+                label="OpenRouter API Key (optional)"
+                type="password"
+                value={settings.openrouterApiKey || ''}
+                onChange={(v) => setSettings({ ...settings, openrouterApiKey: v })}
+                placeholder="Nur nötig bei Anbieter OpenRouter"
               />
 
               <InputField
@@ -362,6 +465,82 @@ export default function SettingsPage() {
             </div>
           </Section>
 
+          {/* Platform Sync */}
+          <Section title="Platform-Sync" description="LinkedIn/XING/StepStone Profil automatisch importieren">
+            <div className="space-y-6">
+              <div className="p-4 bg-[var(--color-warning)]/10 rounded-xl border border-[var(--color-warning)]/20">
+                <p className="text-sm text-[var(--color-warning)]">
+                  ⚠️ Der Sync nutzt Playwright-Scraping und kann durch Anti-Bot-Maßnahmen oder 2FA fehlschlagen. Passwörter werden AES-256-GCM verschlüsselt gespeichert.
+                </p>
+              </div>
+
+              {/* Sync Status */}
+              {syncStatuses.length > 0 && (
+                <div className="space-y-3">
+                  {syncStatuses.map((cred) => (
+                    <div key={cred.platform} className="flex items-center justify-between p-3 bg-[var(--background)] rounded-xl border border-[var(--color-border-soft)]">
+                      <div>
+                        <p className="text-sm font-medium text-[var(--color-foreground)] capitalize">{cred.platform}</p>
+                        <p className="text-xs text-[var(--color-primary-soft)]">{cred.email}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-xs font-medium ${cred.syncStatus === 'success' ? 'text-[var(--color-success)]' : cred.syncStatus === 'failed' ? 'text-[var(--color-error)]' : 'text-[var(--color-primary-soft)]'}`}>
+                          {cred.syncStatus === 'success' ? '✓ Synced' : cred.syncStatus === 'failed' ? '✗ Fehlgeschlagen' : 'Nie'}
+                        </span>
+                        {cred.lastSyncAt && (
+                          <p className="text-xs text-[var(--color-primary-soft)] mt-0.5">
+                            {new Date(cred.lastSyncAt).toLocaleDateString('de-DE')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Credential Input */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">Plattform</label>
+                <select
+                  value={syncPlatform}
+                  onChange={(e) => setSyncPlatform(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] focus:border-[var(--color-accent)] focus:outline-none"
+                >
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="xing">XING</option>
+                  <option value="stepstone">StepStone</option>
+                </select>
+              </div>
+
+              <InputField
+                label="E-Mail"
+                type="email"
+                value={syncEmail}
+                onChange={setSyncEmail}
+                placeholder="deine.email@beispiel.de"
+              />
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">Passwort</label>
+                <input
+                  type="password"
+                  value={syncPassword}
+                  onChange={(e) => setSyncPassword(e.target.value)}
+                  placeholder="Wird verschlüsselt gespeichert"
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                />
+              </div>
+
+              <button
+                onClick={handleSync}
+                disabled={syncing || !syncEmail || !syncPassword}
+                className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+              >
+                {syncing ? 'Synchronisiert...' : 'Profil synchronisieren'}
+              </button>
+            </div>
+          </Section>
+
           {/* Job Preferences */}
           <Section title="Job-Präferenzen" description="Deine Suchkriterien">
             <div className="space-y-6">
@@ -381,6 +560,16 @@ export default function SettingsPage() {
                 placeholder="Berlin, Remote, München"
                 help="Kommagetrennte Liste"
               />
+              <div>
+                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">Mindestgehalt (€/Jahr, optional)</label>
+                <input
+                  type="number"
+                  value={settings.minSalary ?? ''}
+                  onChange={(e) => setSettings({ ...settings, minSalary: e.target.value ? Number(e.target.value) : null })}
+                  placeholder="z.B. 50000"
+                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                />
+              </div>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input
                   type="checkbox"

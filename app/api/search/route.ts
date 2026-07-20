@@ -32,9 +32,13 @@ export async function POST(request: NextRequest) {
   const aiApiKey =
     aiProvider === 'gemini'
       ? settings?.geminiApiKey || undefined
-      : aiProvider === 'openai' || aiProvider === 'openrouter'
+      : aiProvider === 'openai'
         ? settings?.openaiApiKey || undefined
-        : undefined
+        : aiProvider === 'openrouter'
+          ? settings?.openrouterApiKey || undefined
+          : aiProvider === 'mistral'
+            ? settings?.mistralApiKey || undefined
+            : undefined
   const aiBaseUrl = aiProvider === 'ollama' ? settings?.ollamaUrl || undefined : undefined
 
   type SemanticJobResult = ScrapedJob & {
@@ -69,7 +73,17 @@ export async function POST(request: NextRequest) {
       // Save high matches
       const highMatches = jobs.filter(job => job.relevanceScore >= 0.7)
 
+      // Determine which are new (not yet in the user's job list)
+      const existingSemantic = await prisma.job.findMany({
+        where: { userId, url: { in: highMatches.map(j => j.url) } },
+        select: { url: true },
+      })
+      const existingSemanticUrls = new Set(existingSemantic.map(j => j.url))
+      let newJobsCount = 0
+
       for (const job of highMatches) {
+        const isNew = !existingSemanticUrls.has(job.url)
+        if (isNew) newJobsCount++
         try {
           await prisma.job.upsert({
             where: { userId_url: { userId, url: job.url } },
@@ -77,6 +91,7 @@ export async function POST(request: NextRequest) {
               // Never touch status here — a re-search must not reset APPLIED etc.
               score: Math.round(job.relevanceScore * 10),
               scoreReason: job.matchReason,
+              matchDetails: JSON.stringify({ transferableSkills: job.transferableSkills ?? [] }),
             },
             create: {
               userId,
@@ -87,6 +102,7 @@ export async function POST(request: NextRequest) {
               url: job.url,
               score: Math.round(job.relevanceScore * 10),
               scoreReason: job.matchReason,
+              matchDetails: JSON.stringify({ transferableSkills: job.transferableSkills ?? [] }),
               status: 'HIGH_MATCH',
             },
           })
@@ -100,6 +116,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           total: jobs.length,
           highMatches: jobs.filter(j => j.relevanceScore >= 0.7).length,
+          newJobs: newJobsCount,
           jobs,
           semantic: true,
         })
@@ -146,19 +163,32 @@ export async function POST(request: NextRequest) {
     })
   )
 
+  // Determine which jobs are new before upserting
+  const existingTraditional = await prisma.job.findMany({
+    where: { userId, url: { in: scoredJobs.map(j => j.url) } },
+    select: { url: true },
+  })
+  const existingTraditionalUrls = new Set(existingTraditional.map(j => j.url))
+  let newJobsCount = 0
+
   // Auto-save all results to job list
   for (const job of scoredJobs) {
+    const isNew = !existingTraditionalUrls.has(job.url)
+    if (isNew) newJobsCount++
     try {
       const hasScore = job.aiScore !== undefined
       const score = hasScore ? job.aiScore : null
       const scoreReason = hasScore ? job.aiReason : null
+      const matchDetails = hasScore
+        ? JSON.stringify({ strengths: job.strengths ?? [], gaps: job.gaps ?? [] })
+        : null
       const status = hasScore ? (score! >= 7 ? 'HIGH_MATCH' : 'SCORED') : 'DISCOVERED'
 
       await prisma.job.upsert({
         where: { userId_url: { userId, url: job.url } },
         update: {
           // Only refresh the score — never overwrite the user's status
-          ...(score !== null && { score, scoreReason }),
+          ...(score !== null && { score, scoreReason, matchDetails }),
         },
         create: {
           userId,
@@ -167,7 +197,7 @@ export async function POST(request: NextRequest) {
           location: job.location,
           description: job.description,
           url: job.url,
-          ...(score !== null && { score, scoreReason, status }),
+          ...(score !== null && { score, scoreReason, matchDetails, status }),
         },
       })
     } catch {
@@ -180,6 +210,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     total: scoredJobs.length,
     highMatches: highMatchCount,
+    newJobs: newJobsCount,
     jobs: scoredJobs,
     semantic: false,
   })

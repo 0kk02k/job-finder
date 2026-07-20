@@ -112,6 +112,10 @@ export async function POST(request: NextRequest) {
           data: {
             score: scoreResult.score,
             scoreReason: scoreResult.reason,
+            matchDetails: JSON.stringify({
+              strengths: scoreResult.strengths,
+              gaps: scoreResult.gaps,
+            }),
             status: scoreResult.score >= 7 ? 'HIGH_MATCH' : 'SCORED',
           },
         })

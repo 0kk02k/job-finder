@@ -33,24 +33,24 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-[var(--background)] flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-2 text-center">
+        <h1 className="text-2xl font-light text-[var(--color-foreground)] mb-2 text-center">
           Job Finder
         </h1>
-        <p className="text-zinc-600 dark:text-zinc-400 text-center mb-8">
+        <p className="text-[var(--color-primary-soft)] text-center mb-8">
           Melde dich an, um fortzufahren
         </p>
 
-        <form onSubmit={handleSubmit} className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800 space-y-4">
+        <form onSubmit={handleSubmit} className="bg-[var(--color-surface)] rounded-2xl p-6 shadow-sm border border-[var(--color-border)] space-y-4">
           {error && (
-            <div className="bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 text-sm p-3 rounded-lg">
+            <div className="bg-[var(--color-error)]/10 text-[var(--color-error)] text-sm p-3 rounded-xl border border-[var(--color-error)]/20">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
               Email
             </label>
             <input
@@ -58,12 +58,12 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] focus:border-[var(--color-accent)] focus:outline-none"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+            <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
               Passwort
             </label>
             <input
@@ -71,22 +71,22 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-3 py-2 rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] focus:border-[var(--color-accent)] focus:outline-none"
             />
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white py-2 rounded-lg font-medium transition-colors"
+            className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-accent)] disabled:opacity-50 text-[var(--color-surface)] py-3 rounded-xl font-medium transition-colors"
           >
             {loading ? 'Wird angemeldet...' : 'Anmelden'}
           </button>
         </form>
 
-        <p className="text-center text-sm text-zinc-600 dark:text-zinc-400 mt-4">
+        <p className="text-center text-sm text-[var(--color-primary-soft)] mt-4">
           Noch kein Account?{' '}
-          <Link href="/register" className="text-blue-600 dark:text-blue-400 hover:underline">
+          <Link href="/register" className="text-[var(--color-primary)] hover:text-[var(--color-accent)]">
             Registrieren
           </Link>
         </p>

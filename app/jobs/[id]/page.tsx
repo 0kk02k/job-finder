@@ -2,6 +2,7 @@
 
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useToast } from '../../components/Toast'
 
 interface Job {
   id: string
@@ -13,13 +14,30 @@ interface Job {
   status: string
   score: number | null
   scoreReason: string | null
+  matchDetails: string | null
   appliedAt: string | null
   createdAt: string
+}
+
+interface MatchDetails {
+  strengths?: string[]
+  gaps?: string[]
+  transferableSkills?: string[]
+}
+
+function parseMatchDetails(raw: string | null): MatchDetails {
+  if (!raw) return {}
+  try {
+    return JSON.parse(raw) as MatchDetails
+  } catch {
+    return {}
+  }
 }
 
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
+  const toast = useToast()
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -76,45 +94,45 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
       } else {
-        alert('PDF Generierung fehlgeschlagen')
+        toast.error('PDF Generierung fehlgeschlagen')
       }
     } catch (error) {
-      alert('Fehler: ' + error)
+      toast.error('Fehler: ' + error)
     } finally {
       setDownloading(false)
     }
   }
 
   function getStatusColor(status: string) {
-    const colors = {
-      DISCOVERED: 'bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200',
-      SCORED: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-      HIGH_MATCH: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-      APPLIED: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-      INTERVIEW: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-      OFFER: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
-      REJECTED: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-      ARCHIVED: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+    const colors: Record<string, string> = {
+      DISCOVERED: 'bg-[var(--color-border-soft)] text-[var(--color-foreground)]',
+      SCORED: 'bg-[var(--color-border-soft)] text-[var(--color-foreground)]',
+      HIGH_MATCH: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
+      APPLIED: 'bg-[var(--color-accent-soft)]/30 text-[var(--color-foreground)]',
+      INTERVIEW: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
+      OFFER: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
+      REJECTED: 'bg-[var(--color-error)]/10 text-[var(--color-error)]',
+      ARCHIVED: 'bg-[var(--color-border-soft)] text-[var(--color-primary-soft)]',
     }
-    return colors[status as keyof typeof colors] || colors.DISCOVERED
+    return colors[status] || colors.DISCOVERED
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
-        <p className="text-zinc-600 dark:text-zinc-400">Lade Job...</p>
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+        <p className="text-[var(--color-primary-soft)]">Lade Job...</p>
       </div>
     )
   }
 
   if (error || !job) {
     return (
-      <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-zinc-600 dark:text-zinc-400 mb-4">{error || 'Job nicht gefunden'}</p>
+          <p className="text-[var(--color-primary-soft)] mb-4">{error || 'Job nicht gefunden'}</p>
           <button
             onClick={() => router.push('/jobs')}
-            className="text-sm text-zinc-500 dark:text-zinc-400 underline hover:text-zinc-900 dark:hover:text-zinc-50 transition-colors"
+            className="text-sm text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors"
           >
             Zurück zur Job-Übersicht
           </button>
@@ -124,14 +142,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
-      <main className="max-w-4xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-[var(--background)]">
+      <main className="max-w-4xl mx-auto px-6 py-16">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-50 mb-2">
+            <h1 className="text-2xl font-medium text-[var(--color-foreground)] mb-2">
               {job.title}
             </h1>
-            <p className="text-zinc-600 dark:text-zinc-400">
+            <p className="text-[var(--color-primary-soft)]">
               {job.company} • {job.location}
             </p>
           </div>
@@ -141,49 +159,92 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {job.score && (
-          <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800 mb-6">
+          <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
             <div className="flex items-center gap-4 mb-4">
-              <span className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+              <span className="text-3xl font-light text-[var(--color-primary)]">
                 {job.score}/10
               </span>
-              <span className="text-zinc-600 dark:text-zinc-400">AI Match Score</span>
+              <span className="text-[var(--color-primary-soft)]">AI Match Score</span>
             </div>
             {job.scoreReason && (
-              <p className="text-sm text-zinc-700 dark:text-zinc-300">{job.scoreReason}</p>
+              <p className="text-sm text-[var(--color-foreground)]">{job.scoreReason}</p>
             )}
+            {(() => {
+              const { strengths, gaps, transferableSkills } = parseMatchDetails(job.matchDetails)
+              return (
+                <>
+                  {strengths && strengths.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Passt gut:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {strengths.map((skill, i) => (
+                          <span key={i} className="px-3 py-1 bg-[var(--color-success)]/10 text-[var(--color-success)] text-sm rounded-full">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {gaps && gaps.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Fehlt:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {gaps.map((gap, i) => (
+                          <span key={i} className="px-3 py-1 bg-[var(--color-error)]/10 text-[var(--color-error)] text-sm rounded-full">
+                            {gap}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {transferableSkills && transferableSkills.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Transferable Skills:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {transferableSkills.map((skill, i) => (
+                          <span key={i} className="px-3 py-1 bg-[var(--color-border-soft)] text-[var(--color-foreground)] text-sm rounded-full">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
         )}
 
-        <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800 mb-6">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+        <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
+          <h2 className="text-lg font-medium text-[var(--color-foreground)] mb-4">
             Beschreibung
           </h2>
-          <div className="prose dark:prose-invert max-w-none">
-            <p className="whitespace-pre-wrap text-zinc-700 dark:text-zinc-300">
+          <div className="prose max-w-none">
+            <p className="whitespace-pre-wrap text-[var(--color-foreground)] leading-relaxed">
               {job.description}
             </p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-zinc-900 rounded-xl p-6 shadow-sm border border-zinc-200 dark:border-zinc-800 mb-6">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50 mb-4">
+        <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
+          <h2 className="text-lg font-medium text-[var(--color-foreground)] mb-4">
             Aktionen
           </h2>
 
           <div className="space-y-4">
-            <h3 className="font-medium text-zinc-900 dark:text-zinc-50">PDF Export</h3>
+            <h3 className="font-medium text-[var(--color-foreground)]">PDF Export</h3>
             <div className="grid md:grid-cols-2 gap-4">
               <button
                 onClick={() => handleDownloadPDF('resume')}
                 disabled={downloading}
-                className="w-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                className="w-full bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
               >
                 📄 Resume PDF
               </button>
               <button
                 onClick={() => handleDownloadPDF('coverletter')}
                 disabled={downloading}
-                className="w-full bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-50 px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                className="w-full bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
               >
                 ✉️ Anschreiben PDF
               </button>
@@ -196,7 +257,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-zinc-100 hover:bg-zinc-200 dark:bg-zinc-800 dark:hover:bg-zinc-700 text-zinc-900 dark:text-zinc-50 px-6 py-3 rounded-lg font-medium transition-colors"
+            className="bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] px-6 py-3 rounded-xl font-medium transition-colors"
           >
             Job auf Plattform ansehen
           </a>
