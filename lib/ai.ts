@@ -125,7 +125,7 @@ Wenn kein Job gefunden wird, gib null zurück.`
 
   try {
     const { text } = await generateText({
-      model: ai(defaultModel(provider)),
+      model: ai.chat(defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -185,7 +185,7 @@ Gib zurück als JSON:
 
   try {
     const { text } = await generateText({
-      model: ai(model || defaultModel(provider)),
+      model: ai.chat(model || defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -256,7 +256,7 @@ Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lü
 
   try {
     const { text } = await generateText({
-      model: ai(model || (defaultModel(provider))),
+      model: ai.chat(model || (defaultModel(provider))),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -305,7 +305,7 @@ Berücksichtige:
 
   try {
     const { text } = await generateText({
-      model: ai(defaultModel(provider)),
+      model: ai.chat(defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -344,7 +344,7 @@ Fokus auf:
 
   try {
     const { text } = await generateText({
-      model: ai(model || defaultModel(provider)),
+      model: ai.chat(model || defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -381,7 +381,7 @@ Struktur:
 
   try {
     const { text } = await generateText({
-      model: ai(defaultModel(provider)),
+      model: ai.chat(defaultModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 

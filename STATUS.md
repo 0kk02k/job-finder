@@ -88,6 +88,9 @@ job-finder/
 - KI-Fallback: bei leerem KI-Ergebnis fällt die Suche jetzt auf die klassische Suche zurück (vorher: 0 Ergebnisse)
 - User-KI-Settings (Provider/Modell/Keys/Ollama-URL) werden bei der Suche tatsächlich verwendet; Settings-UI hat dafür jetzt Felder
 - KI-Ausfall wird nicht mehr als "5/10"-Score angezeigt (score = null); Scoring auf 15 Jobs pro Suche begrenzt; `useAI` und `remote`-Filter funktionieren jetzt
+- AI SDK: `ai.chat()` statt Default-Responses-API — Mistral/Ollama/Gemini/OpenRouter haben nur Chat-Completions, alle KI-Calls schlugen mit "Not Found" fehl (E2E-Test mit echtem Mistral verifiziert)
+- Re-Suche promoted Jobs von DISCOVERED/SCORED → HIGH_MATCH, ohne APPLIED/INTERVIEW/etc. zu überschreiben
+- `Job.matchDetails` (JSON) speichert strengths/gaps/transferableSkills zum Score
 
 **UI:**
 - Job-Detailseite lud ewig (Next-16: `params` ist Promise) — gefixt, mit echten Fehler-States

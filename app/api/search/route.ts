@@ -41,6 +41,14 @@ export async function POST(request: NextRequest) {
             : undefined
   const aiBaseUrl = aiProvider === 'ollama' ? settings?.ollamaUrl || undefined : undefined
 
+  // Existing statuses by URL — re-searches may refresh scores but must not
+  // clobber statuses the user already set (APPLIED, INTERVIEW, ...)
+  const existingJobs = await prisma.job.findMany({
+    where: { userId },
+    select: { url: true, status: true },
+  })
+  const statusByUrl = new Map(existingJobs.map(j => [j.url, j.status]))
+
   type SemanticJobResult = ScrapedJob & {
     relevanceScore: number
     matchReason: string
@@ -88,10 +96,12 @@ export async function POST(request: NextRequest) {
           await prisma.job.upsert({
             where: { userId_url: { userId, url: job.url } },
             update: {
-              // Never touch status here — a re-search must not reset APPLIED etc.
               score: Math.round(job.relevanceScore * 10),
               scoreReason: job.matchReason,
               matchDetails: JSON.stringify({ transferableSkills: job.transferableSkills ?? [] }),
+              // Promote to HIGH_MATCH only from pre-pipeline states —
+              // never clobber APPLIED/INTERVIEW/etc. on a re-search
+              ...((statusByUrl.get(job.url) === 'DISCOVERED' || statusByUrl.get(job.url) === 'SCORED') && { status: 'HIGH_MATCH' as const }),
             },
             create: {
               userId,
@@ -187,8 +197,10 @@ export async function POST(request: NextRequest) {
       await prisma.job.upsert({
         where: { userId_url: { userId, url: job.url } },
         update: {
-          // Only refresh the score — never overwrite the user's status
+          // Refresh score/details; promote status only from pre-pipeline
+          // states — never clobber APPLIED/INTERVIEW/etc. on a re-search
           ...(score !== null && { score, scoreReason, matchDetails }),
+          ...(score !== null && (statusByUrl.get(job.url) === 'DISCOVERED' || statusByUrl.get(job.url) === 'SCORED') && { status }),
         },
         create: {
           userId,
