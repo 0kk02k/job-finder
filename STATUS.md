@@ -35,6 +35,7 @@ job-finder/
 │       ├── jobs/             # Job CRUD
 │       ├── resume/           # Resume CRUD
 │       ├── settings/         # User Settings
+│       ├── searches/         # Gespeicherte Suchen (CRUD)
 │       └── platforms/
 │           ├── sync/          # LinkedIn/XING/StepStone Sync
 │           └── optimize/      # KI-Profiloptimierung
@@ -43,6 +44,7 @@ job-finder/
 │   ├── scrapers.ts           # Job-Scraping
 │   ├── autoapply.ts          # Auto-Bewerbung (TODO)
 │   ├── ai.ts                 # KI-Hilfsfunktionen
+│   ├── crypto.ts             # AES-256-GCM für Platform-Credentials
 │   └── prisma.ts             # DB Client
 └── prisma/
     └── schema.prisma         # DB Schema
@@ -52,26 +54,28 @@ job-finder/
 
 ### ✅ Fertig
 
-- **Dashboard** mit Welcome-Section, Stats, Quick-Start
-- **Job-Suche** mit KI-Matching (semantisch, transferable Skills)
-- **Job-Tracking** (Status: Discovered, Scored, High Match, Applied, Interview, Offer, Rejected, Archived)
-- **Resume** (Markdown-Editor, Vorschau)
-- **Settings** (AI-Provider, Job-Präferenzen)
-- **Platform Credentials** (LinkedIn, XING, StepStone)
-- **UI/UX** überarbeitet (ruhige, warme Farben, angenehm für lange Sessions)
+- **Dashboard** mit echten Stats, Top-Matches-Karten, „Nächster Schritt"-Hinweis, gespeicherte Suchen
+- **Job-Suche** mit KI-Matching (semantisch, transferable Skills) + klassisch (Jooble, Remotive, Arbeitnow)
+- **Gespeicherte Suchen** (`SavedSearch` + `/api/searches`) mit „N neue Jobs"-Zähler
+- **Job-Tracking** (Status: Discovered, Scored, High Match, Applied, Interview, Offer, Rejected, Archived) mit Filter-Toolbar, Sortierung, Textsuche
+- **Resume** (Markdown-Editor, PDF-Upload mit Text-Extraktion, PDF-Export)
+- **Settings** (AI-Provider + Keys, Ollama-URL, Job-Präferenzen, minSalary, Platform-Sync-UI)
+- **Platform Credentials** (LinkedIn, XING, StepStone) — AES-256-GCM-verschlüsselt
+- **KI-Optimierung** (API + UI in Settings)
+- **UI/UX** vereinheitlicht (CSS-Variablen-System überall, Toast-System statt alert())
+- **Security-Audit 2026-07-18** (siehe unten) — alle kritischen Befunde behoben
 
 ### ⚠️ Teilweise
 
 - **LinkedIn/XING/StepStone Sync** (Playwright-Scraping implementiert, aber ungetestet)
 - **Indeed/Glassdoor** (API-Routen vorhanden, UI als Info-only)
-- **KI-Optimierung** (API fertig, Frontend UI fehlt)
 
 ### ❌ TODO
 
-- Profil-Optimierung UI (`/api/platforms/optimize` Frontend)
 - Auto-Bewerbung (`lib/autoapply.ts` ist leer — API-Endpunkt aktuell bewusst deaktiviert, siehe unten)
 - 2FA-Unterstützung für Platform-Sync
 - Rate-Limiting auf Auth- und KI-Routen
+- Automatisiertes Testsetup
 
 ## Audit & Fixes (2026-07-18)
 
@@ -179,4 +183,4 @@ vercel deploy
 
 ---
 
-Stand: 2026-07-18 (Audit + Security-/Kernfunktions-Fixes, Build sauber, Vercel Deploy noch nicht ready)
+Stand: 2026-07-20 (Audit + Security-/Kernfunktions-Fixes E2E-verifiziert, PLAN.md Stufen 1–7 umgesetzt, README neu geschrieben)
