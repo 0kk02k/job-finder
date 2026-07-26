@@ -262,7 +262,7 @@ function SearchPageContent() {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+                    className="px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
                   >
                     {loading ? '…' : 'Suchen'}
                   </button>
@@ -429,7 +429,7 @@ function JobCard({
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-5 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl text-sm font-medium transition-colors"
+            className="px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl text-sm font-medium transition-colors"
           >
             Ansehen
           </a>

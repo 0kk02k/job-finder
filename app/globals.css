@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Calm, focused color palette - warm neutrals with soft accents */
+/* Warm notebook palette — stone neutrals with a single ochre accent */
 :root {
   --background: #faf9f7;
   --foreground: #1c1917;
@@ -14,8 +14,11 @@
   --color-primary: #57534e;
   --color-primary-soft: #a8a29e;
 
-  --color-accent: #78716c;
-  --color-accent-soft: #d6d3d1;
+  /* Ochre accent — the one color that communicates (CTAs, active states, focus) */
+  --color-accent: #b45309;
+  --color-accent-strong: #92400e;
+  --color-accent-soft: #f0e2cd;
+  --color-on-accent: #ffffff;
 
   --color-success: #5c7a57;
   --color-warning: #8a7247;
@@ -39,8 +42,10 @@
     --color-primary: #d6d3d1;
     --color-primary-soft: #78716c;
 
-    --color-accent: #a8a29e;
-    --color-accent-soft: #57534e;
+    --color-accent: #dfa04e;
+    --color-accent-strong: #ecb668;
+    --color-accent-soft: #5c452a;
+    --color-on-accent: #1c1917;
 
     --color-success: #7a9a75;
     --color-warning: #a88f67;
@@ -51,14 +56,21 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--color-surface);
+  --color-surface-elevated: var(--color-surface-elevated);
+  --color-border: var(--color-border);
+  --color-border-soft: var(--color-border-soft);
+  --color-primary: var(--color-primary);
+  --color-primary-soft: var(--color-primary-soft);
+  --color-accent: var(--color-accent);
+  --color-accent-strong: var(--color-accent-strong);
+  --color-accent-soft: var(--color-accent-soft);
+  --color-on-accent: var(--color-on-accent);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
-}
-
-* {
-  transition-property: color, background-color, border-color;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 200ms;
 }
 
 body {
@@ -70,9 +82,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Softer focus states */
+/* Visible focus states */
 :focus-visible {
-  outline: 2px solid var(--color-accent-soft);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
@@ -92,10 +104,10 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-accent-soft);
+  background: var(--color-border);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-accent);
+  background: var(--color-primary-soft);
 }

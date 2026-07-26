@@ -208,7 +208,7 @@ export default function InterviewPage() {
               href="https://www.16personalities.com/de"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
+              className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
             >
               Test starten →
             </a>
@@ -251,7 +251,7 @@ export default function InterviewPage() {
             <button
               onClick={startInterview}
               disabled={sending}
-              className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
             >
               {sending ? 'Starte…' : 'Interview starten'}
             </button>
@@ -348,7 +348,7 @@ export default function InterviewPage() {
               <button
                 type="submit"
                 disabled={sending || !input.trim()}
-                className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 Senden
               </button>

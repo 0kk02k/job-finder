@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
+import { ButtonLink, StatusBadge } from '../components/ui'
 
 interface Job {
   id: string
@@ -148,31 +149,30 @@ export default function JobsPage() {
     setSortBy('newest')
   }
 
-  function getStatusBadge(status: string) {
-    const badges: Record<string, { label: string; class: string }> = {
-      DISCOVERED: { label: 'Entdeckt', class: 'bg-[var(--color-border-soft)] text-[var(--color-foreground)] border-[var(--color-border)]' },
-      SCORED: { label: 'Bewertet', class: 'bg-[var(--color-border-soft)] text-[var(--color-foreground)] border-[var(--color-border)]' },
-      HIGH_MATCH: { label: 'Top Match', class: 'bg-[var(--color-success)]/10 text-[var(--color-success)] border-[var(--color-success)]/20' },
-      APPLIED: { label: 'Beworben', class: 'bg-[var(--color-accent-soft)]/30 text-[var(--color-foreground)] border-[var(--color-border)]' },
-      INTERVIEW: { label: 'Interview', class: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)] border-[var(--color-warning)]/20' },
-      OFFER: { label: 'Angebot', class: 'bg-[var(--color-success)]/10 text-[var(--color-success)] border-[var(--color-success)]/20' },
-      REJECTED: { label: 'Abgelehnt', class: 'bg-[var(--color-error)]/10 text-[var(--color-error)] border-[var(--color-error)]/20' },
-      ARCHIVED: { label: 'Archiviert', class: 'bg-[var(--color-border-soft)] text-[var(--color-primary-soft)] border-[var(--color-border)]' },
-    }
-    return badges[status] || badges.DISCOVERED
-  }
-
   function getScoreColor(score: number | null) {
-    if (!score) return 'text-[var(--color-primary-soft)]'
-    if (score >= 8) return 'text-[var(--color-success)]'
-    if (score >= 6) return 'text-[var(--color-warning)]'
-    return 'text-[var(--color-error)]'
+    if (!score) return 'text-primary-soft'
+    if (score >= 8) return 'text-success'
+    if (score >= 6) return 'text-warning'
+    return 'text-error'
   }
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <p className="text-[var(--color-primary-soft)]">Lade Jobs...</p>
+      <div className="min-h-screen bg-background">
+        <main className="max-w-5xl mx-auto px-6 py-16">
+          <section className="flex items-center justify-between mb-8 animate-pulse">
+            <div>
+              <div className="h-8 w-32 bg-border rounded mb-2" />
+              <div className="h-4 w-24 bg-border-soft rounded" />
+            </div>
+            <div className="h-12 w-40 bg-border-soft rounded-xl" />
+          </section>
+          <section className="space-y-4 animate-pulse">
+            <SkeletonJobCard />
+            <SkeletonJobCard />
+            <SkeletonJobCard />
+          </section>
+        </main>
       </div>
     )
   }
@@ -185,56 +185,50 @@ export default function JobsPage() {
     [...activeStatuses].some((s) => !defaultActive.has(s))
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-background">
 
       <main className="max-w-5xl mx-auto px-6 py-16">
         {/* Header */}
         <section className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-light text-[var(--color-foreground)] mb-2">
+            <h1 className="text-3xl font-light text-foreground mb-2">
               Jobs
             </h1>
-            <p className="text-[var(--color-primary-soft)]">
+            <p className="text-primary-soft">
               {jobs.length} {jobs.length === 1 ? 'Job' : 'Jobs'} insgesamt
             </p>
           </div>
-          <Link
-            href="/jobs/new"
-            className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
-          >
+          <ButtonLink href="/jobs/new">
             + Job hinzufügen
-          </Link>
+          </ButtonLink>
         </section>
 
         {jobs.length === 0 ? (
           /* Empty State — no jobs at all */
-          <section className="bg-[var(--color-surface)] rounded-2xl p-16 text-center border border-[var(--color-border)]">
-            <p className="text-[var(--color-primary-soft)] mb-6">
+          <section className="bg-surface rounded-2xl p-16 text-center border border-border">
+            <p className="text-primary-soft mb-6">
               Noch keine Jobs gespeichert.
             </p>
-            <Link
-              href="/jobs/new"
-              className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
-            >
+            <ButtonLink href="/jobs/new">
               Ersten Job hinzufügen
-            </Link>
+            </ButtonLink>
           </section>
         ) : (
           <>
             {/* Filter Toolbar */}
-            <section className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6 space-y-4">
+            <section className="bg-surface rounded-2xl p-6 border border-border mb-6 space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <input
                   type="text"
                   placeholder="Titel oder Firma suchen..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--color-border)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:outline-none focus:border-[var(--color-accent)]"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground placeholder:text-primary-soft focus:outline-none focus:border-accent"
                 />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="px-4 py-2.5 rounded-xl bg-[var(--background)] border border-[var(--color-border)] text-[var(--color-foreground)] focus:outline-none focus:border-[var(--color-accent)]"
+                  className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-accent"
                 >
                   <option value="newest">Neueste zuerst</option>
                   <option value="score">Score absteigend</option>
@@ -249,10 +243,11 @@ export default function JobsPage() {
                     <button
                       key={status}
                       onClick={() => toggleStatus(status)}
+                      aria-pressed={active}
                       className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border ${
                         active
-                          ? 'bg-[var(--color-primary)] text-[var(--color-surface)] border-[var(--color-primary)]'
-                          : 'bg-[var(--color-border-soft)] text-[var(--color-primary-soft)] border-[var(--color-border)]'
+                          ? 'bg-accent text-on-accent border-accent'
+                          : 'bg-border-soft text-primary-soft border-border'
                       }`}
                     >
                       {STATUS_LABELS[status]}
@@ -266,9 +261,9 @@ export default function JobsPage() {
                   type="checkbox"
                   checked={highMatchOnly}
                   onChange={(e) => setHighMatchOnly(e.target.checked)}
-                  className="w-4 h-4 accent-[var(--color-primary)]"
+                  className="w-4 h-4 accent-accent"
                 />
-                <span className="text-sm text-[var(--color-foreground)]">
+                <span className="text-sm text-foreground">
                   Nur High Matches (≥7)
                 </span>
               </label>
@@ -276,13 +271,13 @@ export default function JobsPage() {
 
             {/* Result Counter */}
             <div className="flex items-center justify-between mb-4">
-              <p className="text-sm text-[var(--color-primary-soft)]">
+              <p className="text-sm text-primary-soft tabular-nums">
                 {filteredJobs.length} von {jobs.length} Jobs
               </p>
               {hasActiveFilters && (
                 <button
                   onClick={resetFilters}
-                  className="text-sm text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors"
+                  className="text-sm text-primary hover:text-accent transition-colors"
                 >
                   Filter zurücksetzen
                 </button>
@@ -291,13 +286,13 @@ export default function JobsPage() {
 
             {filteredJobs.length === 0 ? (
               /* Empty State — filters yield nothing */
-              <section className="bg-[var(--color-surface)] rounded-2xl p-16 text-center border border-[var(--color-border)]">
-                <p className="text-[var(--color-primary-soft)] mb-6">
+              <section className="bg-surface rounded-2xl p-16 text-center border border-border">
+                <p className="text-primary-soft mb-6">
                   Keine Jobs für diese Filter.
                 </p>
                 <button
                   onClick={resetFilters}
-                  className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
+                  className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors"
                 >
                   Filter zurücksetzen
                 </button>
@@ -305,67 +300,62 @@ export default function JobsPage() {
             ) : (
               /* Job List */
               <section className="space-y-4">
-                {filteredJobs.map((job) => {
-                  const statusBadge = getStatusBadge(job.status)
-                  return (
-                    <div
-                      key={job.id}
-                      className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm"
-                    >
-                      <div className="flex items-start justify-between mb-5">
-                        <div className="flex-1">
-                          <Link href={`/jobs/${job.id}`}>
-                            <h3 className="text-xl font-medium text-[var(--color-foreground)] hover:text-[var(--color-accent)] transition-colors mb-1">
-                              {job.title}
-                            </h3>
-                          </Link>
-                          <p className="text-[var(--color-primary-soft)]">
-                            {job.company} • {job.location || 'Remote'}
-                          </p>
+                {filteredJobs.map((job) => (
+                  <div
+                    key={job.id}
+                    className="bg-surface rounded-2xl p-8 border border-border shadow-sm"
+                  >
+                    <div className="flex items-start justify-between mb-5">
+                      <div className="flex-1">
+                        <Link href={`/jobs/${job.id}`}>
+                          <h3 className="text-xl font-medium text-foreground hover:text-accent transition-colors mb-1">
+                            {job.title}
+                          </h3>
+                        </Link>
+                        <p className="text-primary-soft">
+                          {job.company} • {job.location || 'Remote'}
+                        </p>
+                      </div>
+                      {job.score && (
+                        <div className={`text-3xl font-light tabular-nums ${getScoreColor(job.score)}`}>
+                          {job.score}
                         </div>
-                        {job.score && (
-                          <div className={`text-3xl font-light ${getScoreColor(job.score)}`}>
-                            {job.score}
-                          </div>
-                        )}
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <StatusBadge status={job.status} />
+                        <a
+                          href={job.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:text-accent transition-colors"
+                        >
+                          Job ansehen →
+                        </a>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <span className={`px-3 py-1.5 rounded-full text-xs font-medium border ${statusBadge.class}`}>
-                            {statusBadge.label}
-                          </span>
-                          <a
-                            href={job.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors"
-                          >
-                            Job ansehen →
-                          </a>
-                        </div>
-
-                        <div className="flex gap-2">
-                          <StatusButton
-                            label="Beworben"
-                            onClick={() => updateStatus(job.id, 'APPLIED')}
-                            active={job.status === 'APPLIED'}
-                          />
-                          <StatusButton
-                            label="Interview"
-                            onClick={() => updateStatus(job.id, 'INTERVIEW')}
-                            active={job.status === 'INTERVIEW'}
-                          />
-                          <StatusButton
-                            label="Archiv"
-                            onClick={() => updateStatus(job.id, 'ARCHIVED')}
-                            active={job.status === 'ARCHIVED'}
-                          />
-                        </div>
+                      <div className="flex gap-2">
+                        <StatusButton
+                          label="Beworben"
+                          onClick={() => updateStatus(job.id, 'APPLIED')}
+                          active={job.status === 'APPLIED'}
+                        />
+                        <StatusButton
+                          label="Interview"
+                          onClick={() => updateStatus(job.id, 'INTERVIEW')}
+                          active={job.status === 'INTERVIEW'}
+                        />
+                        <StatusButton
+                          label="Archiv"
+                          onClick={() => updateStatus(job.id, 'ARCHIVED')}
+                          active={job.status === 'ARCHIVED'}
+                        />
                       </div>
                     </div>
-                  )
-                })}
+                  </div>
+                ))}
               </section>
             )}
           </>
@@ -375,14 +365,37 @@ export default function JobsPage() {
   )
 }
 
+function SkeletonJobCard() {
+  return (
+    <div className="bg-surface rounded-2xl p-8 border border-border-soft">
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex-1">
+          <div className="h-6 w-2/3 bg-border rounded mb-2" />
+          <div className="h-4 w-1/3 bg-border-soft rounded" />
+        </div>
+        <div className="h-9 w-8 bg-border-soft rounded" />
+      </div>
+      <div className="flex items-center justify-between">
+        <div className="h-7 w-24 bg-border-soft rounded-full" />
+        <div className="flex gap-2">
+          <div className="h-9 w-24 bg-border-soft rounded-xl" />
+          <div className="h-9 w-24 bg-border-soft rounded-xl" />
+          <div className="h-9 w-20 bg-border-soft rounded-xl" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function StatusButton({ label, onClick, active }: { label: string; onClick: () => void; active?: boolean }) {
   return (
     <button
       onClick={onClick}
+      aria-pressed={active}
       className={`text-sm px-4 py-2 rounded-xl font-medium transition-colors ${
         active
-          ? 'bg-[var(--color-primary)] text-[var(--color-surface)]'
-          : 'bg-[var(--color-border-soft)] text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+          ? 'bg-accent text-on-accent'
+          : 'bg-border-soft text-foreground hover:bg-border'
       }`}
     >
       {label}

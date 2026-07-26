@@ -398,7 +398,7 @@ export default function SettingsPage() {
                 <button
                   onClick={optimizeProfile}
                   disabled={optimizing || !profileName}
-                  className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+                  className="px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
                 >
                   {optimizing ? 'Optimiert...' : '🤖 KI-Optimierung'}
                 </button>
@@ -534,7 +534,7 @@ export default function SettingsPage() {
               <button
                 onClick={handleSync}
                 disabled={syncing || !syncEmail || !syncPassword}
-                className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
               >
                 {syncing ? 'Synchronisiert...' : 'Profil synchronisieren'}
               </button>
@@ -587,7 +587,7 @@ export default function SettingsPage() {
             <button
               onClick={saveSettings}
               disabled={saving}
-              className="px-8 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+              className="px-8 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
             >
               {saving ? 'Wird gespeichert...' : 'Einstellungen speichern'}
             </button>

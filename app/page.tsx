@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { ButtonLink } from './components/ui'
 
 interface Job {
   id: string
@@ -109,23 +110,23 @@ export default function Dashboard() {
   const nextStep = getNextStep()
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-background">
 
       <main className="max-w-5xl mx-auto px-6 py-16">
         {/* Welcome Section */}
         <section className="mb-16">
-          <h2 className="text-3xl font-light text-[var(--color-foreground)] mb-3">
+          <h2 className="text-3xl font-light text-foreground mb-3">
             Willkommen zurück
           </h2>
-          <p className="text-lg text-[var(--color-primary-soft)]">
+          <p className="text-lg text-primary-soft">
             Verwalte deine Bewerbungen einfach und strukturiert.
           </p>
         </section>
 
         {/* Error State */}
         {error && (
-          <section className="mb-8 p-4 bg-[var(--color-error)]/10 rounded-xl border border-[var(--color-error)]/20">
-            <p className="text-sm text-[var(--color-error)]">
+          <section className="mb-8 p-4 bg-error/10 rounded-xl border border-error/20">
+            <p className="text-sm text-error">
               Daten konnten nicht geladen werden. Bitte lade die Seite neu.
             </p>
           </section>
@@ -150,27 +151,24 @@ export default function Dashboard() {
 
         {/* Nächster Schritt */}
         {nextStep && (
-          <section className="mb-8 bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] flex items-center justify-between gap-4">
+          <section className="mb-8 bg-surface rounded-2xl p-6 border border-border flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm text-[var(--color-primary-soft)] mb-1">Nächster Schritt</p>
-              <h3 className="text-lg font-medium text-[var(--color-foreground)] mb-1">
+              <p className="text-sm text-primary-soft mb-1">Nächster Schritt</p>
+              <h3 className="text-lg font-medium text-foreground mb-1">
                 {nextStep.title}
               </h3>
-              <p className="text-sm text-[var(--color-primary-soft)]">{nextStep.description}</p>
+              <p className="text-sm text-primary-soft">{nextStep.description}</p>
             </div>
-            <Link
-              href={nextStep.href}
-              className="flex-shrink-0 text-sm px-5 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
-            >
+            <ButtonLink href={nextStep.href} size="sm" className="flex-shrink-0">
               {nextStep.cta}
-            </Link>
+            </ButtonLink>
           </section>
         )}
 
         {/* Top High Matches */}
         {!loading && !error && topMatches.length > 0 && (
           <section className="mb-8">
-            <h3 className="text-xl font-medium text-[var(--color-foreground)] mb-4">
+            <h3 className="text-xl font-medium text-foreground mb-4">
               Top Matches
             </h3>
             <div className="grid sm:grid-cols-3 gap-4">
@@ -178,19 +176,19 @@ export default function Dashboard() {
                 <Link
                   key={job.id}
                   href={`/jobs/${job.id}`}
-                  className="bg-[var(--color-surface)] rounded-2xl p-5 border border-[var(--color-border-soft)] hover:border-[var(--color-accent)] transition-colors block"
+                  className="bg-surface rounded-2xl p-5 border border-border-soft hover:border-accent transition-colors block"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <p className="font-medium text-[var(--color-foreground)] line-clamp-2 text-sm">
+                    <p className="font-medium text-foreground line-clamp-2 text-sm">
                       {job.title}
                     </p>
                     {job.score != null && (
-                      <span className="flex-shrink-0 ml-2 text-lg font-light text-[var(--color-success)]">
+                      <span className="flex-shrink-0 ml-2 text-lg font-light tabular-nums text-success">
                         {job.score}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-[var(--color-primary-soft)]">{job.company}</p>
+                  <p className="text-xs text-primary-soft">{job.company}</p>
                 </Link>
               ))}
             </div>
@@ -200,33 +198,30 @@ export default function Dashboard() {
         {/* Saved Searches */}
         {savedSearches.length > 0 && (
           <section className="mb-8">
-            <h3 className="text-xl font-medium text-[var(--color-foreground)] mb-4">
+            <h3 className="text-xl font-medium text-foreground mb-4">
               Deine gespeicherten Suchen
             </h3>
             <div className="space-y-3">
               {savedSearches.map((saved) => (
                 <div
                   key={saved.id}
-                  className="flex items-center justify-between bg-[var(--color-surface)] rounded-2xl p-5 border border-[var(--color-border-soft)]"
+                  className="flex items-center justify-between bg-surface rounded-2xl p-5 border border-border-soft"
                 >
                   <div>
-                    <p className="font-medium text-[var(--color-foreground)]">
+                    <p className="font-medium text-foreground">
                       {saved.query}
                       {saved.location ? ` · ${saved.location}` : ''}
                       {saved.remote ? ' · Remote' : ''}
                     </p>
                     {saved.lastRunAt && (
-                      <p className="text-xs text-[var(--color-primary-soft)] mt-1">
+                      <p className="text-xs text-primary-soft mt-1">
                         Zuletzt gesucht: {new Date(saved.lastRunAt).toLocaleDateString('de-DE')}
                       </p>
                     )}
                   </div>
-                  <Link
-                    href={`/search?saved=${saved.id}`}
-                    className="text-sm px-4 py-2 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
-                  >
+                  <ButtonLink href={`/search?saved=${saved.id}`} size="sm">
                     Jetzt suchen
-                  </Link>
+                  </ButtonLink>
                 </div>
               ))}
             </div>
@@ -234,8 +229,8 @@ export default function Dashboard() {
         )}
 
         {/* Getting Started */}
-        <section className="bg-[var(--color-surface)] rounded-2xl p-10 border border-[var(--color-border)] shadow-sm">
-          <h3 className="text-2xl font-medium text-[var(--color-foreground)] mb-8">
+        <section className="bg-surface rounded-2xl p-10 border border-border shadow-sm">
+          <h3 className="text-2xl font-medium text-foreground mb-8">
             Erste Schritte
           </h3>
           <div className="space-y-6 mb-10">
@@ -246,8 +241,8 @@ export default function Dashboard() {
           </div>
 
           <div className="flex flex-wrap gap-4">
-            <PrimaryButton href="/search">Jobs suchen</PrimaryButton>
-            <SecondaryButton href="/resume">Resume hochladen</SecondaryButton>
+            <ButtonLink href="/search">Jobs suchen</ButtonLink>
+            <ButtonLink href="/resume" variant="secondary">Resume hochladen</ButtonLink>
           </div>
         </section>
       </main>
@@ -257,20 +252,20 @@ export default function Dashboard() {
 
 function StatCard({ title, value, subtitle }: { title: string; value: string; subtitle: string }) {
   return (
-    <div className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border-soft)]">
-      <p className="text-sm text-[var(--color-primary-soft)] mb-2">{title}</p>
-      <p className="text-4xl font-light text-[var(--color-foreground)] mb-1">{value}</p>
-      <p className="text-xs text-[var(--color-primary-soft)]">{subtitle}</p>
+    <div className="bg-surface rounded-2xl p-8 border border-border-soft">
+      <p className="text-sm text-primary-soft mb-2">{title}</p>
+      <p className="text-4xl font-light tabular-nums text-foreground mb-1">{value}</p>
+      <p className="text-xs text-primary-soft">{subtitle}</p>
     </div>
   )
 }
 
 function SkeletonCard() {
   return (
-    <div className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border-soft)] animate-pulse">
-      <div className="h-4 w-24 bg-[var(--color-border)] rounded mb-3" />
-      <div className="h-10 w-16 bg-[var(--color-border)] rounded mb-2" />
-      <div className="h-3 w-20 bg-[var(--color-border-soft)] rounded" />
+    <div className="bg-surface rounded-2xl p-8 border border-border-soft animate-pulse">
+      <div className="h-4 w-24 bg-border rounded mb-3" />
+      <div className="h-10 w-16 bg-border rounded mb-2" />
+      <div className="h-3 w-20 bg-border-soft rounded" />
     </div>
   )
 }
@@ -278,35 +273,13 @@ function SkeletonCard() {
 function StepCard({ step, title, description }: { step: number; title: string; description: string }) {
   return (
     <div className="flex items-start gap-5">
-      <div className="flex-shrink-0 w-9 h-9 bg-[var(--color-primary)] text-[var(--color-surface)] rounded-full flex items-center justify-center text-sm font-medium">
+      <div className="flex-shrink-0 w-9 h-9 bg-accent text-on-accent rounded-full flex items-center justify-center text-sm font-medium tabular-nums">
         {step}
       </div>
       <div className="pt-1">
-        <h4 className="font-medium text-[var(--color-foreground)] mb-1">{title}</h4>
-        <p className="text-sm text-[var(--color-primary-soft)] leading-relaxed">{description}</p>
+        <h4 className="font-medium text-foreground mb-1">{title}</h4>
+        <p className="text-sm text-primary-soft leading-relaxed">{description}</p>
       </div>
     </div>
-  )
-}
-
-function PrimaryButton({ href, children }: { href: string; children: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors"
-    >
-      {children}
-    </Link>
-  )
-}
-
-function SecondaryButton({ href, children }: { href: string; children: string }) {
-  return (
-    <Link
-      href={href}
-      className="inline-flex items-center justify-center px-6 py-3 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium transition-colors"
-    >
-      {children}
-    </Link>
   )
 }

@@ -111,7 +111,7 @@ export default function RegisterPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-accent)] disabled:opacity-50 text-[var(--color-surface)] py-3 rounded-xl font-medium transition-colors"
+            className="w-full bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] disabled:opacity-50 text-[var(--color-surface)] py-3 rounded-xl font-medium transition-colors"
           >
             {loading ? 'Wird erstellt...' : 'Registrieren'}
           </button>

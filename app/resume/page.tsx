@@ -182,7 +182,7 @@ export default function ResumePage() {
               </button>
               <button
                 onClick={() => setMode('upload')}
-                className="px-5 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors"
+                className="px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors"
               >
                 Ersetzen
               </button>
@@ -242,7 +242,7 @@ export default function ResumePage() {
               <button
                 onClick={handlePasteSubmit}
                 disabled={loading || !pastedText.trim()}
-                className="w-full py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 {loading ? 'Wird gespeichert...' : 'Speichern'}
               </button>
@@ -266,7 +266,7 @@ export default function ResumePage() {
               <button
                 onClick={saveEdit}
                 disabled={loading}
-                className="px-6 py-3 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 {loading ? 'Speichert...' : 'Speichern'}
               </button>

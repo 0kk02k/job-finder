@@ -63,6 +63,7 @@ job-finder/
 - **Platform Credentials** (LinkedIn, XING, StepStone) — AES-256-GCM-verschlüsselt
 - **KI-Optimierung** (API + UI in Settings)
 - **UI/UX** vereinheitlicht (CSS-Variablen-System überall, Toast-System statt alert())
+- **Design-System 2026-07-26** (siehe unten) — Ocker-Akzent, Shared UI-Komponenten, Mobile-Nav
 - **Security-Audit 2026-07-18** (siehe unten) — alle kritischen Befunde behoben
 
 ### ⚠️ Teilweise
@@ -78,6 +79,17 @@ job-finder/
 - Automatisiertes Testsetup
 - **Auf Mistral vereinheitlichen:** `/api/platforms/optimize` ist noch hart auf `ollama` verdrahtet (Fallback ebenfalls) — auf User-Settings umstellen (Default: Mistral), damit alle KI-Features denselben Provider nutzen
 - **Idee: kleiner KI-Chatbot** — immer erreichbarer Assistent für Fragen zu Jobs, Resume und Bewerbung (nutzt den konfigurierten Provider des Users)
+
+## Design-System-Overhaul (2026-07-26)
+
+- **Ocker-Akzent** (`--color-accent` #b45309 hell / #dfa04e dark) als einzige kommunikative Farbe: CTAs, aktive States, Focus-Ring, Link-Hover. Vorher war die Palette komplett grau, auch die Primär-Buttons
+- **Alle Tokens in `@theme inline` gemappt** (`app/globals.css`) — Tailwind-Utilities (`bg-accent`, `text-primary-soft`, `border-border`) statt `var(...)`-Arbitrary-Values; neue Tokens: `accent`, `accent-strong`, `accent-soft`, `on-accent`
+- **Shared UI-Komponenten** in `app/components/ui.tsx`: `Button`, `ButtonLink` (primary/secondary, md/sm), `Card`, `StatusBadge` — ersetzt die copy-pasteten Button-Class-Strings (14 Stellen in 8 Seiten)
+- **Navigation** (`app/nav.tsx`): aktiver Link mit Akzent-Underline + `aria-current`, Mobile-Hamburger-Menü (<sm), `bg-surface/80` für funktionierendes Backdrop-Blur
+- **Jobs-Liste**: Skeleton-Cards statt „Lade Jobs..."-Text, Filter-Chips mit `aria-pressed` + Akzent-Aktivzustand
+- **Dashboard**: `tabular-nums` auf Stats/Scores (gegen Layout-Shift), Step-Nummern in Akzent
+- Globale `*`-Transition aus `globals.css` entfernt (verursachte ungewollte Einblend-Animationen)
+- Design-Entscheidungen dokumentiert in `.interface-design/system.md`
 
 ## Audit & Fixes (2026-07-18)
 
@@ -157,8 +169,8 @@ vercel deploy
 ## Git Stand
 
 - Branch: `main` (clean)
-- Letzte Änderungen: UI/UX Overhaul, Platform Credentials, XING/Indeed/Glassdoor
-- Nicht committed: `.env` (sensitive), `dev.db` (lokal)
+- Letzte Änderungen: Design-System-Overhaul (Ocker-Akzent, Shared Components, Mobile-Nav), Interview-Chat mit Resume-Kontext
+- Nicht committed: `.env` (sensitive), `dev.db` (lokal), `resume_software_engineer_test.pdf` (Test-Artefakt)
 
 ## Nächste Schritte (wenn weitergemacht wird)
 
@@ -186,4 +198,4 @@ vercel deploy
 
 ---
 
-Stand: 2026-07-20 (Audit + Security-/Kernfunktions-Fixes E2E-verifiziert, PLAN.md Stufen 1–7 umgesetzt, README neu geschrieben)
+Stand: 2026-07-26 (Design-System-Overhaul: Akzent, Shared UI-Komponenten, Mobile-Nav — Build + Lint sauber)

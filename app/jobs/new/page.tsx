@@ -61,7 +61,7 @@ export default function NewJobPage() {
               onClick={() => setManualMode(false)}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 !manualMode
-                  ? 'bg-[var(--color-primary)] text-[var(--color-surface)]'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
                   : 'bg-[var(--color-border-soft)] text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
               }`}
             >
@@ -71,7 +71,7 @@ export default function NewJobPage() {
               onClick={() => setManualMode(true)}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 manualMode
-                  ? 'bg-[var(--color-primary)] text-[var(--color-surface)]'
+                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
                   : 'bg-[var(--color-border-soft)] text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
               }`}
             >
@@ -157,7 +157,7 @@ export default function NewJobPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] disabled:opacity-50 text-[var(--color-surface)] py-3 rounded-xl font-medium transition-colors"
+                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] disabled:opacity-50 text-[var(--color-surface)] py-3 rounded-xl font-medium transition-colors"
               >
                 {loading ? 'Wird hinzugefügt...' : 'Hinzufügen'}
               </button>
