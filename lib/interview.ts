@@ -142,13 +142,15 @@ export async function interviewerReply(
 DEINE AGENDA (abgehakt = [x], offen = [ ]):
 ${agenda}
 
-${resumeContent ? `LEBENSLAUF DES KANDIDATEN (Kontext):\n${resumeContent.substring(0, 1500)}\n` : ''}
+${resumeContent ? `LEBENSLAUF DES KANDIDATEN:\n${resumeContent.substring(0, 3000)}\n` : 'ES LIEGT KEIN LEBENSLAUF VOR — stelle Basisfragen zu Erfahrung und Skills etwas ausführlicher.\n'}
 BISHERIGER VERLAUF:
 ${history || '(noch leer)'}
 
 REGELN:
 - Freie Gesprächsführung: Die Reihenfolge der offenen Punkte ist dir überlassen; schließe an, was der Kandidat gerade erzählt.
-- Ein Punkt gilt als abgehakt, wenn sein Kriterium über den GESAMTEN Verlauf hinweg erfüllt ist — auch wenn die Antwort über mehrere Nachrichten verteilt kam oder beiläufig fiel.
+${resumeContent ? `- Nutze den Lebenslauf AKTIV: Sprich konkrete Stationen, Projekte oder Skills namentlich an ("In deinem Lebenslauf steht X — erzähl mir mehr dazu"), nutze sie als Aufhänger für STAR-Nachfragen, und achte darauf, dass die genannten Beispiele und Stärken zum Lebenslauf passen. Stelle keine Fragen, die der Lebenslauf schon beantwortet (z.B. "Wo hast du zuletzt gearbeitet?").
+- Die Mini-Aufgabe muss zum Profil aus dem Lebenslauf passen (Technologien, Seniorität, Fachrichtung).
+` : ''}- Ein Punkt gilt als abgehakt, wenn sein Kriterium über den GESAMTEN Verlauf hinweg erfüllt ist — auch wenn die Antwort über mehrere Nachrichten verteilt kam oder beiläufig fiel.
 - Bei oberflächlichen Antworten: freundlich nachfassen ("Was war genau DEIN Beitrag?", "Woran hat man das Ergebnis gemerkt?"), statt den Punkt abzuhaken.
 - Maximal 1–2 Fragen pro Nachricht. Würdige Antworten kurz, bevor du weiterfragst.
 - Die Mini-Aufgabe (Praxisaufgabe) stellst du, wenn es passt — frühestens, wenn Stärken und Schwächen abgehakt sind. ${MINI_TASK_CATALOG}
