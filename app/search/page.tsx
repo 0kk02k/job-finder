@@ -156,6 +156,27 @@ function SearchPageContent() {
     runSearch(saved.query, saved.location || '', saved.remote, saved.semantic, saved.id)
   }
 
+  async function ignoreJob(job: SearchResult) {
+    try {
+      const res = await fetch('/api/jobs/ignore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: job.url,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          description: job.description,
+        }),
+      })
+      if (res.ok) {
+        setResults((prev) => prev.filter((j) => j.url !== job.url))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   function getScoreColor(score?: number) {
     if (!score) return 'text-[var(--color-primary-soft)]'
     if (score >= 8) return 'text-[var(--color-success)]'
@@ -311,8 +332,8 @@ function SearchPageContent() {
         {/* Results */}
         {results.length > 0 && (
           <section className="space-y-4">
-            {results.map((job, index) => (
-              <JobCard key={index} job={job} getScoreColor={getScoreColor} getPlatformBadge={getPlatformBadge} />
+            {results.map((job) => (
+              <JobCard key={job.url} job={job} onIgnore={() => ignoreJob(job)} getScoreColor={getScoreColor} getPlatformBadge={getPlatformBadge} />
             ))}
           </section>
         )}
@@ -363,13 +384,21 @@ function StatCard({ title, value, highlight }: { title: string; value: string; h
 
 function JobCard({
   job,
+  onIgnore,
   getScoreColor,
   getPlatformBadge,
 }: {
   job: SearchResult
+  onIgnore: () => void
   getScoreColor: (score?: number) => string
   getPlatformBadge: (platform: string) => string
 }) {
+  const scoreBadge = typeof job.aiScore === 'number'
+    ? { label: `Score ${job.aiScore}/10`, color: getScoreColor(job.aiScore) }
+    : typeof job.relevanceScore === 'number' && job.relevanceScore > 0
+      ? { label: `Match ${Math.round(job.relevanceScore * 100)}%`, color: getScoreColor(Math.round(job.relevanceScore * 10)) }
+      : { label: 'Kein Score', color: 'text-[var(--color-primary-soft)]' }
+
   return (
     <div className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm">
       <div className="flex items-start justify-between mb-5">
@@ -378,16 +407,9 @@ function JobCard({
             <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getPlatformBadge(job.platform)}`}>
               {job.platform}
             </span>
-            {job.aiScore && (
-              <span className={`text-lg font-light ${getScoreColor(job.aiScore)}`}>
-                {job.aiScore}/10
-              </span>
-            )}
-            {job.relevanceScore && (
-              <span className={`text-lg font-light ${getScoreColor(Math.round(job.relevanceScore * 10))}`}>
-                {Math.round(job.relevanceScore * 100)}%
-              </span>
-            )}
+            <span className={`px-3 py-1 rounded-full text-xs font-medium border border-[var(--color-border)] bg-[var(--color-border-soft)] ${scoreBadge.color}`}>
+              {scoreBadge.label}
+            </span>
           </div>
           <h3 className="text-xl font-medium text-[var(--color-foreground)] mb-1">
             {job.title}
@@ -396,14 +418,22 @@ function JobCard({
             {job.company} • {job.location}
           </p>
         </div>
-        <a
-          href={job.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-5 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl text-sm font-medium transition-colors"
-        >
-          Ansehen
-        </a>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onIgnore}
+            className="px-5 py-2.5 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl text-sm font-medium transition-colors"
+          >
+            Ignorieren
+          </button>
+          <a
+            href={job.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-5 py-2.5 bg-[var(--color-primary)] hover:bg-[var(--color-accent)] text-[var(--color-surface)] rounded-xl text-sm font-medium transition-colors"
+          >
+            Ansehen
+          </a>
+        </div>
       </div>
 
       {job.matchReason && (

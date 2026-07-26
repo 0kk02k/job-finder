@@ -86,7 +86,7 @@ export function defaultModel(provider: string): string {
 }
 
 // Parse JSON from model output, tolerating markdown code fences and prose around it
-function parseJsonFromText(text: string) {
+export function parseJsonFromText(text: string) {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
   try {
     return JSON.parse(cleaned)

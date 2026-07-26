@@ -78,6 +78,10 @@ export async function POST(request: NextRequest) {
         apifyToken,
       })
 
+      // Ignored (archived) jobs stay out of the result pool; best matches first
+      jobs = jobs.filter(j => statusByUrl.get(j.url) !== 'ARCHIVED')
+      jobs.sort((a, b) => b.relevanceScore - a.relevanceScore)
+
       // Save high matches
       const highMatches = jobs.filter(job => job.relevanceScore >= 0.7)
 
@@ -173,16 +177,22 @@ export async function POST(request: NextRequest) {
     })
   )
 
+  // Ignored (archived) jobs stay out of the result pool; best scores first,
+  // unscored jobs last
+  const visibleJobs = scoredJobs
+    .filter(j => statusByUrl.get(j.url) !== 'ARCHIVED')
+    .sort((a, b) => (b.aiScore ?? -1) - (a.aiScore ?? -1))
+
   // Determine which jobs are new before upserting
   const existingTraditional = await prisma.job.findMany({
-    where: { userId, url: { in: scoredJobs.map(j => j.url) } },
+    where: { userId, url: { in: visibleJobs.map(j => j.url) } },
     select: { url: true },
   })
   const existingTraditionalUrls = new Set(existingTraditional.map(j => j.url))
   let newJobsCount = 0
 
   // Auto-save all results to job list
-  for (const job of scoredJobs) {
+  for (const job of visibleJobs) {
     const isNew = !existingTraditionalUrls.has(job.url)
     if (isNew) newJobsCount++
     try {
@@ -217,13 +227,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const highMatchCount = scoredJobs.filter(j => (j.aiScore ?? 0) >= 7).length
+  const highMatchCount = visibleJobs.filter(j => (j.aiScore ?? 0) >= 7).length
 
   return NextResponse.json({
-    total: scoredJobs.length,
+    total: visibleJobs.length,
     highMatches: highMatchCount,
     newJobs: newJobsCount,
-    jobs: scoredJobs,
+    jobs: visibleJobs,
     semantic: false,
   })
 }

@@ -25,6 +25,7 @@ model User {
   credentials PlatformCredential[]
   profiles    PlatformProfile[]
   savedSearches SavedSearch[]
+  interviews  InterviewSession[]
 }
 
 model PlatformCredential {
@@ -177,4 +178,19 @@ model SavedSearch {
   createdAt DateTime @default(now())
 
   @@unique([userId, query, location])
+}
+
+model InterviewSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status    String   @default("ACTIVE") // ACTIVE, COMPLETED
+  completedItems String @default("[]") // JSON: abgehakte Leitfaden-IDs (z.B. ["strength-1"])
+  messages  String   @default("[]")  // JSON: [{ role, content, ts }]
+  insights  String?  // JSON, gefüllt bei Abschluss (Stärken/Schwächen/MiniTask/Kompetenzen)
+  personalityType String? // 16Personalities-Typ (z.B. "INFJ-T"), auch ohne Interview eintragbar
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
