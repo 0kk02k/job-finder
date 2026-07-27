@@ -80,6 +80,7 @@ job-finder/
 - **Auf Mistral vereinheitlichen:** `/api/platforms/optimize` ist noch hart auf `ollama` verdrahtet (Fallback ebenfalls) — auf User-Settings umstellen (Default: Mistral), damit alle KI-Features denselben Provider nutzen
 - **Nebius als KI-Provider einbauen:** GLM-5.2 (Z.ai) EU-gehostet über Nebius Token Factory (NL) — neuer Eintrag in `getAIClient()` (`lib/ai.ts`, OpenAI-kompatibel), Provider-Auswahl in Settings. Löst den Mistral-Default ab.
 - **Idee: kleiner KI-Chatbot** — immer erreichbarer Assistent für Fragen zu Jobs, Resume und Bewerbung (nutzt den konfigurierten Provider des Users)
+- **Interview-Auswertung als PDF:** Am Ende des Interviews soll die Akte (Stärken/Schwächen/Mini-Task/Kompetenzen + Zusammenfassung) als PDF herunterladbar sein — analog zum bestehenden Resume-/Anschreiben-Export über `/api/pdf` und `lib/pdf-documents.tsx`
 
 ## Design-System-Overhaul (2026-07-26)
 
