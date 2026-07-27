@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { MarkdownContent } from '../components/Markdown'
 
 interface Message {
   role: 'assistant' | 'user'
@@ -315,13 +316,13 @@ export default function InterviewPage() {
               {interview.messages.map((m, i) => (
                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[80%] rounded-2xl px-5 py-3 text-sm leading-relaxed whitespace-pre-wrap ${
+                    className={`max-w-[80%] rounded-2xl px-5 py-3 text-sm leading-relaxed ${
                       m.role === 'user'
-                        ? 'bg-[var(--color-primary)] text-[var(--color-surface)]'
+                        ? 'bg-[var(--color-primary)] text-[var(--color-surface)] whitespace-pre-wrap'
                         : 'bg-[var(--color-border-soft)] text-[var(--color-foreground)]'
                     }`}
                   >
-                    {m.content}
+                    {m.role === 'user' ? m.content : <MarkdownContent content={m.content} variant="chat" />}
                   </div>
                 </div>
               ))}

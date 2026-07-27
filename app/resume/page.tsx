@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useToast } from '../components/Toast'
+import { MarkdownContent } from '../components/Markdown'
 
 interface Resume {
   id: string
@@ -313,59 +314,4 @@ export default function ResumePage() {
       </main>
     </div>
   )
-}
-
-function MarkdownContent({ content }: { content: string }) {
-  const lines = content.split('\n')
-  const elements: React.ReactNode[] = []
-  let listItems: string[] = []
-
-  function flushList(key: number) {
-    if (listItems.length === 0) return
-    elements.push(
-      <ul key={`list-${key}`} className="list-disc pl-5 space-y-1 mb-3 text-[var(--color-foreground)] text-sm">
-        {listItems.map((item, i) => (
-          <li key={i}>{renderInline(item)}</li>
-        ))}
-      </ul>
-    )
-    listItems = []
-  }
-
-  lines.forEach((line, i) => {
-    const trimmed = line.trim()
-
-    if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
-      listItems.push(trimmed.slice(2))
-      return
-    }
-
-    flushList(i)
-
-    if (trimmed.startsWith('### ')) {
-      elements.push(<h4 key={i} className="text-sm font-medium text-[var(--color-foreground)] mt-4 mb-2">{renderInline(trimmed.slice(4))}</h4>)
-    } else if (trimmed.startsWith('## ')) {
-      elements.push(<h3 key={i} className="text-base font-medium text-[var(--color-foreground)] mt-5 mb-2">{renderInline(trimmed.slice(3))}</h3>)
-    } else if (trimmed.startsWith('# ')) {
-      elements.push(<h2 key={i} className="text-lg font-medium text-[var(--color-foreground)] mt-6 mb-3">{renderInline(trimmed.slice(2))}</h2>)
-    } else if (trimmed === '') {
-      // skip empty lines
-    } else {
-      elements.push(<p key={i} className="text-[var(--color-foreground)] text-sm leading-relaxed mb-3">{renderInline(trimmed)}</p>)
-    }
-  })
-
-  flushList(lines.length)
-
-  return <div>{elements}</div>
-}
-
-function renderInline(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g)
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i}>{part.slice(2, -2)}</strong>
-    }
-    return part
-  })
 }

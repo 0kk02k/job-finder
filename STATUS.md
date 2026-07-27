@@ -78,6 +78,7 @@ job-finder/
 - Rate-Limiting auf Auth- und KI-Routen
 - Automatisiertes Testsetup
 - **Auf Mistral vereinheitlichen:** `/api/platforms/optimize` ist noch hart auf `ollama` verdrahtet (Fallback ebenfalls) — auf User-Settings umstellen (Default: Mistral), damit alle KI-Features denselben Provider nutzen
+- **Nebius als KI-Provider einbauen:** GLM-5.2 (Z.ai) EU-gehostet über Nebius Token Factory (NL) — neuer Eintrag in `getAIClient()` (`lib/ai.ts`, OpenAI-kompatibel), Provider-Auswahl in Settings. Löst den Mistral-Default ab.
 - **Idee: kleiner KI-Chatbot** — immer erreichbarer Assistent für Fragen zu Jobs, Resume und Bewerbung (nutzt den konfigurierten Provider des Users)
 
 ## Design-System-Overhaul (2026-07-26)
@@ -90,6 +91,12 @@ job-finder/
 - **Dashboard**: `tabular-nums` auf Stats/Scores (gegen Layout-Shift), Step-Nummern in Akzent
 - Globale `*`-Transition aus `globals.css` entfernt (verursachte ungewollte Einblend-Animationen)
 - Design-Entscheidungen dokumentiert in `.interface-design/system.md`
+
+## Resume-Ansicht & PDF-Extraktion (2026-07-26)
+
+- **Ursache „Textblob":** `unpdf` mit `mergePages: true` plättet allen Whitespace zu einer Zeile (`.replace(/\s+/g, ' ')`). Upload-Route nutzt jetzt `mergePages: false` + Normalisierung (verwaiste Bullet-Glyphen `•` werden entfernt, pdfjs splittet sie als eigene Text-Runs)
+- **Strukturierter Renderer** (`MarkdownContent` in `app/resume/page.tsx`): erkennt Resume-Sektionen (Profil, Erfahrung, Kenntnisse, …) und rendert sie mit Akzent-Überschrift + Hairline; kurze Zeilen ohne Endpunktuation werden Sub-Headings; hart umgebrochene Zeilen werden zu fließenden Absätzen zusammengeführt (Bindestrich-Umbrüche werden korrekt verbunden)
+- Bestehender Resume-Datensatz in Neon wurde mit der neuen Extraktion repariert
 
 ## Audit & Fixes (2026-07-18)
 

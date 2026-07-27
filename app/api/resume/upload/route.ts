@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 
+// unpdf with mergePages:false keeps line breaks, but pdfjs emits bullet glyphs
+// ("•") as separate text runs — drop those orphaned lines and tidy up spacing.
+function normalizeExtractedText(text: string): string {
+  return text
+    .split('\n')
+    .filter((line) => !/^\s*[•·◦▪]\s*$/.test(line))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,8 +32,9 @@ export async function POST(request: NextRequest) {
   if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
     try {
       const { extractText } = await import('unpdf')
-      const result = await extractText(bytes, { mergePages: true })
-      text = result.text
+      const result = await extractText(bytes, { mergePages: false })
+      const pages = Array.isArray(result.text) ? result.text : [result.text]
+      text = normalizeExtractedText(pages.join('\n\n'))
     } catch (err) {
       console.error('PDF extraction error:', err)
       return NextResponse.json({

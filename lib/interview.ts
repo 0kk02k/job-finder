@@ -115,9 +115,10 @@ interface AIConfig {
   baseUrl?: string
 }
 
-// Nächster Interviewer-Zug im freien Gespräch. Die KI bekommt die Agenda mit
-// abgehakten/offenen Punkten und meldet zurück, welche Punkte durch die letzte
-// Antwort des Kandidaten (oder kumuliert über den Verlauf) abgehakt werden können.
+// Nächster Interviewer-Zug im freien Gespräch. Läuft in zwei getrennten KI-Calls:
+// 1. Abhaken der Agenda (reine Klassifikation — können kleine Modelle zuverlässig),
+// 2. Antwort generieren (freier Text ohne JSON-Zwang — bessere Prosa, und die
+//    Agenda ist da schon aktualisiert, sodass nichts erneut gefragt wird).
 export async function interviewerReply(
   messages: InterviewMessage[],
   completedIds: string[],
@@ -125,21 +126,29 @@ export async function interviewerReply(
   config: AIConfig
 ): Promise<{ reply: string; completed: string[] }> {
   const ai = getAIClient(config.provider || 'mistral', config.apiKey, config.baseUrl)
+  const model = ai.chat(config.model || defaultModel(config.provider || 'mistral'))
 
   const history = messages
     .map((m) => `${m.role === 'assistant' ? 'INTERVIEWER' : 'KANDIDAT'}: ${m.content}`)
     .join('\n\n')
 
+  const validIds = new Set(INTERVIEW_GUIDE.map((i) => i.id))
+
+  // --- Schritt 1: offene Agenda-Punkte gegen den Verlauf prüfen ---
+  const newlyCompleted = await classifyCompleted(history, completedIds, model)
+  const allCompleted = [...new Set([...completedIds, ...newlyCompleted])]
+
   const agenda = INTERVIEW_GUIDE.map((item) => {
-    const done = completedIds.includes(item.id)
+    const done = allCompleted.includes(item.id)
     return `${done ? '[x]' : '[ ]'} ${item.id} (${item.category}: ${item.topic})\n    Abhak-Kriterium: ${item.criteria}`
   }).join('\n')
 
-  const remaining = INTERVIEW_GUIDE.filter((i) => !completedIds.includes(i.id))
+  const remaining = INTERVIEW_GUIDE.filter((i) => !allCompleted.includes(i.id))
 
+  // --- Schritt 2: Antwort mit aktualisierter Agenda generieren ---
   const prompt = `Du bist eine erfahrene, warme HR-Interviewerin und führst ein Interview als natürlichen, interaktiven Chat auf Deutsch. Es ist ein GESPRÄCH, kein Fragebogen: Du hörst zu, greifst Punkte auf, schweifst kurz mit, beantwortest Rückfragen — und führst die Unterhaltung dabei organisch durch deine Agenda.
 
-DEINE AGENDA (abgehakt = [x], offen = [ ]):
+DEINE AGENDA (abgehakt = [x], offen = [ ]) — Stand inklusive der letzten Antwort:
 ${agenda}
 
 ${resumeContent ? `LEBENSLAUF DES KANDIDATEN:\n${resumeContent.substring(0, 3000)}\n` : 'ES LIEGT KEIN LEBENSLAUF VOR — stelle Basisfragen zu Erfahrung und Skills etwas ausführlicher.\n'}
@@ -150,34 +159,91 @@ REGELN:
 - Freie Gesprächsführung: Die Reihenfolge der offenen Punkte ist dir überlassen; schließe an, was der Kandidat gerade erzählt.
 ${resumeContent ? `- Nutze den Lebenslauf AKTIV: Sprich konkrete Stationen, Projekte oder Skills namentlich an ("In deinem Lebenslauf steht X — erzähl mir mehr dazu"), nutze sie als Aufhänger für STAR-Nachfragen, und achte darauf, dass die genannten Beispiele und Stärken zum Lebenslauf passen. Stelle keine Fragen, die der Lebenslauf schon beantwortet (z.B. "Wo hast du zuletzt gearbeitet?").
 - Die Mini-Aufgabe muss zum Profil aus dem Lebenslauf passen (Technologien, Seniorität, Fachrichtung).
-` : ''}- Ein Punkt gilt als abgehakt, wenn sein Kriterium über den GESAMTEN Verlauf hinweg erfüllt ist — auch wenn die Antwort über mehrere Nachrichten verteilt kam oder beiläufig fiel.
-- Bei oberflächlichen Antworten: freundlich nachfassen ("Was war genau DEIN Beitrag?", "Woran hat man das Ergebnis gemerkt?"), statt den Punkt abzuhaken.
-- Maximal 1–2 Fragen pro Nachricht. Würdige Antworten kurz, bevor du weiterfragst.
+` : ''}- NIEMALS eine Frage wiederholen — auch nicht umformuliert. Abgehakte Punkte [x] sind erledigt: frage nicht mehr danach, auch nicht "zur Sicherheit". Prüfe vor jeder Frage den Verlauf: Wurde das schon gefragt oder beiläufig beantwortet? Dann greife einen neuen Aspekt auf oder gehe zum nächsten offenen Punkt über.
+- Bei teilweise beantworteten Punkten: frage gezielt NUR den fehlenden Aspekt ("Und was war am Ende das Ergebnis?"), nicht das ganze Thema erneut.
+- Bei oberflächlichen Antworten: freundlich nachfassen ("Was war genau DEIN Beitrag?", "Woran hat man das Ergebnis gemerkt?").
+- Maximal 1–2 Fragen pro Nachricht. Würdige Antworten kurz und mit sichtbarem Bezug zum Gesagten (konkretes Detail aufgreifen) — aber variiere deine Formulierungen, keine wiederholten Lob- oder Übergangsfloskeln.
 - Die Mini-Aufgabe (Praxisaufgabe) stellst du, wenn es passt — frühestens, wenn Stärken und Schwächen abgehakt sind. ${MINI_TASK_CATALOG}
 - Duzen, lockerer aber professioneller Ton.
 - Sind alle Punkte abgehakt, verabschiede dich mit einer kurzen, ehrlichen Zusammenfassung.
 
-Antworte AUSSCHLIESSLICH als JSON:
-{
-  "reply": "Deine nächste Nachricht an den Kandidaten",
-  "completed": ["id1", "id2"]
-}
-"completed" enthält NUR IDs von Punkten aus der Agenda, die jetzt (kumulativ) erfüllt sind — leer, wenn keiner dazukam. Verbleibende offene Punkte: ${remaining.map((i) => i.id).join(', ') || 'keine'}.`
+Offene Punkte: ${remaining.map((i) => i.id).join(', ') || 'keine — Interview abschließen'}.
+Antworte NUR mit deiner nächsten Nachricht an den Kandidaten (Klartext, kein JSON, keine Meta-Kommentare).`
 
   const { text } = await generateText({
-    model: ai.chat(config.model || defaultModel(config.provider || 'mistral')),
+    model,
     messages: [{ role: 'user', content: prompt }],
   })
 
-  const result = parseJsonFromText(text || '{}')
-  const validIds = new Set(INTERVIEW_GUIDE.map((i) => i.id))
-  const completed = (Array.isArray(result.completed) ? result.completed : [])
-    .filter((id: unknown) => typeof id === 'string' && validIds.has(id) && !completedIds.includes(id))
-
   return {
-    reply: typeof result.reply === 'string' && result.reply.trim() ? result.reply : 'Kannst du das noch etwas genauer beschreiben?',
-    completed,
+    reply: text?.trim() ? text.trim() : 'Kannst du das noch etwas genauer beschreiben?',
+    completed: [...allCompleted].filter((id) => validIds.has(id) && !completedIds.includes(id)),
   }
+}
+
+// Reine Klassifikation: Welche offenen Agenda-Punkte sind über den Verlauf
+// hinweg erfüllt? Bewusst getrennt von der Antwort-Generierung — kleine Modelle
+// sind bei "eine Aufgabe, eine JSON-Liste" deutlich zuverlässiger als bei
+// "schreibe Prosa UND tracke nebenbei State".
+async function classifyCompleted(
+  history: string,
+  alreadyCompleted: string[],
+  model: ReturnType<ReturnType<typeof getAIClient>['chat']>
+): Promise<string[]> {
+  const openItems = INTERVIEW_GUIDE.filter((i) => !alreadyCompleted.includes(i.id))
+  if (openItems.length === 0) return []
+
+  const checklist = openItems
+    .map((item) => `- ${item.id} (${item.topic})\n  Erfüllt wenn: ${item.criteria}`)
+    .join('\n')
+
+  const prompt = `Du prüfst ein Interview-Transkript gegen eine Checkliste. Entscheide für jeden OFFENEN Punkt, ob er über den GESAMTEN Verlauf hinweg erfüllt ist — auch wenn die Antwort über mehrere Nachrichten verteilt kam oder beiläufig fiel.
+
+OFFENE PUNKTE:
+${checklist}
+
+TRANSKRIPT:
+${history}
+
+Regeln:
+- Hake NUR ab, wenn der Kandidat zum Thema des Punkts tatsächlich Inhalt geliefert hat. Ein Punkt, der im Transkript gar nicht vorkommt, ist niemals erfüllt.
+- Substanziell beantwortet reicht — Perfektion ist nicht nötig. Verteilt über mehrere Nachrichten oder beiläufig gegeben zählt.
+- Hake NICHT ab, wenn der Punkt nur angeschnitten, aber inhaltlich leer geblieben ist (z.B. Stärke genannt, aber ohne jegliches Beispiel).
+- Die Mini-Aufgabe (mini-task) ist erst erfüllt, wenn eine Aufgabe gestellt UND beantwortet UND vom Interviewer kommentiert wurde.
+
+Antworte AUSSCHLIESSLICH als JSON:
+{ "completed": [{ "id": "punkt-id", "evidence": "wörtliches Zitat des KANDIDATEN aus dem Transkript, das den Punkt belegt" }] }
+Nur IDs aus der Liste oben. "evidence" muss wörtlich aus dem Transkript stammen (kann gekürzt sein). Leere Liste, wenn keiner erfüllt ist.`
+
+  try {
+    const { text } = await generateText({
+      model,
+      messages: [{ role: 'user', content: prompt }],
+    })
+    const result = parseJsonFromText(text || '{}')
+    const validIds = new Set(openItems.map((i) => i.id))
+    const entries: unknown[] = Array.isArray(result.completed) ? result.completed : []
+
+    // Evidenz-Check: Das Zitat muss (whitespace-normalisiert) im Transkript
+    // vorkommen — halluzinierte Abhakungen werden so verworfen.
+    const normalizedHistory = normalizeForMatch(history)
+    return entries
+      .filter((e: unknown): e is { id: string; evidence: string } =>
+        typeof e === 'object' && e !== null &&
+        typeof (e as { id?: unknown }).id === 'string' && validIds.has((e as { id: string }).id) &&
+        typeof (e as { evidence?: unknown }).evidence === 'string' &&
+        (e as { evidence: string }).evidence.trim().length >= 10
+      )
+      .filter((e: { id: string; evidence: string }) => normalizedHistory.includes(normalizeForMatch(e.evidence)))
+      .map((e: { id: string; evidence: string }) => e.id)
+  } catch (error) {
+    console.error('Checklist classification error:', error)
+    return []
+  }
+}
+
+function normalizeForMatch(text: string): string {
+  return text.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 // Abschluss: strukturierte Insights aus dem kompletten Transkript erzeugen
