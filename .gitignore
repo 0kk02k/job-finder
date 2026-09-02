@@ -46,3 +46,7 @@ next-env.d.ts
 prisma/dev.db
 prisma/migrations/
 .vix/
+
+# impeccable live-mode runtime state
+.impeccable/live/roots.json
+.impeccable/live/sessions/

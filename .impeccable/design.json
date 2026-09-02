@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-02T06:26:02Z",
+  "title": "Design System: Job-Finder",
+  "extensions": {
+    "colorMeta": {
+      "paper": { "role": "neutral", "displayName": "Warm Stone Papier", "canonical": "#faf9f7", "tonalRamp": ["#0c0b0a", "#262523", "#434240", "#62615f", "#838280", "#a6a5a3", "#cac9c7", "#efeeec"] },
+      "ink": { "role": "neutral", "displayName": "Tusche", "canonical": "#1c1917", "tonalRamp": ["#0d0b09", "#272422", "#45413f", "#64605e", "#85817f", "#a8a4a1", "#ccc8c5", "#f2edeb"] },
+      "surface": { "role": "neutral", "displayName": "Blatt Weiß", "canonical": "#ffffff", "tonalRamp": ["#0b0b0b", "#252525", "#424242", "#616161", "#828282", "#a5a5a5", "#c9c9c9", "#eeeeee"] },
+      "border": { "role": "neutral", "displayName": "Haarkante", "canonical": "#e7e5e4", "tonalRamp": ["#0c0b0a", "#262524", "#434241", "#626160", "#848281", "#a6a4a4", "#cac9c8", "#f0eeed"] },
+      "border-soft": { "role": "neutral", "displayName": "Papiernaht", "canonical": "#f5f5f4", "tonalRamp": ["#0b0b0b", "#252524", "#424241", "#616160", "#828281", "#a5a5a4", "#c9c9c8", "#eeeeed"] },
+      "stone": { "role": "neutral", "displayName": "Stein (Sekundärtext)", "canonical": "#57534e", "tonalRamp": ["#0e0b07", "#282420", "#45413c", "#65605b", "#86827c", "#a9a49f", "#cdc8c2", "#f2eee8"] },
+      "stone-soft": { "role": "neutral", "displayName": "Weicher Stein (Tertiärtext)", "canonical": "#a8a29e", "tonalRamp": ["#0e0a08", "#292421", "#46413d", "#65605c", "#87817d", "#aaa4a0", "#cec8c4", "#f3ede9"] },
+      "ochre": { "role": "primary", "displayName": "Gebrannter Ocker", "canonical": "#b45309", "tonalRamp": ["#190500", "#3f1800", "#6b2e01", "#9a4503", "#c56323", "#ed864b", "#fdb792", "#feeae0"] },
+      "ochre-deep": { "role": "primary", "displayName": "Ocker-Deep (Hover)", "canonical": "#92400e", "tonalRamp": ["#1b0400", "#411600", "#6d2b02", "#984616", "#be683c", "#e58b5f", "#fdb695", "#feeae1"] },
+      "ochre-tint": { "role": "primary", "displayName": "Ocker-Tint", "canonical": "#f0e2cd", "tonalRamp": ["#120900", "#2e2313", "#4b402f", "#6b5f4d", "#8d806d", "#b0a38f", "#d5c7b3", "#fbecd7"] },
+      "moss": { "role": "tertiary", "displayName": "Moos (Erfolg)", "canonical": "#5c7a57", "tonalRamp": ["#001000", "#112c0d", "#2e4a2a", "#4d6a48", "#6e8c68", "#90af8a", "#b3d4ad", "#d8fad2"] },
+      "khaki": { "role": "tertiary", "displayName": "Khaki (Vorwarnung)", "canonical": "#8a7247", "tonalRamp": ["#130900", "#322202", "#543e11", "#755d33", "#977e53", "#bba175", "#e0c598", "#ffeccc"] },
+      "clay": { "role": "tertiary", "displayName": "Ton (Abgeschminkt)", "canonical": "#a5786a", "tonalRamp": ["#1e0100", "#3d190d", "#5e362a", "#805548", "#a37668", "#c7988a", "#edbcad", "#ffe9e2"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Stat-Zahlen — 300, tabellarisch; die leisesten lautsten Werte der App." },
+      "headline": { "displayName": "Headline", "purpose": "Seiten- und Sektionsköpfe, 300." },
+      "title": { "displayName": "Title", "purpose": "Karten-Gruppentitel, 500." },
+      "body": { "displayName": "Body", "purpose": "Fließtext und Job-Beschreibungen, 400 / 1.6." },
+      "label": { "displayName": "Label", "purpose": "Nav-Links, Buttons, Badges — klein aber standfest, 500." }
+    },
+    "shadows": [
+      { "name": "card-breath", "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)", "purpose": "Der einzige Schatten im System — ein Hauch auf Cards, kein Tiefen-Hebel (The Edge Rule)." }
+    ],
+    "motion": [
+      { "name": "color-shift", "value": "transition-colors, 150ms", "purpose": "Zustände wechseln nur die Farbe; Geometrie und Position tanzen nicht." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primär-Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Die eine Ocker-Fläche im Viewport — CTA, nichts sonst.",
+      "html": "<button class=\"ds-btn-primary\">Suche starten</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; justify-content: center; background: var(--color-accent, #b45309); color: var(--color-on-accent, #ffffff); border: none; border-radius: 12px; padding: 12px 24px; font: 500 0.875rem/1.4 var(--font-sans, 'Geist Sans', sans-serif); cursor: pointer; transition: background 150ms; } .ds-btn-primary:hover { background: var(--color-accent-strong, #92400e); } .ds-btn-primary:focus-visible { outline: 2px solid var(--color-accent, #b45309); outline-offset: 2px; }"
+    },
+    {
+      "name": "Sekundär-Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Papiernaht-Fläche mit Tusche-Text — die ruhige Alternative.",
+      "html": "<button class=\"ds-btn-secondary\">Zurücksetzen</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; justify-content: center; background: var(--color-border-soft, #f5f5f4); color: var(--color-foreground, #1c1917); border: none; border-radius: 12px; padding: 12px 24px; font: 500 0.875rem/1.4 var(--font-sans, 'Geist Sans', sans-serif); cursor: pointer; transition: background 150ms; } .ds-btn-secondary:hover { background: var(--color-border, #e7e5e4); } .ds-btn-secondary:focus-visible { outline: 2px solid var(--color-accent, #b45309); outline-offset: 2px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Ein Blatt im Notizbuch — Kante statt Schatten, 24px Atmen.",
+      "html": "<div class=\"ds-card\"><strong style=\"font-weight:500\">Senior Frontend-Entwickler</strong><br><span style=\"color:var(--color-primary-soft, #a8a29e); font-size:0.875rem\">Musterfirma GmbH · Berlin</span></div>",
+      "css": ".ds-card { background: var(--color-surface, #ffffff); border: 1px solid var(--color-border, #e7e5e4); border-radius: 16px; padding: 24px; box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05); font-family: var(--font-sans, 'Geist Sans', sans-serif); color: var(--color-foreground, #1c1917); }"
+    },
+    {
+      "name": "Status-Badge „Top Match“",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Gedämpftes Erfolgssignal: 10%-Tint, 20%-Border, Vollton-Text.",
+      "html": "<span class=\"ds-badge-top-match\">Top Match</span>",
+      "css": ".ds-badge-top-match { display: inline-block; background: rgb(92 122 87 / 0.1); border: 1px solid rgb(92 122 87 / 0.2); color: var(--color-success, #5c7a57); border-radius: 9999px; padding: 6px 12px; font: 500 0.75rem/1.4 var(--font-sans, 'Geist Sans', sans-serif); }"
+    },
+    {
+      "name": "Status-Badge „Interview“",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Khaki-Vorwarnung — Bedeutung bleibt gedämpft, schreit nie.",
+      "html": "<span class=\"ds-badge-interview\">Interview</span>",
+      "css": ".ds-badge-interview { display: inline-block; background: rgb(138 114 71 / 0.1); border: 1px solid rgb(138 114 71 / 0.2); color: var(--color-warning, #8a7247); border-radius: 9999px; padding: 6px 12px; font: 500 0.75rem/1.4 var(--font-sans, 'Geist Sans', sans-serif); }"
+    },
+    {
+      "name": "Filter-Chip",
+      "kind": "chip",
+      "refersTo": "chip-active",
+      "description": "Etikett mit Funktion — aktiv Ocker, inaktiv Haarkante; immer aria-pressed.",
+      "html": "<div style=\"display:flex; gap:8px\"><button class=\"ds-chip-active\">Offene Jobs</button><button class=\"ds-chip\">Archiviert</button></div>",
+      "css": ".ds-chip-active, .ds-chip { border-radius: 9999px; padding: 6px 12px; font: 500 0.75rem/1.4 var(--font-sans, 'Geist Sans', sans-serif); cursor: pointer; transition: color 150ms, background 150ms; } .ds-chip-active { background: var(--color-accent, #b45309); color: var(--color-on-accent, #ffffff); border: none; } .ds-chip { background: transparent; color: var(--color-primary, #57534e); border: 1px solid var(--color-border, #e7e5e4); } .ds-chip-active:focus-visible, .ds-chip:focus-visible { outline: 2px solid var(--color-accent, #b45309); outline-offset: 2px; }"
+    },
+    {
+      "name": "Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Papier-Füllung, inset in der Karte — der Ocker-Ring ist der einzige Glow.",
+      "html": "<input class=\"ds-input\" placeholder=\"z. B. Frontend-Entwickler\" />",
+      "css": ".ds-input { background: var(--color-background, #faf9f7); color: var(--color-foreground, #1c1917); border: 1px solid var(--color-border, #e7e5e4); border-radius: 12px; padding: 12px 16px; font: 400 1rem/1.6 var(--font-sans, 'Geist Sans', sans-serif); width: 260px; } .ds-input::placeholder { color: var(--color-primary-soft, #a8a29e); } .ds-input:focus-visible { outline: 2px solid var(--color-accent, #b45309); outline-offset: 2px; border-color: transparent; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "nav-link-active",
+      "description": "Label-Links; aktiv Tusche mit 2px-Ocker-Unterlinie und aria-current.",
+      "html": "<nav class=\"ds-nav\"><a href=\"#\" class=\"ds-nav-active\" aria-current=\"page\">Suchen</a><a href=\"#\" class=\"ds-nav-idle\">Jobs</a><a href=\"#\" class=\"ds-nav-idle\">Resume</a></nav>",
+      "css": ".ds-nav { display: flex; gap: 32px; align-items: center; font-family: var(--font-sans, 'Geist Sans', sans-serif); } .ds-nav a { font-size: 0.875rem; font-weight: 500; text-decoration: none; transition: color 150ms; } .ds-nav-active { color: var(--color-foreground, #1c1917); text-decoration: underline; text-decoration-color: var(--color-accent, #b45309); text-decoration-thickness: 2px; text-underline-offset: 8px; } .ds-nav-idle { color: var(--color-primary-soft, #a8a29e); } .ds-nav-idle:hover { color: var(--color-foreground, #1c1917); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Das Feldnotizbuch",
+    "overview": "Job-Finder sieht aus wie das Notizbuch, in dem jemand ernsthaft an seiner Zukunft schreibt: warmes Papier, Tinte, gerade noch so viel Struktur, dass man beim Blättern nicht den Faden verliert. Und wie in einem echten Notizbuch gibt es genau einen farbigen Stift — einen gebrannten Ocker — der das anrandert, was gerade zählt. Alles andere ist Material, nicht Botschaft. Die Atmosphäre ist ehrlich und ungeschminkt: sie zeigt Lücken, Ablehnungen und fehlende KI-Scores so, wie sie sind, in gedämpften statt schreienden Signalen. Komponenten sind zurückhaltend-selbstsicher: sie versprechen wenig und halten exakt, was sie versprechen.",
+    "keyCharacteristics": [
+      "Ein einziger Akzent (gebrannter Ocker), der nur kommuniziert und nie dekoriert",
+      "Warmes Steinpapier als Grundmaterial; Karten sind dunklere/hellere Blätter desselben Materials",
+      "Tiefe aus 1px-Kanten und Hell/Dunkel, nicht aus Schatten oder Gradients",
+      "Große Type ist leicht (300), kleine Type ist kräftig (500); alle dynamischen Zahlen tabellarisch",
+      "Deutsche, sachlich-warme Wortwahl in allen Zuständen — auch in Fehlern"
+    ],
+    "rules": [
+      { "name": "The One Color Rule", "body": "Ocker kommuniziert — alles andere ist Material. Auf einem Screen ist Ocker CTA, aktivem Zustand und Fokus vorbehalten und macht dort einen kleinen Bruchteil der Fläche aus; seine Seltenheit ist seine Aussage. Semantische Farben gelten nur für Status- und Score-Bedeutung, nie für Deko.", "section": "colors" },
+      { "name": "The Honest Signal Rule", "body": "Bedeutung wird gedämpft ausgedrückt: semantische Farben erscheinen als 10%-Tint-Fläche mit 20%-Border, nie als Vollfläche. Ein „Abgelehnt“ darf lesbar sein, ohne den Nutzer anzuschreien.", "section": "colors" },
+      { "name": "The Light-at-Scale Rule", "body": "Je größer die Type, desto leichter das Gewicht (Display 300), je kleiner, desto kräftiger (Label 500). Keine fetten Überschriften, keine dünnen Buttons.", "section": "typography" },
+      { "name": "The Tabular Numbers Rule", "body": "Jede dynamische Zahl — Stats, Scores, Zähler — trägt tabular-nums. Zahlen sind Messwerte, keine Textur.", "section": "typography" },
+      { "name": "The 1024px Desk Rule", "body": "Die Canvas bleibt ein Schreibtisch (max-w-5xl). Mehr Inhalt bedeutet mehr Karten in der Spalte, keine breitere Spalte.", "section": "layout" },
+      { "name": "The Edge Rule", "body": "Wenn eine Fläche angehoben werden soll, bekommt sie eine Kante oder eine Hell/Dunkel-Stufe — keinen Schatten. shadow-sm ist ein Hauch, kein Hebel, und nur auf Cards zulässig.", "section": "elevation" },
+      { "name": "The Focus Is Bright Rule", "body": "Der Fokusring ist der einzige emissive Moment der UI und immer Ocker. Kein Element darf in Ruhe mehr Aufmerksamkeit beanspruchen als der Fokus im Gebrauch.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do Ocker nur für Kommunikation verwenden: CTA, aktiver Zustand, Fokus, Step-Nummern.",
+      "Do alle Status- und Score-Farben als 10%-Tint mit 20%-Border und Vollton-Text setzen.",
+      "Do tabular-nums auf jede dynamische Zahl (Stats, Scores, „N neue Jobs“).",
+      "Do Shared Components nutzen (app/components/ui.tsx: Button, ButtonLink, Card, StatusBadge) statt Class-Strings zu kopieren.",
+      "Do Tailwind-Utilities auf die @theme inline-Tokens (bg-accent, text-primary-soft, border-border) statt var(...)-Arbitrary-Values.",
+      "Do deutsche, sachlich-warme Copy — auch in Fehlern („Nicht authentifiziert“, kein „Oops!“)."
+    ],
+    "donts": [
+      "Don't zweite kommunikative Farben einführen — keine Blau-Links, keine grünen Success-Buttons, kein Regenbogen in der Nav.",
+      "Don't Gradients, gestapelte Schatten oder Glow-Effekte verwenden — Tiefe kommt aus Kanten und Hell/Dunkel.",
+      "Don't alert() oder Browser-Dialoge — Feedback läuft über das Toast-System.",
+      "Don't fette (≥600) Überschriften oder dünne Button-Texte — das Gewichtsgefälle ist 300 groß / 500 klein.",
+      "Don't dark:-Tailwind-Klassen verwenden — Dark Mode läuft ausschließlich über die prefers-color-scheme-Tokens in app/globals.css.",
+      "Don't semantische Vollflächen (z. B. rote Badges) — Bedeutung bleibt gedämpft."
+    ]
+  }
+}
