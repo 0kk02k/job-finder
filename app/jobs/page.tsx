@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
-import { ButtonLink, StatusBadge } from '../components/ui'
+import { ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
 
 interface Job {
   id: string
@@ -53,7 +53,10 @@ export default function JobsPage() {
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(
     () => new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s)))
   )
-  const [highMatchOnly, setHighMatchOnly] = useState(false)
+  // Deep-Link aus dem Dashboard: /jobs?filter=high_match
+  const [highMatchOnly, setHighMatchOnly] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('filter') === 'high_match'
+  )
   const [sortBy, setSortBy] = useState<SortOption>('newest')
 
   useEffect(() => {
@@ -100,7 +103,7 @@ export default function JobsPage() {
     let result = jobs.filter((job) => activeStatuses.has(job.status))
 
     if (highMatchOnly) {
-      result = result.filter((job) => (job.score ?? 0) >= 7)
+      result = result.filter((job) => (job.score ?? 0) >= HIGH_MATCH_THRESHOLD)
     }
 
     if (search.trim()) {
@@ -149,12 +152,7 @@ export default function JobsPage() {
     setSortBy('newest')
   }
 
-  function getScoreColor(score: number | null) {
-    if (!score) return 'text-primary-soft'
-    if (score >= 8) return 'text-success'
-    if (score >= 6) return 'text-warning'
-    return 'text-error'
-  }
+  const getScoreColor = scoreTone
 
   if (loading) {
     return (

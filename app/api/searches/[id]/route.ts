@@ -11,6 +11,13 @@ export async function PATCH(
   if (!session?.user?.id) return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
 
   const { id } = await params
+  const body = await request.json().catch(() => ({}))
+
+  // lastNewJobs: „N neu"-Zähler des letzten Laufs ( optional, ganzzahlig, plausibel )
+  const lastNewJobs =
+    typeof body?.lastNewJobs === 'number' && Number.isInteger(body.lastNewJobs) && body.lastNewJobs >= 0 && body.lastNewJobs < 10_000
+      ? body.lastNewJobs
+      : undefined
 
   // Only update if the search belongs to the user
   const existing = await prisma.savedSearch.findFirst({
@@ -23,7 +30,7 @@ export async function PATCH(
 
   const updated = await prisma.savedSearch.update({
     where: { id },
-    data: { lastRunAt: new Date() },
+    data: { lastRunAt: new Date(), ...(lastNewJobs !== undefined && { lastNewJobs }) },
   })
 
   return NextResponse.json(updated)

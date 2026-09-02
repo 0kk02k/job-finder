@@ -66,8 +66,19 @@ export function Card({
   )
 }
 
-const STATUS_BADGES: Record<string, { label: string; className: string }> = {
-  DISCOVERED: { label: 'Entdeckt', className: 'bg-border-soft text-foreground border-border' },
+// Eine Schwelle, vier Dateien: High Match beginnt ab KI-Score 7
+export const HIGH_MATCH_THRESHOLD = 7
+
+// Gedämpfte Signale statt Vollfläche (The Honest Signal Rule):
+// Moos ≥8 · Khaki 6–7 · Ton <6 · ohne Score neutral
+export function scoreTone(score: number | null | undefined): string {
+  if (score == null) return 'text-primary-soft'
+  if (score >= 8) return 'text-success'
+  if (score >= 6) return 'text-warning'
+  return 'text-error'
+}
+
+const STATUS_BADGES: Record<string, { label: string; className: string }> = {  DISCOVERED: { label: 'Entdeckt', className: 'bg-border-soft text-foreground border-border' },
   SCORED: { label: 'Bewertet', className: 'bg-border-soft text-foreground border-border' },
   HIGH_MATCH: { label: 'Top Match', className: 'bg-success/10 text-success border-success/20' },
   APPLIED: { label: 'Beworben', className: 'bg-accent-soft/30 text-foreground border-border' },

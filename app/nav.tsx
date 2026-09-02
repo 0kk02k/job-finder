@@ -59,7 +59,7 @@ export function Nav() {
           <button
             onClick={() => setOpen((prev) => !prev)}
             aria-expanded={open}
-            aria-label="Menü öffnen"
+            aria-label={open ? 'Menü schließen' : 'Menü öffnen'}
             className="sm:hidden flex items-center justify-center w-10 h-10 rounded-xl text-foreground hover:bg-border-soft transition-colors"
           >
             <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">

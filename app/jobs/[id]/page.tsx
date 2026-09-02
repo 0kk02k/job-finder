@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '../../components/Toast'
+import { Button, StatusBadge, buttonClasses, scoreTone } from '../../components/ui'
 
 interface Job {
   id: string
@@ -103,19 +104,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
-  function getStatusColor(status: string) {
-    const colors: Record<string, string> = {
-      DISCOVERED: 'bg-[var(--color-border-soft)] text-[var(--color-foreground)]',
-      SCORED: 'bg-[var(--color-border-soft)] text-[var(--color-foreground)]',
-      HIGH_MATCH: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
-      APPLIED: 'bg-[var(--color-accent-soft)]/30 text-[var(--color-foreground)]',
-      INTERVIEW: 'bg-[var(--color-warning)]/10 text-[var(--color-warning)]',
-      OFFER: 'bg-[var(--color-success)]/10 text-[var(--color-success)]',
-      REJECTED: 'bg-[var(--color-error)]/10 text-[var(--color-error)]',
-      ARCHIVED: 'bg-[var(--color-border-soft)] text-[var(--color-primary-soft)]',
-    }
-    return colors[status] || colors.DISCOVERED
-  }
+  // Gedämpfte Signale statt Vollfläche — der Score trägt Bedeutung, nicht Deko
 
   if (loading) {
     return (
@@ -146,28 +135,32 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       <main className="max-w-4xl mx-auto px-6 py-16">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-2xl font-medium text-[var(--color-foreground)] mb-2">
+            <h1 className="text-3xl sm:text-4xl font-light text-[var(--color-foreground)] mb-2">
               {job.title}
             </h1>
-            <p className="text-[var(--color-primary-soft)]">
-              {job.company} • {job.location}
+            <p className="text-[var(--color-primary)]">
+              {job.company}
+              {job.location && (
+                <span className="text-[var(--color-primary-soft)]"> • {job.location}</span>
+              )}
             </p>
           </div>
-          <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(job.status)}`}>
-            {job.status}
-          </span>
+          <StatusBadge status={job.status} />
         </div>
 
         {job.score && (
           <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
-            <div className="flex items-center gap-4 mb-4">
-              <span className="text-3xl font-light text-[var(--color-primary)]">
-                {job.score}/10
+            <div className="flex items-baseline gap-3 mb-3">
+              <span className={`text-5xl font-light tabular-nums ${scoreTone(job.score)}`}>
+                {job.score}
+                <span className="text-2xl text-[var(--color-primary-soft)]">/10</span>
               </span>
-              <span className="text-[var(--color-primary-soft)]">AI Match Score</span>
+              <span className="text-sm text-[var(--color-primary-soft)]">AI Match Score</span>
             </div>
             {job.scoreReason && (
-              <p className="text-sm text-[var(--color-foreground)]">{job.scoreReason}</p>
+              <p className="text-[var(--color-primary)] leading-relaxed max-w-prose">
+                {job.scoreReason}
+              </p>
             )}
             {(() => {
               const { strengths, gaps, transferableSkills } = parseMatchDetails(job.matchDetails)
@@ -216,7 +209,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         )}
 
         <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
-          <h2 className="text-lg font-medium text-[var(--color-foreground)] mb-4">
+          <h2 className="text-sm font-medium text-[var(--color-primary-soft)] mb-4">
             Beschreibung
           </h2>
           <div className="prose max-w-none">
@@ -227,28 +220,29 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
-          <h2 className="text-lg font-medium text-[var(--color-foreground)] mb-4">
+          <h2 className="text-sm font-medium text-[var(--color-primary-soft)] mb-4">
             Aktionen
           </h2>
 
-          <div className="space-y-4">
-            <h3 className="font-medium text-[var(--color-foreground)]">PDF Export</h3>
-            <div className="grid md:grid-cols-2 gap-4">
-              <button
-                onClick={() => handleDownloadPDF('resume')}
-                disabled={downloading}
-                className="w-full bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                📄 Resume PDF
-              </button>
-              <button
-                onClick={() => handleDownloadPDF('coverletter')}
-                disabled={downloading}
-                className="w-full bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] px-4 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
-              >
-                ✉️ Anschreiben PDF
-              </button>
-            </div>
+          <div className="grid md:grid-cols-2 gap-4">
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              onClick={() => handleDownloadPDF('resume')}
+              disabled={downloading}
+            >
+              Resume als PDF
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              onClick={() => handleDownloadPDF('coverletter')}
+              disabled={downloading}
+            >
+              Anschreiben als PDF
+            </Button>
           </div>
         </div>
 
@@ -257,7 +251,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] px-6 py-3 rounded-xl font-medium transition-colors"
+            className={buttonClasses('primary')}
           >
             Job auf Plattform ansehen
           </a>

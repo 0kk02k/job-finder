@@ -175,6 +175,7 @@ model SavedSearch {
   semantic  Boolean  @default(true)
 
   lastRunAt DateTime?
+  lastNewJobs Int?      // „N neue Jobs" beim letzten Lauf — Wiederkomm-Trigger
   createdAt DateTime @default(now())
 
   @@unique([userId, query, location])
