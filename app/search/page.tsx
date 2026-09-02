@@ -229,7 +229,7 @@ function SearchPageContent() {
         <section className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm mb-8">
           <form onSubmit={handleSearch} className="space-y-6">
             <div className="grid md:grid-cols-3 gap-4">
-              <div className="md:col-span-2">
+              <div className="min-w-0 md:col-span-2">
                 <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
                   Job Titel / Stichwort
                 </label>
@@ -243,7 +243,7 @@ function SearchPageContent() {
                 />
               </div>
 
-              <div>
+              <div className="min-w-0">
                 <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
                   Location (optional)
                 </label>
@@ -253,7 +253,7 @@ function SearchPageContent() {
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="z.B. Berlin"
-                    className="flex-1 px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                    className="min-w-0 flex-1 px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
                   />
                   <button
                     type="submit"
