@@ -9,14 +9,14 @@ colors:
   border: "#e7e5e4"
   border-soft: "#f5f5f4"
   stone: "#57534e"
-  stone-soft: "#a8a29e"
+  stone-soft: "#78716c"
   ochre: "#b45309"
   ochre-deep: "#92400e"
   ochre-tint: "#f0e2cd"
   on-ochre: "#ffffff"
-  moss: "#5c7a57"
-  khaki: "#8a7247"
-  clay: "#a5786a"
+  moss: "#55724f"
+  khaki: "#7d6740"
+  clay: "#96553f"
 typography:
   display:
     fontFamily: "Geist Sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
@@ -122,10 +122,10 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 | `paper` / `ink` | `#faf9f7` / `#1c1917` | getauscht |
 | `surface` / `surface-elevated` | `#ffffff` / `#ffffff` | `#292524` / `#2d2a28` |
 | `border` / `border-soft` | `#e7e5e4` / `#f5f5f4` | `#44403c` / `#292524` |
-| `stone` / `stone-soft` | `#57534e` / `#a8a29e` | `#d6d3d1` / `#78716c` |
+| `stone` / `stone-soft` | `#57534e` / `#78716c` | `#d6d3d1` / `#9d968f` |
 | `ochre` / `ochre-deep` | `#b45309` / `#92400e` | `#dfa04e` / `#ecb668` |
 | `ochre-tint` / `on-ochre` | `#f0e2cd` / `#ffffff` | `#5c452a` / `#1c1917` |
-| `moss` / `khaki` / `clay` | `#5c7a57` / `#8a7247` / `#a5786a` | `#7a9a75` / `#a88f67` / `#c58a7a` |
+| `moss` / `khaki` / `clay` | `#55724f` / `#7d6740` / `#96553f` | `#89ab84` / `#b5a077` / `#c99284` |
 
 ### Primary
 - **Gebrannter Ocker** (`#b45309`, dunkel `#dfa04e`): die einzige kommunizierende Farbe. Primär-Buttons, aktive Nav-Underline, aktive Filter-Chips, Fokusring, Link-Hover, Step-Nummern. Im Dark Mode wird sie heller und wärmer, nicht kräftiger — derselbe Bleistift bei Kerzenlicht.
@@ -135,12 +135,12 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 - **Tusche** (`#1c1917`): Primärtext und dunkler Modus als Hintergrund.
 - **Blatt Weiß** (`#ffffff`): Karten und Nav-Fläche (`bg-surface`), mit Blur über dem Inhalt.
 - **Haarkante** (`#e7e5e4`) und **Papiernaht** (`#f5f5f4`): 1px-Borders erster und zweiter Ordnung; Papiernaht ist auch die Sekundär-Button-Füllung.
-- **Stein** (`#57534e`) und **Weicher Stein** (`#a8a29e`): Sekundär- und Tertiärtext — Hierarchie über drei Textstufen, nie über Grau-Willkür.
+- **Stein** (`#57534e`) und **Weicher Stein** (`#78716c`): Sekundär- und Tertiärtext — Hierarchie über drei Textstufen, nie über Grau-Willkür.
 
 ### Semantic (Muted Signals)
-- **Moos** (`#5c7a57`): Erfolg — Score ≥ 8, „Top Match", „Angebot".
-- **Khaki** (`#8a7247`): Vorwarnung — „Interview", Score 6–7.
-- **Ton** (`#a5786a`): Abgeschminkt — „Abgelehnt", Score < 6. Ein warmes, nicht feueriges Rot.
+- **Moos** (`#55724f`): Erfolg — Score ≥ 8, „Top Match", „Angebot".
+- **Khaki** (`#7d6740`): Vorwarnung — „Interview", Score 6–7.
+- **Ton** (`#96553f`): Abgeschminkt — „Abgelehnt", Score < 6. Ein warmes, nicht feueriges Rot.
 
 ### Named Rules
 **The One Color Rule.** Ocker kommuniziert — alles andere ist Material. Auf einem Screen ist Ocker CTA, aktivem Zustand und Fokus vorbehalten und macht dort einen kleinen Bruchteil der Fläche aus; seine Seltenheit ist seine Aussage. Semantische Farben gelten nur für Status- und Score-Bedeutung, nie für Deko.

@@ -4,8 +4,9 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 type Variant = 'primary' | 'secondary'
 type Size = 'md' | 'sm'
 
+// transition ohne outline-color: der Fokusring ist der eine emissive Moment und blendet nicht ein
 const baseClasses =
-  'inline-flex items-center justify-center rounded-xl font-medium transition-colors'
+  'inline-flex items-center justify-center rounded-xl font-medium transition-[background-color,color,border-color]'
 
 const variantClasses: Record<Variant, string> = {
   primary: 'bg-accent hover:bg-accent-strong text-on-accent',

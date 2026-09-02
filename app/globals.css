@@ -1,82 +1,89 @@
 @import "tailwindcss";
 
-/* Warm notebook palette — stone neutrals with a single ochre accent */
+/* Warm notebook palette — stone neutrals with a single ochre accent.
+   Roh-Tokens tragen eigene Namen (--paper, --stone, --ochre …); die @theme-Keys
+   (--color-*) verweisen darauf. Früher hießen beide Ebenen gleich
+   (--color-primary: var(--color-primary) in @theme) — eine zirkuläre Referenz,
+   die nur durch Kaskaden-Zufall funktionierte und vom Processor unterschlagen
+   wurde. Keine Namens-Kollision, keine Zirkularität. */
 :root {
-  --background: #faf9f7;
-  --foreground: #1c1917;
+  --paper: #faf9f7;
+  --ink: #1c1917;
 
-  --color-surface: #ffffff;
-  --color-surface-elevated: #ffffff;
+  --surface: #ffffff;
+  --surface-elevated: #ffffff;
 
-  --color-border: #e7e5e4;
-  --color-border-soft: #f5f5f4;
+  --border-line: #e7e5e4;
+  --border-soft: #f5f5f4;
 
-  --color-primary: #57534e;
-  --color-primary-soft: #a8a29e;
+  --stone: #57534e;
+  /* secondary text: stone-500 — 4.6:1 auf paper (AA); stone-400 war 2.4:1 */
+  --stone-soft: #78716c;
 
   /* Ochre accent — the one color that communicates (CTAs, active states, focus) */
-  --color-accent: #b45309;
-  --color-accent-strong: #92400e;
-  --color-accent-soft: #f0e2cd;
-  --color-on-accent: #ffffff;
+  --ochre: #b45309;
+  --ochre-deep: #92400e;
+  --ochre-tint: #f0e2cd;
+  --on-ochre: #ffffff;
 
-  --color-success: #5c7a57;
-  --color-warning: #8a7247;
-  --color-error: #a5786a;
+  /* Signalfarben auf Textstärke angehoben: ≥4.5:1 auf paper UND auf der eigenen /10-Tint-Fläche */
+  --moss: #55724f;
+  --khaki: #7d6740;
+  --clay: #96553f;
 
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --app-font-sans: var(--font-geist-sans);
+  --app-font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #1c1917;
-    --foreground: #faf9f7;
+    --paper: #1c1917;
+    --ink: #faf9f7;
 
-    --color-surface: #292524;
-    --color-surface-elevated: #2d2a28;
+    --surface: #292524;
+    --surface-elevated: #2d2a28;
 
-    --color-border: #44403c;
-    --color-border-soft: #292524;
+    --border-line: #44403c;
+    --border-soft: #292524;
 
-    --color-primary: #d6d3d1;
-    --color-primary-soft: #78716c;
+    --stone: #d6d3d1;
+    --stone-soft: #9d968f;
 
-    --color-accent: #dfa04e;
-    --color-accent-strong: #ecb668;
-    --color-accent-soft: #5c452a;
-    --color-on-accent: #1c1917;
+    --ochre: #dfa04e;
+    --ochre-deep: #ecb668;
+    --ochre-tint: #5c452a;
+    --on-ochre: #1c1917;
 
-    --color-success: #7a9a75;
-    --color-warning: #a88f67;
-    --color-error: #c58a7a;
+    --moss: #89ab84;
+    --khaki: #b5a077;
+    --clay: #c99284;
   }
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-surface: var(--color-surface);
-  --color-surface-elevated: var(--color-surface-elevated);
-  --color-border: var(--color-border);
-  --color-border-soft: var(--color-border-soft);
-  --color-primary: var(--color-primary);
-  --color-primary-soft: var(--color-primary-soft);
-  --color-accent: var(--color-accent);
-  --color-accent-strong: var(--color-accent-strong);
-  --color-accent-soft: var(--color-accent-soft);
-  --color-on-accent: var(--color-on-accent);
-  --color-success: var(--color-success);
-  --color-warning: var(--color-warning);
-  --color-error: var(--color-error);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-mono);
+  --color-background: var(--paper);
+  --color-foreground: var(--ink);
+  --color-surface: var(--surface);
+  --color-surface-elevated: var(--surface-elevated);
+  --color-border: var(--border-line);
+  --color-border-soft: var(--border-soft);
+  --color-primary: var(--stone);
+  --color-primary-soft: var(--stone-soft);
+  --color-accent: var(--ochre);
+  --color-accent-strong: var(--ochre-deep);
+  --color-accent-soft: var(--ochre-tint);
+  --color-on-accent: var(--on-ochre);
+  --color-success: var(--moss);
+  --color-warning: var(--khaki);
+  --color-error: var(--clay);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--app-font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -84,13 +91,15 @@ body {
 
 /* Visible focus states */
 :focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--ochre);
   outline-offset: 2px;
 }
 
-/* Smooth scrolling */
-html {
-  scroll-behavior: smooth;
+/* Smooth scrolling — nur, wenn keine reduzierte Bewegung gewünscht ist */
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 /* Custom scrollbar */
@@ -104,10 +113,10 @@ html {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: var(--border-line);
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary-soft);
+  background: var(--stone-soft);
 }

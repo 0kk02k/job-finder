@@ -41,7 +41,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const DEFAULT_HIDDEN = new Set(['ARCHIVED', 'REJECTED'])
 
-type SortOption = 'newest' | 'score' | 'company'
+type SortOption = 'newest' | 'oldest' | 'score' | 'company'
 
 export default function JobsPage() {
   const router = useRouter()
@@ -53,11 +53,18 @@ export default function JobsPage() {
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(
     () => new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s)))
   )
-  // Deep-Link aus dem Dashboard: /jobs?filter=high_match
+  // Deep-Links aus dem Dashboard: /jobs?filter=high_match · /jobs?filter=unscored
   const [highMatchOnly, setHighMatchOnly] = useState(
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('filter') === 'high_match'
   )
-  const [sortBy, setSortBy] = useState<SortOption>('newest')
+  const [unscoredOnly, setUnscoredOnly] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('filter') === 'unscored'
+  )
+  const [sortBy, setSortBy] = useState<SortOption>(() => {
+    if (typeof window === 'undefined') return 'newest'
+    // Deep-Link aus dem Dashboard: die am längsten wartenden zuerst
+    return new URLSearchParams(window.location.search).get('sort') === 'oldest' ? 'oldest' : 'newest'
+  })
 
   useEffect(() => {
     fetchJobs()
@@ -106,6 +113,10 @@ export default function JobsPage() {
       result = result.filter((job) => (job.score ?? 0) >= HIGH_MATCH_THRESHOLD)
     }
 
+    if (unscoredOnly) {
+      result = result.filter((job) => job.score == null)
+    }
+
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       result = result.filter(
@@ -124,6 +135,11 @@ export default function JobsPage() {
           (a.company ?? '').localeCompare(b.company ?? '')
         )
         break
+      case 'oldest':
+        result = [...result].sort(
+          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        )
+        break
       default:
         result = [...result].sort(
           (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
@@ -131,7 +147,7 @@ export default function JobsPage() {
     }
 
     return result
-  }, [jobs, activeStatuses, highMatchOnly, search, sortBy])
+  }, [jobs, activeStatuses, highMatchOnly, unscoredOnly, search, sortBy])
 
   function toggleStatus(status: string) {
     setActiveStatuses((prev) => {
@@ -149,6 +165,7 @@ export default function JobsPage() {
     setSearch('')
     setActiveStatuses(new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s))))
     setHighMatchOnly(false)
+    setUnscoredOnly(false)
     setSortBy('newest')
   }
 
@@ -158,14 +175,14 @@ export default function JobsPage() {
     return (
       <div className="min-h-screen bg-background">
         <main className="max-w-5xl mx-auto px-6 py-16">
-          <section className="flex items-center justify-between mb-8 animate-pulse">
+          <section className="flex items-center justify-between mb-8 animate-pulse motion-reduce:animate-none">
             <div>
               <div className="h-8 w-32 bg-border rounded mb-2" />
               <div className="h-4 w-24 bg-border-soft rounded" />
             </div>
             <div className="h-12 w-40 bg-border-soft rounded-xl" />
           </section>
-          <section className="space-y-4 animate-pulse">
+          <section className="space-y-4 animate-pulse motion-reduce:animate-none">
             <SkeletonJobCard />
             <SkeletonJobCard />
             <SkeletonJobCard />
@@ -179,6 +196,7 @@ export default function JobsPage() {
   const hasActiveFilters =
     search.trim() !== '' ||
     highMatchOnly ||
+    unscoredOnly ||
     activeStatuses.size !== defaultActive.size ||
     [...activeStatuses].some((s) => !defaultActive.has(s))
 
@@ -229,6 +247,7 @@ export default function JobsPage() {
                   className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-accent"
                 >
                   <option value="newest">Neueste zuerst</option>
+                  <option value="oldest">Älteste zuerst</option>
                   <option value="score">Score absteigend</option>
                   <option value="company">Firma A–Z</option>
                 </select>
@@ -254,17 +273,30 @@ export default function JobsPage() {
                 })}
               </div>
 
-              <label className="inline-flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={highMatchOnly}
-                  onChange={(e) => setHighMatchOnly(e.target.checked)}
-                  className="w-4 h-4 accent-accent"
-                />
-                <span className="text-sm text-foreground">
-                  Nur High Matches (≥7)
-                </span>
-              </label>
+              <div className="flex flex-wrap gap-6">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={highMatchOnly}
+                    onChange={(e) => setHighMatchOnly(e.target.checked)}
+                    className="w-4 h-4 accent-accent"
+                  />
+                  <span className="text-sm text-foreground">
+                    Nur High Matches (≥7)
+                  </span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={unscoredOnly}
+                    onChange={(e) => setUnscoredOnly(e.target.checked)}
+                    className="w-4 h-4 accent-accent"
+                  />
+                  <span className="text-sm text-foreground">
+                    Nur ohne KI-Bewertung
+                  </span>
+                </label>
+              </div>
             </section>
 
             {/* Result Counter */}

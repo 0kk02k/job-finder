@@ -16,7 +16,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Job Finder",
-  description: "AI-powered job search and application management",
+  description:
+    "Private Jobsuche und Bewerbungs-Verwaltung: semantische Suche, KI-Matching gegen deinen Lebenslauf, Pipeline-Tracking und Interview-Training.",
 };
 
 export default function RootLayout({
@@ -32,7 +33,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <Nav />
-          {children}
+          <div id="inhalt">{children}</div>
         </Providers>
       </body>
     </html>

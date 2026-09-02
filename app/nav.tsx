@@ -29,6 +29,13 @@ export function Nav() {
 
   return (
     <nav className="border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-10">
+      {/* Skip-Link: der erste Tab-Stop springt über die komplette Navigation */}
+      <a
+        href="#inhalt"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-on-accent"
+      >
+        Zum Inhalt springen
+      </a>
       <div className="max-w-5xl mx-auto px-6 py-5">
         <div className="flex items-center justify-between">
           <Link href="/" className="text-xl font-medium text-foreground">
@@ -73,23 +80,23 @@ export function Nav() {
         </div>
       </div>
 
-      {/* Mobile menu panel */}
+      {/* Mobile menu panel — Tap-Targets ≥ 40px (WCAG 2.5.8) */}
       {open && (
-        <div className="sm:hidden border-t border-border-soft px-6 py-4 flex flex-col gap-4">
+        <div className="sm:hidden border-t border-border-soft px-6 py-4 flex flex-col gap-1">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setOpen(false)}
               aria-current={pathname.startsWith(link.href) ? 'page' : undefined}
-              className={linkClasses(pathname.startsWith(link.href))}
+              className={`py-2.5 ${linkClasses(pathname.startsWith(link.href))}`}
             >
               {link.label}
             </Link>
           ))}
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            className="text-left text-primary-soft hover:text-foreground text-sm font-medium transition-colors"
+            className="text-left py-2.5 text-primary-soft hover:text-foreground text-sm font-medium transition-colors"
           >
             Abmelden
           </button>
