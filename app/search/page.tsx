@@ -3,6 +3,8 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { scoreTone } from '../components/ui'
+import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
+import { textSnippet } from '../components/Markdown'
 
 interface SearchResult {
   title: string
@@ -40,6 +42,8 @@ function SearchPageContent() {
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])
   const [stats, setStats] = useState({ total: 0, highMatches: 0, newJobs: 0 })
+  // Für die ehrliche Limit-Zeile: wie viele der Treffer tatsächlich einen Score haben
+  const scoredCount = results.filter((j) => typeof j.aiScore === 'number').length
   const [error, setError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
@@ -321,7 +325,19 @@ function SearchPageContent() {
         {!loading && results.length > 0 && (
           <section className="grid sm:grid-cols-2 gap-4 mb-8">
             <StatCard title="Jobs gefunden" value={stats.total.toString()} />
-            <StatCard title="High Matches (≥7)" value={stats.highMatches.toString()} highlight />
+            <StatCard
+              title={`High Matches (≥${HIGH_MATCH_THRESHOLD})`}
+              value={stats.highMatches.toString()}
+              highlight
+            />
+            {/* Das Scoring-Limit ehrlich benennen: ohne diese Zeile sieht
+                „ohne Score" nach einem kaputten System aus, nicht nach einem Limit */}
+            {scoredCount > 0 && scoredCount < results.length && (
+              <p className="sm:col-span-2 text-sm text-primary tabular-nums">
+                KI-Bewertung: {scoredCount} von {results.length} Treffern bewertet — bewertet
+                werden die ersten 15 Treffer pro Suche, der Rest bleibt ohne Score.
+              </p>
+            )}
           </section>
         )}
 
@@ -486,7 +502,7 @@ function JobCard({
       )}
 
       <p className="text-sm text-[var(--color-primary-soft)] line-clamp-3 leading-relaxed">
-        {job.description?.substring(0, 300)}…
+        {job.description ? textSnippet(job.description) : ''}
       </p>
     </div>
   )

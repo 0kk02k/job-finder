@@ -8,7 +8,7 @@ import { z } from 'zod'
 const settingsSchema = z.object({
   geminiApiKey: z.string().nullable(),
   openaiApiKey: z.string().nullable(),
-  mistralApiKey: z.string().nullable(),
+  nebiusApiKey: z.string().nullable(),
   openrouterApiKey: z.string().nullable(),
   apifyApiKey: z.string().nullable(),
   ollamaUrl: z.string().nullable(),

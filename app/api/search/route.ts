@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { searchJobs, semanticSearch, type ScrapedJob } from '@/lib/scrapers'
 import { scoreJob, generateSearchQueries } from '@/lib/ai'
+import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 
 // POST /api/search - AI-powered job search with semantic matching
 export async function POST(request: NextRequest) {
@@ -26,18 +27,18 @@ export async function POST(request: NextRequest) {
   const settings = await prisma.userSettings.findUnique({ where: { userId } })
   const apifyToken = settings?.apifyApiKey || null
 
-  // AI config from user settings (falls back to Mistral via env key)
-  const aiProvider = settings?.aiProvider || 'mistral'
+  // AI config from user settings (falls back to Nebius via env key)
+  const aiProvider = settings?.aiProvider || 'nebius'
   const aiModel = settings?.aiModel || undefined
   const aiApiKey =
-    aiProvider === 'gemini'
-      ? settings?.geminiApiKey || undefined
-      : aiProvider === 'openai'
-        ? settings?.openaiApiKey || undefined
-        : aiProvider === 'openrouter'
-          ? settings?.openrouterApiKey || undefined
-          : aiProvider === 'mistral'
-            ? settings?.mistralApiKey || undefined
+    aiProvider === 'nebius'
+      ? settings?.nebiusApiKey || undefined
+      : aiProvider === 'gemini'
+        ? settings?.geminiApiKey || undefined
+        : aiProvider === 'openai'
+          ? settings?.openaiApiKey || undefined
+          : aiProvider === 'openrouter'
+            ? settings?.openrouterApiKey || undefined
             : undefined
   const aiBaseUrl = aiProvider === 'ollama' ? settings?.ollamaUrl || undefined : undefined
 
@@ -160,7 +161,7 @@ export async function POST(request: NextRequest) {
       if (!resumeContent || index >= SCORE_LIMIT) return job
       try {
         if (job.description) {
-          const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl)
+          const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null)
           if (scoreResult.score === null) return job // AI unreachable — leave unscored
           return {
             ...job,
@@ -202,7 +203,7 @@ export async function POST(request: NextRequest) {
       const matchDetails = hasScore
         ? JSON.stringify({ strengths: job.strengths ?? [], gaps: job.gaps ?? [] })
         : null
-      const status = hasScore ? (score! >= 7 ? 'HIGH_MATCH' : 'SCORED') : 'DISCOVERED'
+      const status = hasScore ? (score! >= HIGH_MATCH_THRESHOLD ? 'HIGH_MATCH' : 'SCORED') : 'DISCOVERED'
 
       await prisma.job.upsert({
         where: { userId_url: { userId, url: job.url } },
@@ -227,7 +228,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const highMatchCount = visibleJobs.filter(j => (j.aiScore ?? 0) >= 7).length
+  const highMatchCount = visibleJobs.filter(j => (j.aiScore ?? 0) >= HIGH_MATCH_THRESHOLD).length
 
   return NextResponse.json({
     total: visibleJobs.length,

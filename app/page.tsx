@@ -3,16 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Button, ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, scoreTone } from './components/ui'
+import { scoreLabel } from '@/lib/matching'
 
 interface Job {
   id: string
   title: string
   company: string | null
+  location: string | null
+  url: string | null
   status: string
   score: number | null
   scoreReason: string | null
   matchDetails: string | null
   createdAt: string
+  updatedAt: string
 }
 
 interface SavedSearch {
@@ -30,13 +34,50 @@ const PIPELINE_AHEAD = ['APPLIED', 'INTERVIEW', 'OFFER']
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const WEEK_MS = 7 * DAY_MS
-// Das Angebot im Hero: so viele am längsten wartende Jobs zeigt es konkret
-const OFFER_COUNT = 10
+// Das Angebot im Hero: so viele am längsten wartende Jobs zeigt es konkret.
+// Bewusst knapp — die Liste darf die eigene Handlung (CTA) nicht unters Fold schieben.
+const OFFER_COUNT = 5
+
+// Quelle sichtbar machen: das Portal, das den Treffer geliefert hat (aus der URL
+// abgeleitet — Herkunft ist Teil der Klick-Entscheidung, Jooble klickt sich anders an
+// als Remotive). Unbekannte Hosts fallen auf den Hostnamen zurück, nie auf „Quelle".
+const SOURCE_LABELS: Record<string, string> = {
+  'jooble.org': 'Jooble',
+  'remotive.com': 'Remotive',
+  'arbeitnow.com': 'Arbeitnow',
+  'linkedin.com': 'LinkedIn',
+  'stepstone.de': 'StepStone',
+  'xing.com': 'XING',
+  'indeed.com': 'Indeed',
+}
+
+function sourceLabel(url: string | null | undefined): string | null {
+  if (!url) return null
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '')
+    const known = Object.keys(SOURCE_LABELS).find((k) => host === k || host.endsWith(`.${k}`))
+    return known ? SOURCE_LABELS[known] : host
+  } catch {
+    return null
+  }
+}
+
+// „vor 9 Tagen" statt „09.08.2026" — Staleness muss keiner selbst rechnen;
+// ab 30 Tagen spricht das absolute Datum, weil „vor 74 Tagen" nichts mehr sagt.
+function relativeDays(iso: string): string {
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / DAY_MS)
+  if (days <= 0) return 'heute'
+  if (days === 1) return 'gestern'
+  if (days < 30) return `vor ${days} Tagen`
+  return `am ${new Date(iso).toLocaleDateString('de-DE')}`
+}
 
 // Jobs laden ist der Trunk der Seite — sein Zustand entscheidet, was überhaupt behauptet werden darf.
 // `auth` (Sitzung abgelaufen) ist bewusst getrennt von `error` (Netzwerk/Server):
-// dieselbe Meldung für beides war eine falsche Diagnose.
+// dieselbe Meldung für beides war eine falsche Diagnose. Innerhalb von `error` ist
+// Netzwerk wieder getrennt von Server — „prüfe deine Verbindung" ist nur dort wahr.
 type JobsState = 'loading' | 'ok' | 'auth' | 'error'
+type JobsError = { kind: 'network' | 'server'; status?: number }
 
 // Das Angebot im Hero: Jobs mit ausgerechneter Wartezeit (Ladezeit, nicht Renderzeit)
 type OfferJob = Job & { daysWaiting: number }
@@ -48,13 +89,16 @@ interface NextStep {
   cta: string
   // Das Angebot als konkrete Liste statt nackter Zahl — nur im unbewertet-Zweig
   jobs?: OfferJob[]
+  // Altersspalte nur, wenn sie unterscheidet; bei identischen Werten steht sie einmal im Text
+  showAgeColumn?: boolean
   // Das Widerwort gegen die Kaskaden-Meinung: der unterdrückte Zweig als Textlink
   alternative?: { label: string; href: string }
 }
 
 export default function Dashboard() {
   const [jobsState, setJobsState] = useState<JobsState>('loading')
-  const [stats, setStats] = useState<{ total: number; scored: number; applied: number } | null>(null)
+  const [jobsError, setJobsError] = useState<JobsError | null>(null)
+  const [stats, setStats] = useState<{ total: number; totalAll: number; scored: number; applied: number } | null>(null)
   const [waitingCount, setWaitingCount] = useState(0)
   const [unscoredCount, setUnscoredCount] = useState(0)
   const [unscoredAllCount, setUnscoredAllCount] = useState(0)
@@ -73,6 +117,7 @@ export default function Dashboard() {
   const loadAll = useCallback(async () => {
     const isFirstLoad = !hasLoadedOnce.current
     if (isFirstLoad) setJobsState('loading')
+    setJobsError(null)
     setResumeError(false)
     setSearchesError(false)
     try {
@@ -88,8 +133,12 @@ export default function Dashboard() {
       }
 
       if (!jobsRes.ok) {
-        if (isFirstLoad) setJobsState('error')
-        else setRefreshError(true)
+        if (isFirstLoad) {
+          setJobsError({ kind: 'server', status: jobsRes.status })
+          setJobsState('error')
+        } else {
+          setRefreshError(true)
+        }
         return
       }
 
@@ -123,6 +172,7 @@ export default function Dashboard() {
 
       setStats({
         total: active.length,
+        totalAll: jobs.length,
         scored: scored.length,
         applied: active.filter((j) => PIPELINE_AHEAD.includes(j.status)).length,
       })
@@ -164,8 +214,13 @@ export default function Dashboard() {
         setSearchesError(true)
       }
     } catch {
-      if (isFirstLoad) setJobsState('error')
-      else setRefreshError(true)
+      // fetch wirft bei echten Netzwerkproblemen — nur hier ist „Verbindung prüfen" die wahre Diagnose
+      if (isFirstLoad) {
+        setJobsError({ kind: 'network' })
+        setJobsState('error')
+      } else {
+        setRefreshError(true)
+      }
     }
   }, [])
 
@@ -182,20 +237,30 @@ export default function Dashboard() {
       return {
         title: 'Lade deinen Lebenslauf hoch',
         description:
-          'Ohne Lebenslauf kann die KI keine Matches berechnen. Deine Daten bleiben in deiner privaten Instanz.',
+          'Ohne Lebenslauf kann die KI keine Matches berechnen. Deine Daten bleiben bei dir — nichts verlässt diese App.',
         href: '/resume',
         cta: 'Lebenslauf hochladen',
       }
     }
 
-    // Angebot statt Rückstand: die Kaskade zeigt nicht die Lücke, sondern den konkreten Einstieg
+    // Angebot statt Rückstand: die Ältesten als konkreten Einstieg — aber die
+    // Primäraktion führt zur Suche, denn bewertet wird dort (Limit: 15 pro Suche),
+    // nicht beim Ansehen der Liste. „Ohne Bewertung" statt „unbewertet": Zustand,
+    // kein Vorwurf. Die Zahl im Satz ist dieselbe Menge wie die Liste darunter.
     if (unscoredCount > 0 && unscoredCount >= waitingCount) {
+      // Identische Wartezeiten nicht 5× wiederholen — der Wert steht einmal im Satz
+      const uniformDays =
+        oldestUnscored.length > 1 &&
+        oldestUnscored.every((j) => j.daysWaiting === oldestUnscored[0].daysWaiting)
       return {
-        title: 'Fang mit den am längsten wartenden an',
-        description: `${unscoredAllCount} von ${stats.total} Jobs haben noch keine KI-Bewertung — diese ${oldestUnscored.length} warten am längsten.`,
-        href: '/jobs?filter=unscored&sort=oldest',
-        cta: 'Alle unbewerteten ansehen',
+        title: 'Nimm dir zuerst die Ältesten vor',
+        description: uniformDays
+          ? `Diese ${oldestUnscored.length} von ${unscoredCount} Jobs ohne Bewertung liegen seit ${oldestUnscored[0].daysWaiting} Tagen in deiner Liste.`
+          : `Diese ${oldestUnscored.length} von ${unscoredCount} Jobs ohne Bewertung sind die Ältesten in deiner Liste.`,
+        href: '/search',
+        cta: 'Neue Suche starten',
         jobs: oldestUnscored,
+        showAgeColumn: !uniformDays,
         alternative:
           waitingCount > 0
             ? { label: 'Lieber die High Matches ansehen', href: '/jobs?filter=high_match' }
@@ -226,9 +291,11 @@ export default function Dashboard() {
 
   const nextStep = getNextStep()
   const newJobsTotal = savedSearches.reduce((n, s) => n + (s.lastNewJobs ?? 0), 0)
-  // Onboarding nur bei sicher bekanntem Zustand — ein Resume-API-Fehler wird nicht zum Onboarding umgedeutet
+  // Onboarding nur bei sicher bekanntem Zustand — ein Resume-API-Fehler wird nicht zum
+  // Onboarding umgedeutet. „Leer" heißt: wirklich leer (totalAll, alle Jobs inkl.
+  // archiviert/abgelehnt) — wer eine geleerte Pipeline hat, bekommt kein Anfänger-Onboarding zurück.
   const showOnboarding =
-    jobsState === 'ok' && stats != null && !resumeError && (hasResume === false || stats.total === 0)
+    jobsState === 'ok' && stats != null && !resumeError && (hasResume === false || stats.totalAll === 0)
 
   // Genau ein aktueller Schritt: der erste noch offene — die Nummerierung trägt echte Ordnung
   const onboardingSteps = [
@@ -241,13 +308,13 @@ export default function Dashboard() {
     {
       step: 2,
       title: 'Jobs suchen',
-      description: 'Füge Jobs per URL hinzu oder starte eine Suche aus mehreren Quellen.',
+      description: 'Suche nach einem Beruf oder Ort — oder füge einen Job per Link ein.',
       done: (stats?.total ?? 0) > 0,
     },
     {
       step: 3,
       title: 'KI-Matching',
-      description: 'Die KI bewertet Treffer gegen deinen Lebenslauf — nichts verlässt deine Instanz.',
+      description: 'Die KI bewertet Treffer gegen deinen Lebenslauf — nichts verlässt diese App.',
       done: (stats?.scored ?? 0) > 0,
     },
   ]
@@ -273,14 +340,17 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Netzwerk-/Serverfehler — nur hier ist „Verbindung prüfen" eine wahre Diagnose */}
+        {/* Netzwerk- und Serverfehler — getrennte Diagnose: „Verbindung prüfen" nur bei
+            echten Netzwerkproblemen; ein 500er liegt nicht an der Verbindung des Nutzers. */}
         {jobsState === 'error' && (
           <section role="alert" className="mb-8 p-4 bg-error/10 rounded-xl border border-error/20">
             <h1 className="text-lg font-medium text-foreground mb-1">
               Daten konnten nicht geladen werden
             </h1>
             <p className="text-sm text-primary mb-3">
-              Prüfe deine Verbindung und versuch es erneut.
+              {jobsError?.kind === 'server'
+                ? `Der Server meldet einen Fehler${jobsError.status ? ` (${jobsError.status})` : ''} — das liegt nicht an deiner Verbindung. Versuch es gleich noch einmal.`
+                : 'Prüfe deine Verbindung und versuch es erneut.'}
             </p>
             <Button size="sm" variant="secondary" onClick={() => void loadAll()}>
               Erneut versuchen
@@ -305,79 +375,151 @@ export default function Dashboard() {
 
         {/* Nächster Schritt — die eine Akzentfläche der Seite, mit der einzigen Primär-Aktion */}
         {jobsState === 'loading' && (
-          <div className="mb-6 bg-accent-soft/30 rounded-2xl p-8 border border-accent/20 animate-pulse motion-reduce:animate-none" aria-hidden="true">
-            <div className="h-9 w-2/3 bg-border rounded mb-4" />
-            <div className="h-4 w-1/2 bg-border rounded mb-6" />
-            <div className="h-12 w-44 bg-border rounded-xl" />
-          </div>
+          <>
+            {/* Lade-Text für Screenreader: das Skeleton allein ist aria-hidden und sagt nichts */}
+            <p className="sr-only" role="status">
+              Daten werden geladen …
+            </p>
+            <div className="mb-6 bg-accent-soft/30 rounded-2xl p-8 border border-accent/20 animate-pulse motion-reduce:animate-none" aria-hidden="true">
+              <div className="h-9 w-2/3 bg-border rounded mb-4" />
+              <div className="h-4 w-1/2 bg-border rounded mb-6" />
+              <div className="h-12 w-44 bg-border rounded-xl" />
+            </div>
+            {/* Skelette für die unteren Sektionen — ohne sie springt der Inhalt beim Laden nach unten */}
+            <div className="mt-12 space-y-4 animate-pulse motion-reduce:animate-none" aria-hidden="true">
+              <div className="h-8 w-56 bg-border rounded mb-6" />
+              <div className="grid sm:grid-cols-3 gap-4">
+                <div className="h-36 bg-surface border border-border-soft rounded-2xl" />
+                <div className="h-36 bg-surface border border-border-soft rounded-2xl" />
+                <div className="h-36 bg-surface border border-border-soft rounded-2xl" />
+              </div>
+              <div className="h-8 w-64 bg-border rounded mt-10 mb-6" />
+              <div className="h-20 bg-surface border border-border-soft rounded-2xl" />
+              <div className="h-20 bg-surface border border-border-soft rounded-2xl" />
+            </div>
+          </>
         )}
         {jobsState !== 'loading' && jobsState !== 'auth' && jobsState !== 'error' && nextStep && (
           <section className="mb-6 bg-accent-soft/30 rounded-2xl p-8 border border-accent/20">
-            <h1 className="text-3xl sm:text-4xl font-light text-foreground mb-3">
+            <h1 className="text-3xl sm:text-4xl font-light text-foreground mb-3 tabular-nums">
               {nextStep.title}
             </h1>
             <p className="text-primary leading-relaxed max-w-prose mb-6">
               {nextStep.description}
             </p>
 
-            {/* Das Angebot als konkrete Liste: die am längsten wartenden, direkt anklickbar */}
-            {nextStep.jobs && nextStep.jobs.length > 0 && (
-              <ul className="border-y border-accent/20 divide-y divide-accent/20 mb-6">
-                {nextStep.jobs.map((job) => (
-                  <li key={job.id}>
-                    <Link
-                      href={`/jobs/${job.id}`}
-                      className="flex items-center justify-between gap-4 py-2.5 group"
-                    >
-                      <span className="min-w-0">
-                        <span className="block text-sm font-medium text-foreground truncate group-hover:text-accent-strong">
-                          {job.title}
-                        </span>
-                        <span className="block text-xs text-primary truncate">
-                          {job.company ?? 'Ohne Angabe'}
-                        </span>
-                      </span>
-                      <span className="flex-shrink-0 text-xs text-primary tabular-nums whitespace-nowrap">
-                        seit {job.daysWaiting} {job.daysWaiting === 1 ? 'Tag' : 'Tagen'}
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
+            {/* Die Handlung zuerst — die Liste darf sie nicht unters Fold schieben.
+                Im Onboarding bleibt der Slot ganz weg: die Karte unten trägt die eine Aktion. */}
+            {!showOnboarding && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-6">
+                <ButtonLink href={nextStep.href}>{nextStep.cta}</ButtonLink>
+                {nextStep.alternative && (
+                  <Link
+                    href={nextStep.alternative.href}
+                    className="text-sm font-medium text-primary underline decoration-accent/60 underline-offset-4 hover:text-foreground hover:decoration-accent"
+                  >
+                    {nextStep.alternative.label}
+                  </Link>
+                )}
+              </div>
             )}
 
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              {/* Im Onboarding trägt die Erste-Schritte-Karte die eine Aktion — nicht zweimal */}
-              {!showOnboarding && <ButtonLink href={nextStep.href}>{nextStep.cta}</ButtonLink>}
-              {nextStep.alternative && !showOnboarding && (
-                <Link
-                  href={nextStep.alternative.href}
-                  className="text-sm font-medium text-primary underline decoration-accent/60 underline-offset-4 hover:text-foreground hover:decoration-accent"
-                >
-                  {nextStep.alternative.label}
-                </Link>
-              )}
-            </div>
+            {/* Das Angebot als konkrete Liste: die am längsten wartenden, direkt anklickbar */}
+            {nextStep.jobs && nextStep.jobs.length > 0 && (
+              <>
+                <ul className="border-y border-accent/20 divide-y divide-accent/20">
+                  {nextStep.jobs.map((job) => (
+                    <li key={job.id}>
+                      <Link
+                        href={`/jobs/${job.id}`}
+                        className="flex items-center justify-between gap-4 py-2.5 group"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium text-foreground truncate group-hover:text-accent-strong">
+                            {job.title}
+                          </span>
+                          <span className="block text-xs text-primary truncate">
+                            {job.company ?? 'Ohne Angabe'}
+                          </span>
+                        </span>
+                        {nextStep.showAgeColumn && (
+                          <span className="flex-shrink-0 text-xs text-primary tabular-nums whitespace-nowrap">
+                            seit {job.daysWaiting} {job.daysWaiting === 1 ? 'Tag' : 'Tagen'}
+                          </span>
+                        )}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                {unscoredCount > nextStep.jobs.length && (
+                  <Link
+                    href="/jobs?filter=unscored&sort=oldest"
+                    className="mt-2 inline-block text-xs text-primary underline decoration-accent/60 underline-offset-4 hover:text-foreground hover:decoration-accent"
+                  >
+                    … und {unscoredCount - nextStep.jobs.length} weitere ansehen
+                  </Link>
+                )}
+              </>
+            )}
           </section>
         )}
 
-        {/* Belegzeile — persönliche Perspektive; Korpus-Zahl synchron zum Zähler auf /jobs; im Onboarding ausgeblendet */}
+        {/* Erste Schritte — direkt nach dem Hero: genau ein aktueller Schritt, die Karte trägt die eine Aktion */}
+        {showOnboarding && (
+          <section className="bg-surface rounded-2xl p-10 border border-border mb-6">
+            <h2 className="text-2xl font-medium text-foreground mb-8">Erste Schritte</h2>
+            {/* ol statt div-Reihe: die Reihenfolge ist echtes Inhalt —
+                Screenreader kündigen Position an, ohne aria-label auf div zu setzen */}
+            <ol className="space-y-6 mb-10">
+              {onboardingSteps.map((step, i) => (
+                <OnboardingStep
+                  key={step.step}
+                  step={step.step}
+                  title={step.title}
+                  description={step.description}
+                  state={step.done ? 'done' : i === firstOpenStep ? 'current' : 'upcoming'}
+                />
+              ))}
+            </ol>
+
+            {nextStep && <ButtonLink href={nextStep.href}>{nextStep.cta}</ButtonLink>}
+          </section>
+        )}
+
+        {/* Belegzeile — zwei Zeiträume, zwei Sätze: „neu" ist immer die letzte Woche aus
+            gespeicherten Suchen; die Bestandszahlen stehen ohne Zeitrahmen und heißen
+            „aktiv" (derselbe Schnitt wie überall auf dieser Seite). Rechts: der
+            Refresh-Control, damit Wiederkommen nicht den Umweg über /jobs braucht. */}
         {jobsState === 'ok' && stats && !showOnboarding && (
-          <p className="text-sm text-primary mb-12 tabular-nums">
-            Deine letzten 7 Tage:{' '}
-            <span className="font-medium text-foreground whitespace-nowrap">
-              {newThisWeek} {newThisWeek === 1 ? 'neuer Fund' : 'neue Funde'}
-            </span>{' '}
-            ·{' '}
-            <span className="whitespace-nowrap">
-              <span className="font-medium text-foreground">
-                {unscoredAllCount} von {stats.total}
-              </span>{' '}
-              Jobs ohne Bewertung
-            </span>{' '}
-            ·{' '}
-            <span className="whitespace-nowrap">{stats.applied} in der Pipeline</span>
-          </p>
+          <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 mb-12">
+            <div className="text-sm text-primary tabular-nums">
+              {savedSearches.length > 0 && (
+                <p className="mb-1">
+                  Diese Woche:{' '}
+                  {newThisWeek === 0 ? (
+                    'keine neuen Funde'
+                  ) : (
+                    <span className="font-medium text-foreground whitespace-nowrap">
+                      {newThisWeek} {newThisWeek === 1 ? 'neuer Fund' : 'neue Funde'}
+                    </span>
+                  )}{' '}
+                  aus deinen gespeicherten Suchen.
+                </p>
+              )}
+              <p>
+                <span className="whitespace-nowrap">
+                  <span className="font-medium text-foreground">
+                    {unscoredAllCount} von {stats.total}
+                  </span>{' '}
+                  aktiven Jobs ohne Bewertung
+                </span>{' '}
+                · <span className="whitespace-nowrap">{stats.applied} in der Pipeline</span>
+              </p>
+            </div>
+            <Button size="sm" variant="secondary" onClick={() => void loadAll()}>
+              Aktualisieren
+            </Button>
+          </div>
         )}
 
         {/* Lebenslauf-Status unbekannt — ein API-Fehler wird nicht zu „lade dein Resume hoch" umgedeutet */}
@@ -396,13 +538,15 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Top Matches — mit Beweis, nicht als Nacktzahl */}
-        {jobsState === 'ok' && topMatches.length > 0 && (
+        {/* Top Matches — mit Beweis, nicht als Nacktzahl. Im Onboarding ausgeblendet:
+            Wer hört „ohne Lebenslauf keine Matches", darf keine Scores sehen. */}
+        {jobsState === 'ok' && !showOnboarding && topMatches.length > 0 && (
           <section className="mb-12">
             <h2 className="text-xl font-medium text-foreground mb-4">Top Matches</h2>
             <div className="grid sm:grid-cols-3 gap-4">
               {topMatches.map((job) => {
                 const proof = matchProof(job)
+                const source = sourceLabel(job.url)
                 return (
                   <Link
                     key={job.id}
@@ -416,14 +560,22 @@ export default function Dashboard() {
                       {job.score != null && (
                         <span
                           className={`flex-shrink-0 text-lg font-light tabular-nums ${scoreTone(job.score)}`}
-                          title={`KI-Score — High Match ab ${HIGH_MATCH_THRESHOLD}`}
                         >
-                          {job.score}
-                          <span className="text-xs text-primary-soft">/10</span>
+                          {/* Bedeutung als Text getragen, nicht nur als Farbe (WCAG 1.4.1) */}
+                          <span className="sr-only">
+                            KI-Score: {job.score} von 10 — {scoreLabel(job.score)}
+                          </span>
+                          <span aria-hidden="true">
+                            {job.score}
+                            <span className="text-xs text-primary-soft">/10</span>
+                          </span>
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-primary-soft">{job.company ?? 'Ohne Angabe'}</p>
+                    <p className="text-xs text-primary-soft">
+                      {job.company ?? 'Ohne Angabe'}
+                      {source && <> · {source}</>}
+                    </p>
                     {proof && (
                       <p className="mt-2 text-xs text-primary leading-relaxed">
                         {proof.label}: {proof.values.join(', ')}
@@ -442,8 +594,27 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Saved Searches — der Wiederkomm-Trigger: „N neu" statt fünf gleichberechtigter CTAs */}
-        {jobsState === 'ok' && savedSearches.length > 0 && (
+        {/* Leer-Ausgabe statt stumm verschwindender Sektion: der Grund, warum hier
+            nichts steht, und der Ausweg — Scores entstehen bei der Suche (15 pro Suche). */}
+        {jobsState === 'ok' && !showOnboarding && topMatches.length === 0 && (
+          <section className="mb-12">
+            <h2 className="text-xl font-medium text-foreground mb-4">Top Matches</h2>
+            <div className="bg-surface rounded-2xl p-8 border border-border-soft">
+              <p className="font-medium text-foreground mb-1">Noch keine bewerteten Jobs</p>
+              <p className="text-sm text-primary leading-relaxed max-w-prose mb-5">
+                Bewertungen entstehen bei der Suche — die KI bewertet dort die ersten 15 Treffer
+                gegen deinen Lebenslauf. Starte eine Suche, dann erscheinen hier deine stärksten
+                Treffer.
+              </p>
+              <ButtonLink href="/search" variant="secondary" size="sm">
+                Jetzt suchen
+              </ButtonLink>
+            </div>
+          </section>
+        )}
+
+        {/* Saved Searches — der Wiederkomm-Trigger; im Onboarding ausgeblendet */}
+        {jobsState === 'ok' && !showOnboarding && savedSearches.length > 0 && (
           <section className="mb-12">
             <h2 className="text-xl font-medium text-foreground mb-4">
               Deine gespeicherten Suchen
@@ -454,15 +625,16 @@ export default function Dashboard() {
                   key={saved.id}
                   className="flex items-center justify-between gap-4 bg-surface rounded-2xl p-5 border border-border-soft"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium text-foreground">
                       {saved.query}
                       {saved.location ? ` · ${saved.location}` : ''}
                       {saved.remote ? ' · Remote' : ''}
                     </p>
                     <p className="text-xs text-primary-soft mt-1 tabular-nums">
-                      {saved.lastRunAt &&
-                        `Zuletzt gesucht: ${new Date(saved.lastRunAt).toLocaleDateString('de-DE')}`}
+                      {saved.lastRunAt
+                        ? `Zuletzt gesucht: ${relativeDays(saved.lastRunAt)}`
+                        : 'Noch nie gesucht'}
                       {saved.lastRunAt && saved.lastNewJobs != null && saved.lastNewJobs > 0 && ' · '}
                       {saved.lastNewJobs != null && saved.lastNewJobs > 0 && (
                         <span className="inline-block px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20 font-medium">
@@ -510,7 +682,7 @@ export default function Dashboard() {
         )}
 
         {/* Gescheiterte Suche-Liste bleibt sichtbar statt still zu verschwinden */}
-        {jobsState === 'ok' && searchesError && savedSearches.length === 0 && (
+        {jobsState === 'ok' && !showOnboarding && searchesError && savedSearches.length === 0 && (
           <section className="mb-12">
             <h2 className="text-xl font-medium text-foreground mb-4">Deine gespeicherten Suchen</h2>
             <div
@@ -524,44 +696,35 @@ export default function Dashboard() {
             </div>
           </section>
         )}
-
-        {/* Erste Schritte — genau ein aktueller Schritt, die Karte trägt die eine Aktion */}
-        {showOnboarding && (
-          <section className="bg-surface rounded-2xl p-10 border border-border">
-            <h2 className="text-2xl font-medium text-foreground mb-8">Erste Schritte</h2>
-            <div className="space-y-6 mb-10">
-              {onboardingSteps.map((step, i) => (
-                <OnboardingStep
-                  key={step.step}
-                  step={step.step}
-                  title={step.title}
-                  description={step.description}
-                  state={step.done ? 'done' : i === firstOpenStep ? 'current' : 'upcoming'}
-                />
-              ))}
-            </div>
-
-            {nextStep && <ButtonLink href={nextStep.href}>{nextStep.cta}</ButtonLink>}
-          </section>
-        )}
       </main>
     </div>
   )
 }
 
-// Beweiszeile aus echten Matching-Daten — nicht erfunden, nur was die KI hinterlegt hat
+// Beweiszeile aus echten Matching-Daten — nicht erfunden, nur was die KI hinterlegt hat.
+// Sprachliche Regel: ab der High-Match-Schwelle (8) belegt die Zeile, sie relativiert
+// nicht — neben einem grünen Score steht kein „Lücke". Unter der Schwelle (6–7, „gut
+// mit kleinen Lücken") zeigt sie die Lücke, statt sie zu verbergen.
 function matchProof(job: Job): { label: string; values: string[] } | null {
   if (!job.matchDetails) return null
   try {
     const d = JSON.parse(job.matchDetails) as Record<string, unknown>
     const strings = (v: unknown) =>
       Array.isArray(v) ? v.filter((s): s is string => typeof s === 'string') : []
-    const strengths = strings(d.strengths)
-    if (strengths.length > 0) return { label: 'Passt', values: strengths.slice(0, 2) }
-    const transferable = strings(d.transferableSkills)
-    if (transferable.length > 0) return { label: 'Übertragbar', values: transferable.slice(0, 2) }
+    const isHighMatch = (job.score ?? 0) >= HIGH_MATCH_THRESHOLD
+    // Dedupe: dieselbe generische Stärke zweimal ist Beugung, kein Beleg
+    const strengths = [...new Set(strings(d.strengths))]
+    if (strengths.length > 0) {
+      return { label: isHighMatch ? 'Passt' : 'Stärken', values: strengths.slice(0, 2) }
+    }
+    const transferable = [...new Set(strings(d.transferableSkills))]
+    if (transferable.length > 0) {
+      return { label: isHighMatch ? 'Passt auf' : 'Übertragbar', values: transferable.slice(0, 2) }
+    }
     const gaps = strings(d.gaps)
-    if (gaps.length > 0) return { label: 'Lücke', values: gaps.slice(0, 1) }
+    if (gaps.length > 0 && !isHighMatch) {
+      return { label: 'Lücke', values: gaps.slice(0, 1) }
+    }
     return null
   } catch {
     return null
@@ -588,12 +751,12 @@ function OnboardingStep({
         ? 'bg-accent text-on-accent border-transparent'
         : 'bg-transparent text-primary-soft border-border'
   return (
-    <div className="flex items-start gap-5" aria-current={state === 'current' ? 'step' : undefined}>
+    <li className="flex items-start gap-5" aria-current={state === 'current' ? 'step' : undefined}>
+      {/* Nummer/Häkchen rein visuell — die ol-Semantik trägt die Position,
+          das sr-only „(erledigt)" im Titel den Zustand */}
       <div
+        aria-hidden="true"
         className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-medium tabular-nums border ${marker}`}
-        aria-label={
-          state === 'done' ? `${title} erledigt` : state === 'current' ? `Schritt ${step}: ${title}` : title
-        }
       >
         {state === 'done' ? (
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -610,6 +773,6 @@ function OnboardingStep({
         </h3>
         <p className="text-sm leading-relaxed text-primary-soft">{description}</p>
       </div>
-    </div>
+    </li>
   )
 }

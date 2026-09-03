@@ -3,6 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '../../components/Toast'
+import { MarkdownContent, normalizeTextContent } from '../../components/Markdown'
 import { Button, StatusBadge, buttonClasses, scoreTone } from '../../components/ui'
 
 interface Job {
@@ -109,7 +110,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   if (loading) {
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <p className="text-[var(--color-primary-soft)]">Lade Job...</p>
+        <p className="text--primary-soft">Lade Job...</p>
       </div>
     )
   }
@@ -118,10 +119,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     return (
       <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
         <div className="text-center">
-          <p className="text-[var(--color-primary-soft)] mb-4">{error || 'Job nicht gefunden'}</p>
+          <p className="text--primary-soft mb-4">{error || 'Job nicht gefunden'}</p>
           <button
             onClick={() => router.push('/jobs')}
-            className="text-sm text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors"
+            className="text-sm text--primary hover:text--accent transition-colors"
           >
             Zurück zur Job-Übersicht
           </button>
@@ -135,13 +136,13 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       <main className="max-w-4xl mx-auto px-6 py-16">
         <div className="flex items-start justify-between mb-6">
           <div>
-            <h1 className="text-3xl sm:text-4xl font-light text-[var(--color-foreground)] mb-2">
+            <h1 className="text-3xl sm:text-4xl font-light text--foreground mb-2">
               {job.title}
             </h1>
-            <p className="text-[var(--color-primary)]">
+            <p className="text--primary">
               {job.company}
               {job.location && (
-                <span className="text-[var(--color-primary-soft)]"> • {job.location}</span>
+                <span className="text--primary-soft"> • {job.location}</span>
               )}
             </p>
           </div>
@@ -149,16 +150,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         </div>
 
         {job.score && (
-          <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
+          <div className="bg--surface rounded-2xl p-6 border border--border mb-6">
             <div className="flex items-baseline gap-3 mb-3">
               <span className={`text-5xl font-light tabular-nums ${scoreTone(job.score)}`}>
                 {job.score}
-                <span className="text-2xl text-[var(--color-primary-soft)]">/10</span>
+                <span className="text-2xl text--primary-soft">/10</span>
               </span>
-              <span className="text-sm text-[var(--color-primary-soft)]">AI Match Score</span>
+              <span className="text-sm text--primary-soft">AI Match Score</span>
             </div>
             {job.scoreReason && (
-              <p className="text-[var(--color-primary)] leading-relaxed max-w-prose">
+              <p className="text--primary leading-relaxed max-w-prose">
                 {job.scoreReason}
               </p>
             )}
@@ -168,10 +169,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <>
                   {strengths && strengths.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Passt gut:</p>
+                      <p className="text-sm font-medium text--foreground mb-2">Passt gut:</p>
                       <div className="flex flex-wrap gap-2">
                         {strengths.map((skill, i) => (
-                          <span key={i} className="px-3 py-1 bg-[var(--color-success)]/10 text-[var(--color-success)] text-sm rounded-full">
+                          <span key={i} className="px-3 py-1 bg--success/10 text--success text-sm rounded-full">
                             {skill}
                           </span>
                         ))}
@@ -180,10 +181,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   )}
                   {gaps && gaps.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Fehlt:</p>
+                      <p className="text-sm font-medium text--foreground mb-2">Fehlt:</p>
                       <div className="flex flex-wrap gap-2">
                         {gaps.map((gap, i) => (
-                          <span key={i} className="px-3 py-1 bg-[var(--color-error)]/10 text-[var(--color-error)] text-sm rounded-full">
+                          <span key={i} className="px-3 py-1 bg--error/10 text--error text-sm rounded-full">
                             {gap}
                           </span>
                         ))}
@@ -192,10 +193,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   )}
                   {transferableSkills && transferableSkills.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Transferable Skills:</p>
+                      <p className="text-sm font-medium text--foreground mb-2">Transferable Skills:</p>
                       <div className="flex flex-wrap gap-2">
                         {transferableSkills.map((skill, i) => (
-                          <span key={i} className="px-3 py-1 bg-[var(--color-border-soft)] text-[var(--color-foreground)] text-sm rounded-full">
+                          <span key={i} className="px-3 py-1 bg--border-soft text--foreground text-sm rounded-full">
                             {skill}
                           </span>
                         ))}
@@ -208,19 +209,19 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
-          <h2 className="text-sm font-medium text-[var(--color-primary-soft)] mb-4">
+        <div className="bg--surface rounded-2xl p-6 border border--border mb-6">
+          <h2 className="text-sm font-medium text--primary-soft mb-4">
             Beschreibung
           </h2>
           <div className="prose max-w-none">
-            <p className="whitespace-pre-wrap text-[var(--color-foreground)] leading-relaxed">
-              {job.description}
-            </p>
+            {/* Normalisiert (Entities, Bullets, Absätze) und als Fließtext mit Listen gerendert —
+                keine Formatierungsartefakte aus den Job-Börsen-Feeds */}
+            <MarkdownContent content={normalizeTextContent(job.description ?? '')} variant="description" />
           </div>
         </div>
 
-        <div className="bg-[var(--color-surface)] rounded-2xl p-6 border border-[var(--color-border)] mb-6">
-          <h2 className="text-sm font-medium text-[var(--color-primary-soft)] mb-4">
+        <div className="bg--surface rounded-2xl p-6 border border--border mb-6">
+          <h2 className="text-sm font-medium text--primary-soft mb-4">
             Aktionen
           </h2>
 

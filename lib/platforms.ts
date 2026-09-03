@@ -343,7 +343,7 @@ export interface ProfileOptimization {
 export async function optimizeProfile(
   profile: LinkedInProfile | StepStoneProfile,
   targetJobs: string[],
-  aiProvider: string = 'mistral'
+  aiProvider: string = 'nebius'
 ): Promise<ProfileOptimization> {
   const { getAIClient, defaultModel } = await import('./ai')
   const { generateText } = await import('ai')
@@ -409,7 +409,7 @@ export async function generateOptimizedSection(
   section: 'headline' | 'about' | 'experience' | 'skills',
   currentContent: string,
   targetJobs: string[],
-  aiProvider: string = 'mistral'
+  aiProvider: string = 'nebius'
 ): Promise<string> {
   const { getAIClient, defaultModel } = await import('./ai')
   const { generateText } = await import('ai')

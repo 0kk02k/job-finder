@@ -125,8 +125,8 @@ export async function interviewerReply(
   resumeContent: string | null,
   config: AIConfig
 ): Promise<{ reply: string; completed: string[] }> {
-  const ai = getAIClient(config.provider || 'mistral', config.apiKey, config.baseUrl)
-  const model = ai.chat(config.model || defaultModel(config.provider || 'mistral'))
+  const ai = getAIClient(config.provider || 'nebius', config.apiKey, config.baseUrl)
+  const model = ai.chat(config.model || defaultModel(config.provider || 'nebius'))
 
   const history = messages
     .map((m) => `${m.role === 'assistant' ? 'INTERVIEWER' : 'KANDIDAT'}: ${m.content}`)
@@ -251,7 +251,7 @@ export async function generateInsights(
   messages: InterviewMessage[],
   config: AIConfig
 ): Promise<InterviewInsights | null> {
-  const ai = getAIClient(config.provider || 'mistral', config.apiKey, config.baseUrl)
+  const ai = getAIClient(config.provider || 'nebius', config.apiKey, config.baseUrl)
 
   const transcript = messages
     .map((m) => `${m.role === 'assistant' ? 'INTERVIEWER' : 'KANDIDAT'}: ${m.content}`)
@@ -280,7 +280,7 @@ Nur aus dem Transkript belegte Aussagen verwenden, nichts erfinden. Wurde keine 
 
   try {
     const { text } = await generateText({
-      model: ai.chat(config.model || defaultModel(config.provider || 'mistral')),
+      model: ai.chat(config.model || defaultModel(config.provider || 'nebius')),
       messages: [{ role: 'user', content: prompt }],
     })
     const result = parseJsonFromText(text || '{}')

@@ -1,8 +1,12 @@
 // AI integration for job scoring, resume matching, and intelligent job extraction
-// Supports: Ollama (local), Gemini (cloud), OpenRouter (multi-provider)
+// Supports: Nebius Token Factory (Default, Kimi K2.5), Ollama (local), Gemini, OpenRouter
 
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
+
+// Ein Ort, eine Wahrheit: die Standard-Modell-ID für Nebius Token Factory.
+// (Im Studio verifizierbar über „Copy model ID".)
+export const NEBIUS_DEFAULT_MODEL = 'moonshotai/Kimi-K2.5'
 
 export interface ScoreResult {
   score: number | null // 1-10, null wenn die KI nicht bewerten konnte
@@ -50,10 +54,10 @@ export function getAIClient(provider: string, apiKey?: string, baseUrl?: string)
     })
   }
 
-  if (provider === 'mistral') {
+  if (provider === 'nebius') {
     return createOpenAI({
-      baseURL: 'https://api.mistral.ai/v1',
-      apiKey: apiKey || process.env.MISTRAL_API_KEY,
+      baseURL: baseUrl || 'https://api.tokenfactory.nebius.com/v1',
+      apiKey: apiKey || process.env.NEBIUS_API_KEY,
     })
   }
 
@@ -79,7 +83,7 @@ export function getAIClient(provider: string, apiKey?: string, baseUrl?: string)
 // Default model per provider
 export function defaultModel(provider: string): string {
   if (provider === 'ollama') return 'llama3.2'
-  if (provider === 'mistral') return 'mistral-small-latest'
+  if (provider === 'nebius') return NEBIUS_DEFAULT_MODEL
   if (provider === 'gemini') return 'gemini-2.0-flash'
   if (provider === 'openrouter') return 'openai/gpt-4o-mini'
   return 'gpt-4o-mini'
@@ -98,7 +102,7 @@ export function parseJsonFromText(text: string) {
 }
 
 // AI-powered job extraction from unstructured HTML
-export async function extractJobFromHTML(html: string, url: string, provider: string = 'mistral'): Promise<ExtractedJob | null> {
+export async function extractJobFromHTML(html: string, url: string, provider: string = 'nebius'): Promise<ExtractedJob | null> {
   const ai = getAIClient(provider)
 
   const prompt = `Du bist ein Job-Extraktions-Experte. Extrahiere strukturierte Job-Daten aus dieser unstrukturierten HTML/Text-Seite.
@@ -145,7 +149,7 @@ export async function semanticJobSearch(
   resume: string,
   searchQuery: string,
   availableJobs: SemanticJob[],
-  provider: string = 'mistral',
+  provider: string = 'nebius',
   model?: string,
   apiKey?: string,
   baseUrl?: string
@@ -220,15 +224,23 @@ Gib zurück als JSON:
 }
 
 // Score job against resume (enhanced with transferable skills)
+// minSalary: Wunscheinstellung aus den Settings — als Kontext in die Bewertung,
+// damit die gespeicherte Einstellung eine Wirkung hat statt nur zu existieren.
 export async function scoreJob(
   jobDescription: string,
   resume: string,
-  provider: string = 'mistral',
+  provider: string = 'nebius',
   model?: string,
   apiKey?: string,
-  baseUrl?: string
+  baseUrl?: string,
+  minSalary?: number | null
 ): Promise<ScoreResult> {
   const ai = getAIClient(provider, apiKey, baseUrl)
+
+  const salaryLine =
+    typeof minSalary === 'number' && minSalary > 0
+      ? `5. Gehaltsvorstellung: Der Nutzer sucht ab ${minSalary} — liegt das angegebene Gehalt darunter, wirkt das den Score senkend, ist aber nur ein Faktor neben den Skills.\n`
+      : ''
 
   const prompt = `Du bist ein Karriere-Experte. Bewerte diesen Job auf einer Skala von 1-10 basierend auf dem Resume.
 
@@ -243,6 +255,7 @@ Berücksichtige dabei:
 2. Transferable Skills (Skills die übertragbar sind)
 3. Potenzial zur Einarbeitung (job ist vielleicht etwas höher, aber lernbar)
 4. Kultur-Fit basierend auf Firmenbeschreibung (falls vorhanden)
+${salaryLine}
 
 Gib zurück als JSON:
 {
@@ -281,7 +294,7 @@ Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lü
 export async function generateSearchQueries(
   resume: string,
   originalQuery: string,
-  provider: string = 'mistral'
+  provider: string = 'nebius'
 ): Promise<string[]> {
   const ai = getAIClient(provider)
 
@@ -321,7 +334,7 @@ Berücksichtige:
 export async function tailorResume(
   resume: string,
   jobDescription: string,
-  provider: string = 'mistral',
+  provider: string = 'nebius',
   model?: string
 ): Promise<string> {
   const ai = getAIClient(provider)
@@ -359,7 +372,7 @@ export async function generateCoverLetter(
   resume: string,
   jobDescription: string,
   company: string,
-  provider: string = 'mistral'
+  provider: string = 'nebius'
 ): Promise<string> {
   const ai = getAIClient(provider)
 

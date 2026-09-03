@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { scrapeJobUrl } from '@/lib/scrapers'
 import { scoreJob } from '@/lib/ai'
+import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 
 // Only allow public http(s) URLs — block SSRF against localhost/private/metadata hosts.
 function isPublicHttpUrl(rawUrl: string): boolean {
@@ -37,7 +38,10 @@ function isPublicHttpUrl(rawUrl: string): boolean {
   return true
 }
 
-// GET /api/jobs - list all jobs for user
+// GET /api/jobs - list all jobs for user.
+// select statt Voll-Return: `description` trägt den gescrapten Volltext —
+// ohne Feldliste lädt das Dashboard über mehrere MB JSON, um sieben
+// Kennzahlen zu rendern.
 export async function GET(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -46,6 +50,19 @@ export async function GET(request: NextRequest) {
   const jobs = await prisma.job.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      company: true,
+      location: true,
+      url: true,
+      status: true,
+      score: true,
+      scoreReason: true,
+      matchDetails: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   })
 
   return NextResponse.json(jobs)
@@ -98,13 +115,22 @@ export async function POST(request: NextRequest) {
   }
 
   // Auto-score if we have resume
-  const resume = await prisma.resume.findFirst({
-    where: { userId, isActive: true },
-  })
+  const [resume, settings] = await Promise.all([
+    prisma.resume.findFirst({ where: { userId, isActive: true } }),
+    prisma.userSettings.findUnique({ where: { userId } }),
+  ])
 
   if (resume && job.description) {
     try {
-      const scoreResult = await scoreJob(job.description, resume.content)
+      const scoreResult = await scoreJob(
+        job.description,
+        resume.content,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        settings?.minSalary ?? null
+      )
       // score is null when the AI was unreachable — keep the job unscored then
       if (scoreResult.score !== null) {
         await prisma.job.update({
@@ -116,7 +142,7 @@ export async function POST(request: NextRequest) {
               strengths: scoreResult.strengths,
               gaps: scoreResult.gaps,
             }),
-            status: scoreResult.score >= 7 ? 'HIGH_MATCH' : 'SCORED',
+            status: scoreResult.score >= HIGH_MATCH_THRESHOLD ? 'HIGH_MATCH' : 'SCORED',
           },
         })
       }

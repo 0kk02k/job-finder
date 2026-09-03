@@ -20,7 +20,7 @@ export async function scrapeJobUrl(url: string): Promise<Partial<ScrapedJob> | n
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
     })
     const html = await response.text()
-    const extracted = await extractJobFromHTML(html, url, 'mistral')
+    const extracted = await extractJobFromHTML(html, url, 'nebius')
     return extracted
   } catch (error) {
     console.error('Scrape error:', error)
@@ -184,7 +184,7 @@ export async function semanticSearch(params: {
     params.resume,
     params.query,
     semanticJobs,
-    params.provider || 'mistral',
+    params.provider || 'nebius',
     params.model,
     params.apiKey,
     params.baseUrl

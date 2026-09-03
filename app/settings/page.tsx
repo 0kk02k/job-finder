@@ -11,7 +11,7 @@ interface Settings {
   ollamaUrl: string | null
   geminiApiKey: string | null
   openaiApiKey: string | null
-  mistralApiKey: string | null
+  nebiusApiKey: string | null
   openrouterApiKey: string | null
   targetTitles: string | null
   targetLocations: string | null
@@ -155,7 +155,7 @@ export default function SettingsPage() {
           ollamaUrl: settings.ollamaUrl,
           geminiApiKey: settings.geminiApiKey,
           openaiApiKey: settings.openaiApiKey,
-          mistralApiKey: settings.mistralApiKey,
+          nebiusApiKey: settings.nebiusApiKey,
           openrouterApiKey: settings.openrouterApiKey,
           apifyApiKey: settings.apifyApiKey,
           targetTitles: settings.targetTitles,
@@ -253,11 +253,11 @@ export default function SettingsPage() {
               <div>
                 <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">KI-Anbieter</label>
                 <select
-                  value={settings.aiProvider || 'mistral'}
+                  value={settings.aiProvider || 'nebius'}
                   onChange={(e) => setSettings({ ...settings, aiProvider: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] focus:border-[var(--color-accent)] focus:outline-none"
                 >
-                  <option value="mistral">Mistral</option>
+                  <option value="nebius">Nebius Token Factory (Kimi K2.5)</option>
                   <option value="ollama">Ollama (lokal)</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
@@ -271,7 +271,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.aiModel || ''}
                 onChange={(v) => setSettings({ ...settings, aiModel: v })}
-                placeholder="mistral-small-latest"
+                placeholder="moonshotai/Kimi-K2.5"
               />
 
               {settings.aiProvider === 'ollama' && (
@@ -302,11 +302,11 @@ export default function SettingsPage() {
               />
 
               <InputField
-                label="Mistral API Key (optional)"
+                label="Nebius API Key (optional — sonst NEBIUS_API_KEY aus der Umgebung)"
                 type="password"
-                value={settings.mistralApiKey || ''}
-                onChange={(v) => setSettings({ ...settings, mistralApiKey: v })}
-                placeholder="Nur nötig bei Anbieter Mistral"
+                value={settings.nebiusApiKey || ''}
+                onChange={(v) => setSettings({ ...settings, nebiusApiKey: v })}
+                placeholder="Nur nötig bei Anbieter Nebius"
               />
 
               <InputField

@@ -11,19 +11,19 @@ import {
 
 async function getAIConfig(userId: string) {
   const settings = await prisma.userSettings.findUnique({ where: { userId } })
-  const provider = settings?.aiProvider || 'mistral'
+  const provider = settings?.aiProvider || 'nebius'
   return {
     provider,
     model: settings?.aiModel || undefined,
     apiKey:
-      provider === 'gemini'
-        ? settings?.geminiApiKey || undefined
-        : provider === 'openai'
-          ? settings?.openaiApiKey || undefined
-          : provider === 'openrouter'
-            ? settings?.openrouterApiKey || undefined
-            : provider === 'mistral'
-              ? settings?.mistralApiKey || undefined
+      provider === 'nebius'
+        ? settings?.nebiusApiKey || undefined
+        : provider === 'gemini'
+          ? settings?.geminiApiKey || undefined
+          : provider === 'openai'
+            ? settings?.openaiApiKey || undefined
+            : provider === 'openrouter'
+              ? settings?.openrouterApiKey || undefined
               : undefined,
     baseUrl: provider === 'ollama' ? settings?.ollamaUrl || undefined : undefined,
   }

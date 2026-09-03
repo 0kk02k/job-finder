@@ -78,21 +78,21 @@ function Toast({ toast, onClose }: { toast: ToastItem; onClose: () => void }) {
   return (
     <div
       role={isError ? 'alert' : 'status'}
-      className={`flex items-start gap-3 bg-[var(--color-surface)] rounded-xl p-4 border shadow-lg transition-all duration-300 motion-reduce:transition-none ${
+      className={`flex items-start gap-3 bg-surface rounded-xl p-4 border border-border shadow-sm transition-all duration-300 motion-reduce:transition-none ${
         exiting ? 'opacity-0 translate-x-4' : 'opacity-100'
       }`}
     >
       {/* Status-Punkt statt Farb-Balken: das Signal reicht in die Bedeutung, trägt sie nicht allein */}
       <span
         aria-hidden="true"
-        className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${isError ? 'bg-[var(--color-error)]' : 'bg-[var(--color-success)]'}`}
+        className={`mt-1.5 h-2 w-2 flex-shrink-0 rounded-full ${isError ? 'bg-error' : 'bg-success'}`}
       />
-      <p className="flex-1 text-sm text-[var(--color-foreground)] leading-relaxed">
+      <p className="flex-1 text-sm text-foreground leading-relaxed">
         {toast.message}
       </p>
       <button
         onClick={onClose}
-        className="flex-shrink-0 p-1 -m-1 text-[var(--color-primary-soft)] hover:text-[var(--color-foreground)] transition-colors motion-reduce:transition-none"
+        className="flex-shrink-0 p-1 -m-1 text-primary-soft hover:text-foreground transition-colors motion-reduce:transition-none"
         aria-label="Schließen"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">

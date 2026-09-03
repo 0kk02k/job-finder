@@ -346,9 +346,13 @@ export default function JobsPage() {
                           {job.company} • {job.location || 'Remote'}
                         </p>
                       </div>
-                      {job.score && (
+                      {job.score != null ? (
                         <div className={`text-3xl font-light tabular-nums ${getScoreColor(job.score)}`}>
                           {job.score}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-primary-soft pt-3">
+                          Noch keine Bewertung
                         </div>
                       )}
                     </div>

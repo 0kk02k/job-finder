@@ -78,12 +78,12 @@ model UserSettings {
 
   geminiApiKey    String?
   openaiApiKey    String?
-  mistralApiKey   String?
+  nebiusApiKey    String?
   openrouterApiKey String?
   apifyApiKey     String?
   ollamaUrl       String?  @default("http://localhost:11434")
-  aiProvider      String   @default("mistral")
-  aiModel         String?  @default("mistral-small-latest")
+  aiProvider      String   @default("nebius")
+  aiModel         String?  @default("moonshotai/Kimi-K2.5")
 
   targetTitles    String?  // JSON array of job titles
   targetLocations String?  // JSON array of locations
