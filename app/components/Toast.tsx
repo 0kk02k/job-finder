@@ -43,9 +43,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     (message: string, type: ToastType) => {
       const id = ++idRef.current
       setToasts((prev) => [...prev, { id, message, type }])
-      setTimeout(() => dismiss(id), 4000)
     },
-    [dismiss]
+    []
   )
 
   const success = useCallback((message: string) => push(message, 'success'), [push])
@@ -66,18 +65,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
 function Toast({ toast, onClose }: { toast: ToastItem; onClose: () => void }) {
   const [exiting, setExiting] = useState(false)
+  // Hover pausiert das Ausblenden — Fehlermeldungen mit Handlungsanweisung
+  // sind nicht nach 4 s weg, nur weil man sie lesen will
+  const [paused, setPaused] = useState(false)
 
   useEffect(() => {
-    // Trigger exit animation slightly before unmount
+    if (paused) return
     const timer = setTimeout(() => setExiting(true), 3700)
     return () => clearTimeout(timer)
-  }, [])
+  }, [paused])
+
+  useEffect(() => {
+    if (!exiting) return
+    const timer = setTimeout(onClose, 300)
+    return () => clearTimeout(timer)
+  }, [exiting, onClose])
 
   const isError = toast.type === 'error'
 
   return (
     <div
       role={isError ? 'alert' : 'status'}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
       className={`flex items-start gap-3 bg-surface rounded-xl p-4 border border-border shadow-sm transition-all duration-300 motion-reduce:transition-none ${
         exiting ? 'opacity-0 translate-x-4' : 'opacity-100'
       }`}

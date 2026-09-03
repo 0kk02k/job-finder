@@ -20,7 +20,16 @@ const settingsSchema = z.object({
   remote: z.boolean(),
 }).partial()
 
-// GET /api/settings - get user settings
+// GET liefert API-Keys nie im Klartext — nur einen Maskiert-Hinweis („••••4f2a“).
+// Ein neuer Key wird gesetzt, indem man ihn eintippt; leer lassen heißt behalten.
+const KEY_FIELDS = ['geminiApiKey', 'openaiApiKey', 'nebiusApiKey', 'openrouterApiKey', 'apifyApiKey'] as const
+
+function maskKey(value: string | null | undefined): string | null {
+  if (!value) return null
+  return `••••${value.slice(-4)}`
+}
+
+// GET /api/settings - get user settings (Keys maskiert)
 export async function GET() {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -37,10 +46,21 @@ export async function GET() {
     })
   }
 
-  return NextResponse.json(settings)
+  const { geminiApiKey: _g, openaiApiKey: _o, nebiusApiKey: _n, openrouterApiKey: _r, apifyApiKey: _a, ...rest } = settings
+  return NextResponse.json({
+    ...rest,
+    geminiKeyHint: maskKey(_g),
+    openaiKeyHint: maskKey(_o),
+    nebiusKeyHint: maskKey(_n),
+    openrouterKeyHint: maskKey(_r),
+    apifyKeyHint: maskKey(_a),
+  })
 }
 
-// PUT /api/settings - update settings
+// PUT /api/settings - update settings.
+// Key-Felder gelten nur, wenn der Client einen nicht-leeren NEUEN Wert schickt.
+// `null` bedeutet ausdrücklich „unverändert“ — nach dem Maskiert-GET kann ein
+// null sonst nur versehentlich sein und würde den gespeicherten Key löschen.
 export async function PUT(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -56,11 +76,28 @@ export async function PUT(request: NextRequest) {
     )
   }
 
+  const data = { ...parsed.data }
+  for (const key of KEY_FIELDS) {
+    if (data[key] != null && typeof data[key] === 'string' && (data[key] as string).trim() === '') {
+      delete data[key]
+    }
+    if (data[key] === null) {
+      delete data[key]
+    }
+  }
+
   const settings = await prisma.userSettings.upsert({
     where: { userId },
-    update: parsed.data,
-    create: { userId, ...parsed.data },
+    update: data,
+    create: { userId, ...data },
   })
 
-  return NextResponse.json(settings)
+  return NextResponse.json({
+    ...settings,
+    geminiApiKey: undefined,
+    openaiApiKey: undefined,
+    nebiusApiKey: undefined,
+    openrouterApiKey: undefined,
+    apifyApiKey: undefined,
+  })
 }

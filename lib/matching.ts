@@ -12,3 +12,10 @@ export function scoreLabel(score: number): string {
   if (score >= 6) return 'gutes Matching mit Lücken'
   return 'wenig Passung'
 }
+
+// Semantische Relevanz (0–1) auf dieselbe Skala bringen wie den KI-Score (1–10) —
+// eine Schwelle, eine Skala, keine zweite Wahrheit. 0.75 Relevanz ergibt Score 8
+// und damit High Match; klassische Suche und semantische Suche sagen dasselbe.
+export function relevanceToScore(relevance: number): number {
+  return Math.min(10, Math.max(1, Math.round(relevance * 10)))
+}

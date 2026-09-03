@@ -367,39 +367,85 @@ Fokus auf:
   }
 }
 
-// Generate cover letter
+// Generate cover letter.
+// Wirft bei KI-Ausfall — der Aufrufer entscheidet über den ehrlichen Fallback
+// (Vorlage mit „bitte prüfen“-Hinweis), statt still eine leere Antwort zu liefern.
 export async function generateCoverLetter(
   resume: string,
   jobDescription: string,
   company: string,
-  provider: string = 'nebius'
+  provider: string = 'nebius',
+  model?: string,
+  apiKey?: string,
+  baseUrl?: string,
+  jobTitle?: string
 ): Promise<string> {
-  const ai = getAIClient(provider)
+  const ai = getAIClient(provider, apiKey, baseUrl)
 
   const prompt = `Schreibe ein professionelles Anschreiben auf Deutsch für:
 
 Firma: ${company}
+Stelle: ${jobTitle || 'wie ausgeschrieben'}
 Job-Beschreibung: ${jobDescription}
 
-Basierend auf diesem Resume:
+Basierend auf diesem Lebenslauf:
 ${resume}
 
-Halte es kurz (3-4 Absätze), professionell und überzeugend.
+Halte es kurz (3-4 Absätze), professionell und überzeugend. Beziehe dich konkret
+auf Anforderungen aus der Stellenbeschreibung und Stärken aus dem Lebenslauf —
+keine Floskeln ohne Bezug. Beginne mit einer Anrede („Sehr geehrte Damen und Herren,“
+oder konkreter, falls ein Ansprechpartner erkennbar ist) und schließe mit
+„Mit freundlichen Grüßen“.
 
 Struktur:
 1. Einleitung: Warum ich mich bewerbe
-2. Meine relevanten Skills und Erfahrungen
+2. Meine relevanten Skills und Erfahrungen (aus dem Lebenslauf belegt)
 3. Warum ich zur Firma passe
 4. Abschluss`
 
-  try {
-    const { text } = await generateText({
-      model: ai.chat(defaultModel(provider)),
-      messages: [{ role: 'user', content: prompt }],
-    })
+  const { text } = await generateText({
+    model: ai.chat(model || defaultModel(provider)),
+    messages: [{ role: 'user', content: prompt }],
+  })
 
-    return text || ''
-  } catch {
-    return ''
+  if (!text || text.trim().length === 0) {
+    throw new Error('Die KI hat kein Anschreiben geliefert')
+  }
+  return text.trim()
+}
+
+// Provider-Konfiguration aus den Nutzer-Settings — eine Stelle für die Zuordnung
+// „welcher Key gehört zu welchem Provider“, statt derselben Ternärkette in jeder Route.
+interface AIConfigSource {
+  aiProvider?: string | null
+  aiModel?: string | null
+  nebiusApiKey?: string | null
+  geminiApiKey?: string | null
+  openaiApiKey?: string | null
+  openrouterApiKey?: string | null
+  ollamaUrl?: string | null
+}
+
+export function aiConfigFromSettings(settings: AIConfigSource | null | undefined): {
+  provider: string
+  model?: string
+  apiKey?: string
+  baseUrl?: string
+} {
+  const provider = settings?.aiProvider || 'nebius'
+  return {
+    provider,
+    model: settings?.aiModel || undefined,
+    apiKey:
+      provider === 'nebius'
+        ? settings?.nebiusApiKey || undefined
+        : provider === 'gemini'
+          ? settings?.geminiApiKey || undefined
+          : provider === 'openai'
+            ? settings?.openaiApiKey || undefined
+            : provider === 'openrouter'
+              ? settings?.openrouterApiKey || undefined
+              : undefined,
+    baseUrl: provider === 'ollama' ? settings?.ollamaUrl || undefined : undefined,
   }
 }

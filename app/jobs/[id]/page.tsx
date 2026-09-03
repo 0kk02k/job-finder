@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '../../components/Toast'
 import { MarkdownContent, normalizeTextContent } from '../../components/Markdown'
 import { Button, StatusBadge, buttonClasses, scoreTone } from '../../components/ui'
+import { scoreLabel } from '@/lib/matching'
 
 interface Job {
   id: string
@@ -43,7 +44,13 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [job, setJob] = useState<Job | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [downloading, setDownloading] = useState(false)
+  // Ein „beschäftigt“-Zustand pro Handlung — ein gemeinsamer sperrt beide Buttons
+  // und behauptet, was nicht passiert
+  const [busy, setBusy] = useState<'resume' | 'generate' | 'letter' | null>(null)
+  // Anschreiben: bewusst nur Client-State — der Text gehört der Nutzerin, sie
+  // bearbeitet ihn und lädt das PDF selbst. Nichts wird persistiert.
+  const [letter, setLetter] = useState<{ text: string; source: 'ki' | 'vorlage' } | null>(null)
+  const [letterError, setLetterError] = useState<string | null>(null)
 
   async function fetchJob(jobId: string) {
     try {
@@ -71,17 +78,61 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     void fetchJob(id)
   }, [id])
 
-  async function handleDownloadPDF(type: 'resume' | 'coverletter') {
+  // Anschreiben erzeugen: Primärweg KI (echter Lebenslauf + echte Anzeige). Ein
+  // Ausfall wird benannt — der Stufen-2-Fallback (Vorlage) läuft nur auf Ausdruck.
+  async function handleGenerateLetter(useTemplate = false) {
+    if (!job) return
+    setBusy('generate')
+    setLetterError(null)
+    try {
+      if (useTemplate) {
+        const response = await fetch('/api/pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'coverletter-template', jobId: job.id }),
+        })
+        if (!response.ok) {
+          setLetterError('Die Vorlage konnte nicht erzeugt werden.')
+          return
+        }
+        const data = await response.json()
+        setLetter({ text: data.text, source: 'vorlage' })
+        return
+      }
+
+      const response = await fetch('/api/coverletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      })
+      const data = await response.json().catch(() => undefined)
+      if (!response.ok) {
+        setLetterError(
+          data?.error ??
+            'Die KI ist nicht erreichbar — es wurde kein Anschreiben erzeugt. Deine Daten sind unverändert.'
+        )
+        return
+      }
+      setLetter({ text: data.text, source: 'ki' })
+    } catch {
+      setLetterError('Netzwerkfehler — prüfe deine Verbindung und versuch es erneut.')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function handleDownloadPDF(type: 'resume' | 'letter') {
     if (!job) return
 
-    setDownloading(true)
+    setBusy(type)
     try {
       const response = await fetch('/api/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          type,
+          type: type === 'resume' ? 'resume' : 'coverletter',
           jobId: job.id,
+          ...(type === 'letter' && letter?.text ? { content: letter.text } : {}),
         }),
       })
 
@@ -90,34 +141,32 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = type === 'resume' ? 'Resume.pdf' : `Cover_Letter_${job.company}.pdf`
+        a.download = type === 'resume' ? 'Lebenslauf.pdf' : `Anschreiben_${job.company ?? 'Bewerbung'}.pdf`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
       } else {
-        toast.error('PDF Generierung fehlgeschlagen')
+        toast.error('Das PDF konnte nicht erzeugt werden — versuch es erneut.')
       }
-    } catch (error) {
-      toast.error('Fehler: ' + error)
+    } catch {
+      toast.error('Netzwerkfehler — das PDF konnte nicht geladen werden.')
     } finally {
-      setDownloading(false)
+      setBusy(null)
     }
   }
 
-  // Gedämpfte Signale statt Vollfläche — der Score trägt Bedeutung, nicht Deko
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <p className="text-primary-soft">Lade Job...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-primary-soft">Lade Job …</p>
       </div>
     )
   }
 
   if (error || !job) {
     return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <p className="text-primary-soft mb-4">{error || 'Job nicht gefunden'}</p>
           <button
@@ -132,31 +181,36 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      <main className="max-w-4xl mx-auto px-6 py-16">
+    <div className="min-h-screen bg-background">
+      <main className="max-w-5xl mx-auto px-6 py-16">
         <div className="flex items-start justify-between mb-6">
-          <div>
+          <div className="min-w-0">
             <h1 className="text-3xl sm:text-4xl font-light text-foreground mb-2">
               {job.title}
             </h1>
             <p className="text-primary">
-              {job.company}
+              {job.company ?? 'Ohne Angabe'}
               {job.location && (
-                <span className="text-primary-soft"> • {job.location}</span>
+                <span className="text-primary-soft"> · {job.location}</span>
               )}
             </p>
           </div>
           <StatusBadge status={job.status} />
         </div>
 
-        {job.score && (
+        {job.score != null ? (
           <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
             <div className="flex items-baseline gap-3 mb-3">
               <span className={`text-5xl font-light tabular-nums ${scoreTone(job.score)}`}>
-                {job.score}
-                <span className="text-2xl text-primary-soft">/10</span>
+                <span className="sr-only">
+                  KI-Score: {job.score} von 10 — {scoreLabel(job.score)}
+                </span>
+                <span aria-hidden="true">
+                  {job.score}
+                  <span className="text-2xl text-primary-soft">/10</span>
+                </span>
               </span>
-              <span className="text-sm text-primary-soft">AI Match Score</span>
+              <span className="text-sm text-primary-soft">KI-Score</span>
             </div>
             {job.scoreReason && (
               <p className="text-primary leading-relaxed max-w-prose">
@@ -193,7 +247,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   )}
                   {transferableSkills && transferableSkills.length > 0 && (
                     <div className="mt-4">
-                      <p className="text-sm font-medium text-foreground mb-2">Transferable Skills:</p>
+                      <p className="text-sm font-medium text-foreground mb-2">Übertragbare Stärken:</p>
                       <div className="flex flex-wrap gap-2">
                         {transferableSkills.map((skill, i) => (
                           <span key={i} className="px-3 py-1 bg-border-soft text-foreground text-sm rounded-full">
@@ -206,6 +260,13 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 </>
               )
             })()}
+          </div>
+        ) : (
+          <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
+            <p className="text-sm text-primary">
+              Noch keine Bewertung — entsteht bei der nächsten Suche oder beim erneuten Suchen
+              dieses Jobs.
+            </p>
           </div>
         )}
 
@@ -220,9 +281,83 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         </div>
 
+        {/* Anschreiben — das Artefakt, das einen Menschen erreicht: KI-Entwurf aus dem echten
+            Lebenslauf, editierbar vor dem Download. Kein stiller Fallback — ein KI-Ausfall
+            wird benannt, die Vorlage ist ausdrücklich als solche markiert. */}
+        <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
+          <h2 className="text-sm font-medium text-primary-soft mb-4">Anschreiben</h2>
+
+          {!letter && !letterError && (
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <p className="text-sm text-primary leading-relaxed max-w-prose">
+                Aus deinem Lebenslauf und dieser Stellenanzeige — zum Bearbeiten, bevor du sie
+                verschickst.
+              </p>
+              <Button onClick={() => void handleGenerateLetter(false)} disabled={busy !== null}>
+                {busy === 'generate' ? 'Wird erzeugt …' : 'Anschreiben erzeugen'}
+              </Button>
+            </div>
+          )}
+
+          {letterError && (
+            <div className="mb-4">
+              <div role="alert" className="p-4 bg-error/10 rounded-xl border border-error/20 mb-4">
+                <p className="text-sm text-primary">{letterError}</p>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <Button size="sm" variant="secondary" onClick={() => void handleGenerateLetter(false)}>
+                  Erneut versuchen
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => void handleGenerateLetter(true)}>
+                  Statische Vorlage verwenden
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {letter && (
+            <div>
+              <p className="text-xs text-primary-soft mb-2">
+                {letter.source === 'ki'
+                  ? 'Von der KI aus deinem Lebenslauf erzeugt — bitte persönlich prüfen und anpassen.'
+                  : 'Statische Vorlage — bitte in eigenen Worten prüfen, bevor du sie verschickst.'}
+              </p>
+              <label htmlFor="coverletter-text" className="sr-only">
+                Anschreiben-Text (bearbeitbar)
+              </label>
+              <textarea
+                id="coverletter-text"
+                value={letter.text}
+                onChange={(e) => setLetter({ ...letter, text: e.target.value })}
+                rows={14}
+                className="w-full rounded-xl bg-background border border-border p-4 text-sm leading-relaxed text-foreground"
+              />
+              <div className="flex flex-wrap items-center gap-3 mt-4">
+                <Button size="sm" onClick={() => void handleDownloadPDF('letter')} disabled={busy !== null}>
+                  {busy === 'letter' ? 'Wird geladen …' : 'Als PDF herunterladen'}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => void handleGenerateLetter(letter.source === 'vorlage')}
+                  disabled={busy !== null}
+                >
+                  Neu erzeugen
+                </Button>
+                <button
+                  onClick={() => setLetter(null)}
+                  className="text-sm text-primary underline decoration-accent/60 underline-offset-4 hover:text-foreground hover:decoration-accent"
+                >
+                  Verwerfen
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
           <h2 className="text-sm font-medium text-primary-soft mb-4">
-            Aktionen
+            Unterlagen & Quelle
           </h2>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -230,32 +365,20 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               variant="secondary"
               size="sm"
               className="w-full"
-              onClick={() => handleDownloadPDF('resume')}
-              disabled={downloading}
+              onClick={() => void handleDownloadPDF('resume')}
+              disabled={busy !== null}
             >
-              Resume als PDF
+              {busy === 'resume' ? 'Wird geladen …' : 'Lebenslauf als PDF'}
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => handleDownloadPDF('coverletter')}
-              disabled={downloading}
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonClasses('secondary', 'sm') + ' w-full'}
             >
-              Anschreiben als PDF
-            </Button>
+              Anzeige im Portal ansehen
+            </a>
           </div>
-        </div>
-
-        <div className="flex gap-4">
-          <a
-            href={job.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonClasses('primary')}
-          >
-            Job auf Plattform ansehen
-          </a>
         </div>
       </main>
     </div>

@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { searchJobs, semanticSearch, type ScrapedJob } from '@/lib/scrapers'
-import { scoreJob, generateSearchQueries } from '@/lib/ai'
-import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
+import { scoreJob, generateSearchQueries, aiConfigFromSettings } from '@/lib/ai'
+import { HIGH_MATCH_THRESHOLD, relevanceToScore } from '@/lib/matching'
 
 // POST /api/search - AI-powered job search with semantic matching
 export async function POST(request: NextRequest) {
@@ -13,6 +13,10 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json()
   const { query, location, remote, platforms, useAI, semantic } = body
+  // Kontrolle statt Stillstand: standardmäßig wird jeder Treffer in die Liste
+  // übernommen (bisheriges Verhalten), aber die Fläche kann es ausschalten —
+  // und der Nutzer sieht den Schalter, statt sich zu wundern, woher die 188 Jobs kamen.
+  const autoSave = body.autoSave !== false
 
   if (!query) {
     return NextResponse.json({ error: 'Suchbegriff erforderlich' }, { status: 400 })
@@ -28,19 +32,8 @@ export async function POST(request: NextRequest) {
   const apifyToken = settings?.apifyApiKey || null
 
   // AI config from user settings (falls back to Nebius via env key)
-  const aiProvider = settings?.aiProvider || 'nebius'
-  const aiModel = settings?.aiModel || undefined
-  const aiApiKey =
-    aiProvider === 'nebius'
-      ? settings?.nebiusApiKey || undefined
-      : aiProvider === 'gemini'
-        ? settings?.geminiApiKey || undefined
-        : aiProvider === 'openai'
-          ? settings?.openaiApiKey || undefined
-          : aiProvider === 'openrouter'
-            ? settings?.openrouterApiKey || undefined
-            : undefined
-  const aiBaseUrl = aiProvider === 'ollama' ? settings?.ollamaUrl || undefined : undefined
+  const { provider: aiProvider, model: aiModel, apiKey: aiApiKey, baseUrl: aiBaseUrl } =
+    aiConfigFromSettings(settings)
 
   // Existing statuses by URL — re-searches may refresh scores but must not
   // clobber statuses the user already set (APPLIED, INTERVIEW, ...)
@@ -83,30 +76,40 @@ export async function POST(request: NextRequest) {
       jobs = jobs.filter(j => statusByUrl.get(j.url) !== 'ARCHIVED')
       jobs.sort((a, b) => b.relevanceScore - a.relevanceScore)
 
-      // Save high matches
-      const highMatches = jobs.filter(job => job.relevanceScore >= 0.7)
+      // Dieselbe Skala wie der klassische Pfad: Relevanz (0–1) → Score (1–10),
+      // High Match ab HIGH_MATCH_THRESHOLD — nicht ab einer zweiten Wahrheit (0.7)
+      const semanticScore = (j: SemanticJobResult) => relevanceToScore(j.relevanceScore)
+
+      // Save matches (Vorab-Match ab 0.7 Relevanz); ohne autoSave wird nichts geschrieben
+      const toSave = autoSave ? jobs.filter(job => job.relevanceScore >= 0.7) : []
+      const idByUrl: Record<string, string> = {}
 
       // Determine which are new (not yet in the user's job list)
       const existingSemantic = await prisma.job.findMany({
-        where: { userId, url: { in: highMatches.map(j => j.url) } },
+        where: { userId, url: { in: toSave.map(j => j.url) } },
         select: { url: true },
       })
       const existingSemanticUrls = new Set(existingSemantic.map(j => j.url))
       let newJobsCount = 0
 
-      for (const job of highMatches) {
+      for (const job of toSave) {
         const isNew = !existingSemanticUrls.has(job.url)
         if (isNew) newJobsCount++
+        const score = semanticScore(job)
         try {
-          await prisma.job.upsert({
+          const saved = await prisma.job.upsert({
             where: { userId_url: { userId, url: job.url } },
             update: {
-              score: Math.round(job.relevanceScore * 10),
+              score,
               scoreReason: job.matchReason,
               matchDetails: JSON.stringify({ transferableSkills: job.transferableSkills ?? [] }),
               // Promote to HIGH_MATCH only from pre-pipeline states —
               // never clobber APPLIED/INTERVIEW/etc. on a re-search
-              ...((statusByUrl.get(job.url) === 'DISCOVERED' || statusByUrl.get(job.url) === 'SCORED') && { status: 'HIGH_MATCH' as const }),
+              ...(
+                score >= HIGH_MATCH_THRESHOLD &&
+                (statusByUrl.get(job.url) === 'DISCOVERED' || statusByUrl.get(job.url) === 'SCORED')
+                && { status: 'HIGH_MATCH' as const }
+              ),
             },
             create: {
               userId,
@@ -115,12 +118,13 @@ export async function POST(request: NextRequest) {
               location: job.location,
               description: job.description,
               url: job.url,
-              score: Math.round(job.relevanceScore * 10),
+              score,
               scoreReason: job.matchReason,
               matchDetails: JSON.stringify({ transferableSkills: job.transferableSkills ?? [] }),
-              status: 'HIGH_MATCH',
+              status: score >= HIGH_MATCH_THRESHOLD ? 'HIGH_MATCH' : 'SCORED',
             },
           })
+          idByUrl[job.url] = saved.id
         } catch {
           continue
         }
@@ -130,9 +134,10 @@ export async function POST(request: NextRequest) {
       if (jobs.length > 0) {
         return NextResponse.json({
           total: jobs.length,
-          highMatches: jobs.filter(j => j.relevanceScore >= 0.7).length,
+          highMatches: jobs.filter(j => semanticScore(j) >= HIGH_MATCH_THRESHOLD).length,
           newJobs: newJobsCount,
-          jobs,
+          jobs: jobs.map(j => ({ ...j, aiScore: semanticScore(j), aiReason: j.matchReason })),
+          ids: idByUrl,
           semantic: true,
         })
       }
@@ -191,40 +196,44 @@ export async function POST(request: NextRequest) {
   })
   const existingTraditionalUrls = new Set(existingTraditional.map(j => j.url))
   let newJobsCount = 0
+  const idByUrl: Record<string, string> = {}
 
-  // Auto-save all results to job list
-  for (const job of visibleJobs) {
-    const isNew = !existingTraditionalUrls.has(job.url)
-    if (isNew) newJobsCount++
-    try {
-      const hasScore = job.aiScore !== undefined
-      const score = hasScore ? job.aiScore : null
-      const scoreReason = hasScore ? job.aiReason : null
-      const matchDetails = hasScore
-        ? JSON.stringify({ strengths: job.strengths ?? [], gaps: job.gaps ?? [] })
-        : null
-      const status = hasScore ? (score! >= HIGH_MATCH_THRESHOLD ? 'HIGH_MATCH' : 'SCORED') : 'DISCOVERED'
+  // Auto-save all results to job list — außer die Fläche sagt es ab (autoSave: false)
+  if (autoSave) {
+    for (const job of visibleJobs) {
+      const isNew = !existingTraditionalUrls.has(job.url)
+      if (isNew) newJobsCount++
+      try {
+        const hasScore = job.aiScore !== undefined
+        const score = hasScore ? job.aiScore : null
+        const scoreReason = hasScore ? job.aiReason : null
+        const matchDetails = hasScore
+          ? JSON.stringify({ strengths: job.strengths ?? [], gaps: job.gaps ?? [] })
+          : null
+        const status = hasScore ? (score! >= HIGH_MATCH_THRESHOLD ? 'HIGH_MATCH' : 'SCORED') : 'DISCOVERED'
 
-      await prisma.job.upsert({
-        where: { userId_url: { userId, url: job.url } },
-        update: {
-          // Refresh score/details; promote status only from pre-pipeline
-          // states — never clobber APPLIED/INTERVIEW/etc. on a re-search
-          ...(score !== null && { score, scoreReason, matchDetails }),
-          ...(score !== null && (statusByUrl.get(job.url) === 'DISCOVERED' || statusByUrl.get(job.url) === 'SCORED') && { status }),
-        },
-        create: {
-          userId,
-          title: job.title,
-          company: job.company,
-          location: job.location,
-          description: job.description,
-          url: job.url,
-          ...(score !== null && { score, scoreReason, matchDetails, status }),
-        },
-      })
-    } catch {
-      continue
+        const saved = await prisma.job.upsert({
+          where: { userId_url: { userId, url: job.url } },
+          update: {
+            // Refresh score/details; promote status only from pre-pipeline
+            // states — never clobber APPLIED/INTERVIEW/etc. on a re-search
+            ...(score !== null && { score, scoreReason, matchDetails }),
+            ...(score !== null && (statusByUrl.get(job.url) === 'DISCOVERED' || statusByUrl.get(job.url) === 'SCORED') && { status }),
+          },
+          create: {
+            userId,
+            title: job.title,
+            company: job.company,
+            location: job.location,
+            description: job.description,
+            url: job.url,
+            ...(score !== null && { score, scoreReason, matchDetails, status }),
+          },
+        })
+        idByUrl[job.url] = saved.id
+      } catch {
+        continue
+      }
     }
   }
 
@@ -235,6 +244,7 @@ export async function POST(request: NextRequest) {
     highMatches: highMatchCount,
     newJobs: newJobsCount,
     jobs: visibleJobs,
+    ids: idByUrl,
     semantic: false,
   })
 }

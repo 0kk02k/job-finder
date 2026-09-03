@@ -21,6 +21,7 @@ export default function ResumePage() {
   const [content, setContent] = useState('')
   const [pastedText, setPastedText] = useState('')
   const [downloading, setDownloading] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -148,21 +149,21 @@ export default function ResumePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--background)] flex items-center justify-center">
-        <p className="text-[var(--color-primary-soft)]">Lade Resume...</p>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-primary-soft">Lade Lebenslauf …</p>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-background">
       <main className="max-w-3xl mx-auto px-6 py-16">
         <section className="flex items-center justify-between mb-12">
           <div>
-            <h1 className="text-3xl font-light text-[var(--color-foreground)] mb-2">
-              Resume
+            <h1 className="text-3xl font-light text-foreground mb-2">
+              Lebenslauf
             </h1>
-            <p className="text-[var(--color-primary-soft)]">
+            <p className="text-primary-soft">
               {resume ? 'Dein Lebenslauf für KI-Matching' : 'Lade deinen Lebenslauf hoch'}
             </p>
           </div>
@@ -171,19 +172,20 @@ export default function ResumePage() {
               <button
                 onClick={handleDownloadPDF}
                 disabled={downloading}
-                className="px-5 py-2.5 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
               >
-                {downloading ? '…' : '📄 Als PDF'}
+                {downloading ? 'Wird geladen …' : 'Als PDF'}
               </button>
               <button
                 onClick={() => setMode('edit')}
-                className="px-5 py-2.5 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium text-sm transition-colors"
+                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors"
               >
                 Bearbeiten
               </button>
+              {/* Selten + ersatzlos — deshalb Sekundär, nicht der eine Ocker-Primary */}
               <button
                 onClick={() => setMode('upload')}
-                className="px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium text-sm transition-colors"
+                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors"
               >
                 Ersetzen
               </button>
@@ -194,10 +196,13 @@ export default function ResumePage() {
         {/* Upload Mode */}
         {mode === 'upload' && (
           <section className="space-y-8">
-            {/* File Upload */}
-            <div
+            {/* File Upload — echter Button statt div onClick: Tastatur und
+                Screenreader bekommen denselben Weg wie die Maus */}
+            <button
+              type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="bg-[var(--color-surface)] rounded-2xl p-12 border-2 border-dashed border-[var(--color-border)] hover:border-[var(--color-accent)] cursor-pointer transition-colors text-center"
+              disabled={uploading}
+              className="w-full bg-surface rounded-2xl p-12 border-2 border-dashed border-border hover:border-accent cursor-pointer transition-colors text-center"
             >
               <input
                 ref={fileInputRef}
@@ -205,32 +210,33 @@ export default function ResumePage() {
                 accept=".pdf,.txt,.md,.markdown"
                 onChange={handleFileUpload}
                 className="hidden"
+                aria-hidden="true"
+                tabIndex={-1}
               />
               {uploading ? (
-                <p className="text-[var(--color-primary-soft)]">Wird hochgeladen...</p>
+                <p className="text-primary-soft">Wird hochgeladen …</p>
               ) : (
                 <>
-                  <p className="text-4xl mb-4">📄</p>
-                  <p className="text-[var(--color-foreground)] font-medium mb-2">
+                  <p className="text-foreground font-medium mb-2">
                     Datei hochladen
                   </p>
-                  <p className="text-sm text-[var(--color-primary-soft)]">
-                    Klicken und PDF, .txt oder .md Datei wählen
+                  <p className="text-sm text-primary-soft">
+                    Klicken und PDF-, .txt- oder .md-Datei wählen
                   </p>
                 </>
               )}
-            </div>
+            </button>
 
             {/* Divider */}
             <div className="flex items-center gap-4">
-              <div className="flex-1 h-px bg-[var(--color-border)]" />
-              <span className="text-sm text-[var(--color-primary-soft)]">oder</span>
-              <div className="flex-1 h-px bg-[var(--color-border)]" />
+              <div className="flex-1 h-px bg-border" />
+              <span className="text-sm text-primary-soft">oder</span>
+              <div className="flex-1 h-px bg-border" />
             </div>
 
             {/* Paste Text */}
-            <div className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm">
-              <label className="block text-sm font-medium text-[var(--color-foreground)] mb-3">
+            <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
+              <label className="block text-sm font-medium text-foreground mb-3">
                 Text einfügen
               </label>
               <textarea
@@ -238,12 +244,11 @@ export default function ResumePage() {
                 onChange={(e) => setPastedText(e.target.value)}
                 rows={10}
                 placeholder="Füge hier deinen Lebenslauf ein..."
-                className="w-full px-5 py-4 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] text-sm leading-relaxed placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none resize-none mb-4"
               />
               <button
                 onClick={handlePasteSubmit}
                 disabled={loading || !pastedText.trim()}
-                className="w-full py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="w-full py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 {loading ? 'Wird gespeichert...' : 'Speichern'}
               </button>
@@ -253,32 +258,45 @@ export default function ResumePage() {
 
         {/* Edit Mode */}
         {mode === 'edit' && resume && (
-          <section className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm">
-            <label className="block text-sm font-medium text-[var(--color-foreground)] mb-3">
-              Resume bearbeiten (Markdown)
+          <section className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
+            <label htmlFor="resume-edit" className="block text-sm font-medium text-foreground mb-3">
+              Lebenslauf bearbeiten (Markdown)
             </label>
             <textarea
+              id="resume-edit"
               value={content}
               onChange={(e) => setContent(e.target.value)}
               rows={20}
-              className="w-full px-5 py-4 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] font-mono text-sm leading-relaxed focus:border-[var(--color-accent)] focus:outline-none resize-none mb-4"
+              className="w-full px-5 py-4 rounded-xl border border-border bg-background text-foreground font-mono text-sm leading-relaxed resize-none mb-4"
             />
             <div className="flex gap-3">
               <button
                 onClick={saveEdit}
                 disabled={loading}
-                className="px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
               >
-                {loading ? 'Speichert...' : 'Speichern'}
+                {loading ? 'Speichert …' : 'Speichern'}
               </button>
+              {/* Ungespeicherte Änderungen gehen nicht still verloren —
+                  zweiter Klick verwirft bewusst */}
               <button
                 onClick={() => {
+                  if (content !== resume.content && !confirmDiscard) {
+                    setConfirmDiscard(true)
+                    setTimeout(() => setConfirmDiscard(false), 5000)
+                    return
+                  }
+                  setConfirmDiscard(false)
                   setMode('view')
                   setContent(resume.content)
                 }}
-                className="px-6 py-3 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium transition-colors"
+                className={`px-6 py-3 rounded-xl font-medium transition-colors ${
+                  confirmDiscard
+                    ? 'bg-error/10 text-error border border-error/20'
+                    : 'bg-border-soft hover:bg-border text-foreground'
+                }`}
               >
-                Abbrechen
+                {confirmDiscard ? 'Änderungen wirklich verwerfen' : 'Abbrechen'}
               </button>
             </div>
           </section>
@@ -288,12 +306,12 @@ export default function ResumePage() {
         {mode === 'view' && resume && (
           <>
           {resume.updatedAt && (
-            <p className="text-sm text-[var(--color-primary-soft)] mb-4">
+            <p className="text-sm text-primary-soft mb-4 tabular-nums">
               Zuletzt aktualisiert: {new Date(resume.updatedAt).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
           )}
-          <section className="bg-[var(--color-surface)] rounded-2xl p-10 border border-[var(--color-border)] shadow-sm mb-6">
-            <h2 className="text-xl font-medium text-[var(--color-foreground)] mb-6">
+          <section className="bg-surface rounded-2xl p-10 border border-border shadow-sm mb-6">
+            <h2 className="text-xl font-medium text-foreground mb-6">
               {resume.name}
             </h2>
             <MarkdownContent content={content} />
@@ -303,10 +321,10 @@ export default function ResumePage() {
 
         {/* Tip */}
         {resume && mode === 'view' && (
-          <section className="bg-[var(--color-success)]/10 rounded-2xl p-6 border border-[var(--color-success)]/20">
-            <h3 className="font-medium text-[var(--color-success)] mb-2">💡 Tipp</h3>
-            <p className="text-[var(--color-foreground)] text-sm leading-relaxed">
-              Dein Resume wird verwendet, um Jobs zu bewerten und Matches zu finden.
+          <section className="bg-success/10 rounded-2xl p-6 border border-success/20">
+            <h3 className="font-medium text-success mb-2">Tipp</h3>
+            <p className="text-foreground text-sm leading-relaxed">
+              Dein Lebenslauf wird verwendet, um Jobs zu bewerten und Matches zu finden.
               Je mehr Details (Skills, Erfahrung, Projekte), desto besser die KI-Treffer.
             </p>
           </section>

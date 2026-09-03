@@ -33,46 +33,52 @@ export default function NewJobPage() {
       })
 
       if (response.ok) {
-        router.push('/jobs')
+        const job = await response.json().catch(() => undefined)
+        toast.success('Job hinzugefügt.')
+        // Direkt ins Detail: dort erscheint die KI-Bewertung — oder der ehrliche
+        // Hinweis, warum (noch) keine da ist
+        router.push(job?.id ? `/jobs/${job.id}` : '/jobs')
       } else {
-        const data = await response.json().catch(() => ({}))
-        toast.error(data.error || 'Fehler beim Hinzufügen des Jobs')
+        const err = await response.json().catch(() => ({}))
+        toast.error(err.error || 'Fehler beim Hinzufügen des Jobs')
       }
-    } catch (error) {
-      toast.error('Fehler: ' + error)
+    } catch {
+      toast.error('Netzwerkfehler — der Job konnte nicht hinzugefügt werden.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-background">
       <main className="max-w-2xl mx-auto px-6 py-16">
-        <h1 className="text-3xl font-light text-[var(--color-foreground)] mb-2">
+        <h1 className="text-3xl font-light text-foreground mb-2">
           Job hinzufügen
         </h1>
-        <p className="text-[var(--color-primary-soft)] mb-8">
+        <p className="text-primary-soft mb-8">
           Per URL automatisch extrahieren oder manuell eingeben.
         </p>
 
-        <div className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm">
-          <div className="flex gap-3 mb-6">
+        <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
+          <div className="flex gap-3 mb-6" role="group" aria-label="Eingabemodus wählen">
             <button
               onClick={() => setManualMode(false)}
+              aria-pressed={!manualMode}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 !manualMode
-                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
-                  : 'bg-[var(--color-border-soft)] text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-border-soft text-foreground hover:bg-border'
               }`}
             >
-              Per URL
+              Per Link
             </button>
             <button
               onClick={() => setManualMode(true)}
+              aria-pressed={manualMode}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 manualMode
-                  ? 'bg-[var(--color-accent)] text-[var(--color-on-accent)]'
-                  : 'bg-[var(--color-border-soft)] text-[var(--color-foreground)] hover:bg-[var(--color-border)]'
+                  ? 'bg-accent text-on-accent'
+                  : 'bg-border-soft text-foreground hover:bg-border'
               }`}
             >
               Manuell
@@ -82,71 +88,76 @@ export default function NewJobPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {!manualMode ? (
               <div>
-                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                  Job URL
+                <label htmlFor="job-url" className="block text-sm font-medium text-foreground mb-2">
+                  Link zur Stellenanzeige
                 </label>
                 <input
+                  id="job-url"
                   type="url"
                   name="url"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
-                  placeholder="https://www.indeed.de/jobs/..."
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                  placeholder="https://www.stepstone.de/..."
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
                   required
                 />
-                <p className="text-sm text-[var(--color-primary-soft)] mt-2">
+                <p className="text-sm text-primary-soft mt-2">
                   Wir versuchen, die Details automatisch zu extrahieren.
                 </p>
               </div>
             ) : (
               <>
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                    Job Titel *
+                  <label htmlFor="job-title" className="block text-sm font-medium text-foreground mb-2">
+                    Stellentitel *
                   </label>
                   <input
+                    id="job-title"
                     type="text"
                     name="title"
-                    placeholder="z.B. Senior Software Engineer"
-                    className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                    placeholder="z. B. Mechatroniker, Sozialpädagogin, Data Analyst"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                  <label htmlFor="job-company" className="block text-sm font-medium text-foreground mb-2">
                     Firma *
                   </label>
                   <input
+                    id="job-company"
                     type="text"
                     name="company"
-                    placeholder="z.B. Google"
-                    className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                    placeholder="z. B. Stadtverwaltung, Caritas, Bosch"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
                     required
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                    Location
+                  <label htmlFor="job-location" className="block text-sm font-medium text-foreground mb-2">
+                    Ort
                   </label>
                   <input
+                    id="job-location"
                     type="text"
                     name="location"
-                    placeholder="z.B. Berlin oder Remote"
-                    className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                    placeholder="z. B. Berlin oder Remote"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
+                  <label htmlFor="job-description" className="block text-sm font-medium text-foreground mb-2">
                     Beschreibung *
                   </label>
                   <textarea
+                    id="job-description"
                     name="description"
                     rows={6}
-                    placeholder="Füge die vollständige Job-Beschreibung hier ein..."
-                    className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--background)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none resize-none"
+                    placeholder="Füge die vollständige Stellenbeschreibung hier ein …"
+                    className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft resize-none"
                     required
                   />
                 </div>
@@ -157,13 +168,13 @@ export default function NewJobPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] disabled:opacity-50 text-[var(--color-surface)] py-3 rounded-xl font-medium transition-colors"
+                className="flex-1 bg-accent hover:bg-accent-strong disabled:opacity-50 text-surface py-3 rounded-xl font-medium transition-colors"
               >
-                {loading ? 'Wird hinzugefügt...' : 'Hinzufügen'}
+                {loading ? 'Wird hinzugefügt …' : 'Hinzufügen'}
               </button>
               <Link
                 href="/jobs"
-                className="px-6 py-3 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl font-medium transition-colors"
+                className="px-6 py-3 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium transition-colors"
               >
                 Abbrechen
               </Link>

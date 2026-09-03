@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
 import { ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
+import { scoreLabel } from '@/lib/matching'
 
 interface Job {
   id: string
@@ -237,14 +238,16 @@ export default function JobsPage() {
                 <input
                   type="text"
                   placeholder="Titel oder Firma suchen..."
+                  aria-label="Jobs durchsuchen"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground placeholder:text-primary-soft focus:outline-none focus:border-accent"
+                  className="flex-1 px-4 py-2.5 rounded-xl bg-background border border-border text-foreground placeholder:text-primary-soft"
                 />
                 <select
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as SortOption)}
-                  className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground focus:outline-none focus:border-accent"
+                  aria-label="Sortierung"
+                  className="px-4 py-2.5 rounded-xl bg-background border border-border text-foreground"
                 >
                   <option value="newest">Neueste zuerst</option>
                   <option value="oldest">Älteste zuerst</option>
@@ -282,7 +285,7 @@ export default function JobsPage() {
                     className="w-4 h-4 accent-accent"
                   />
                   <span className="text-sm text-foreground">
-                    Nur High Matches (≥7)
+                    Nur High Matches (≥{HIGH_MATCH_THRESHOLD})
                   </span>
                 </label>
                 <label className="inline-flex items-center gap-2 cursor-pointer">
@@ -336,19 +339,27 @@ export default function JobsPage() {
                     className="bg-surface rounded-2xl p-8 border border-border shadow-sm"
                   >
                     <div className="flex items-start justify-between mb-5">
-                      <div className="flex-1">
+                      <div className="min-w-0 flex-1">
                         <Link href={`/jobs/${job.id}`}>
-                          <h3 className="text-xl font-medium text-foreground hover:text-accent transition-colors mb-1">
+                          <h2 className="text-xl font-medium text-foreground hover:text-accent transition-colors mb-1">
                             {job.title}
-                          </h3>
+                          </h2>
                         </Link>
                         <p className="text-primary-soft">
-                          {job.company} • {job.location || 'Remote'}
+                          {[
+                            job.company ?? null,
+                            job.location ?? null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ') || 'Ohne Angabe'}
                         </p>
                       </div>
                       {job.score != null ? (
                         <div className={`text-3xl font-light tabular-nums ${getScoreColor(job.score)}`}>
-                          {job.score}
+                          <span className="sr-only">
+                            KI-Score: {job.score} von 10 — {scoreLabel(job.score)}
+                          </span>
+                          <span aria-hidden="true">{job.score}</span>
                         </div>
                       ) : (
                         <div className="text-xs text-primary-soft pt-3">

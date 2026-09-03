@@ -9,7 +9,7 @@ const links = [
   { href: '/search', label: 'Suchen' },
   { href: '/jobs', label: 'Jobs' },
   { href: '/interview', label: 'Interview' },
-  { href: '/resume', label: 'Resume' },
+  { href: '/resume', label: 'Lebenslauf' },
   { href: '/settings', label: 'Einstellungen' },
 ]
 
@@ -39,7 +39,7 @@ export function Nav() {
       <div className="max-w-5xl mx-auto px-6 py-5">
         <div className="flex items-center justify-between">
           <Link href="/" className="text-xl font-medium text-foreground">
-            Job Finder
+            Job-Finder
           </Link>
 
           {/* Desktop links */}

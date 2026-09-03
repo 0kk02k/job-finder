@@ -1,10 +1,13 @@
 'use client'
 
 import { Suspense, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { scoreTone } from '../components/ui'
-import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
+import { HIGH_MATCH_THRESHOLD, scoreLabel } from '@/lib/matching'
+import { platformLabel } from '@/lib/sources'
 import { textSnippet } from '../components/Markdown'
+import { useToast } from '../components/Toast'
 
 interface SearchResult {
   title: string
@@ -34,13 +37,19 @@ interface SavedSearch {
 function SearchPageContent() {
   const searchParams = useSearchParams()
   const savedId = searchParams.get('saved')
+  const toast = useToast()
 
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
   const [remote, setRemote] = useState(false)
   const [semantic, setSemantic] = useState(true)
+  // Kontrolle statt Stillstand: Übernahme in die Liste ist sichtbar und abschaltbar —
+  // nicht mehr ein Nebeneffekt, über den die Fläche schweigt
+  const [autoSave, setAutoSave] = useState(true)
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<SearchResult[]>([])
+  // url → Job-ID: macht den (ggf. soeben erzeugten) Listeneintrag auffindbar
+  const [jobIds, setJobIds] = useState<Record<string, string>>({})
   const [stats, setStats] = useState({ total: 0, highMatches: 0, newJobs: 0 })
   // Für die ehrliche Limit-Zeile: wie viele der Treffer tatsächlich einen Score haben
   const scoredCount = results.filter((j) => typeof j.aiScore === 'number').length
@@ -91,6 +100,7 @@ function SearchPageContent() {
   ) {
     setLoading(true)
     setResults([])
+    setJobIds({})
     setError(null)
     setJustSaved(false)
 
@@ -98,7 +108,7 @@ function SearchPageContent() {
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: q, location: loc, remote: rem, semantic: sem }),
+        body: JSON.stringify({ query: q, location: loc, remote: rem, semantic: sem, autoSave }),
       })
 
       const data = await response.json()
@@ -108,6 +118,7 @@ function SearchPageContent() {
         return
       }
       setResults(data.jobs || [])
+      setJobIds(data.ids || {})
       setStats({
         total: data.total,
         highMatches: data.highMatches,
@@ -176,33 +187,24 @@ function SearchPageContent() {
       })
       if (res.ok) {
         setResults((prev) => prev.filter((j) => j.url !== job.url))
+      } else {
+        toast.error('Ignorieren fehlgeschlagen — der Treffer bleibt in der Liste.')
       }
     } catch {
-      // ignore
+      toast.error('Netzwerkfehler — der Treffer bleibt in der Liste.')
     }
   }
 
-  const getScoreColor = scoreTone
-
-  function getPlatformBadge(platform: string) {
-    const badges: Record<string, string> = 'bg-purple-50 text-purple-700 border-purple-200|bg-blue-50 text-blue-700 border-blue-200|bg-green-50 text-green-700 border-green-200|bg-orange-50 text-orange-700 border-orange-200|bg-teal-50 text-teal-700 border-teal-200|bg-red-50 text-red-700 border-red-200|bg-amber-50 text-amber-700 border-amber-200|bg-cyan-50 text-cyan-700 border-cyan-200|bg-violet-50 text-violet-700 border-violet-200'.split('|').reduce((acc, val, i) => {
-      const names = ['indeed', 'linkedin', 'glassdoor', 'ziprecruiter', 'xing', 'stepstone', 'jooble', 'remotive', 'arbeitnow']
-      acc[names[i]] = val
-      return acc
-    }, {} as Record<string, string>)
-    return badges[platform] || 'bg-zinc-50 text-zinc-700 border-zinc-200'
-  }
-
   return (
-    <div className="min-h-screen bg-[var(--background)]">
+    <div className="min-h-screen bg-background">
 
       <main className="max-w-5xl mx-auto px-6 py-16">
         {/* Header */}
         <section className="mb-12">
-          <h1 className="text-3xl font-light text-[var(--color-foreground)] mb-3">
+          <h1 className="text-3xl font-light text-foreground mb-3">
             Jobsuche
           </h1>
-          <p className="text-lg text-[var(--color-primary-soft)]">
+          <p className="text-lg text-primary-soft">
             KI-gestützte semantische Suche findet Jobs, die auch mit anderen Titeln passen.
           </p>
         </section>
@@ -210,7 +212,7 @@ function SearchPageContent() {
         {/* Saved Searches */}
         {savedSearches.length > 0 && (
           <section className="mb-6">
-            <p className="text-sm font-medium text-[var(--color-foreground)] mb-3">
+            <p className="text-sm font-medium text-foreground mb-3">
               Gespeicherte Suchen
             </p>
             <div className="flex flex-wrap gap-2">
@@ -218,7 +220,7 @@ function SearchPageContent() {
                 <button
                   key={saved.id}
                   onClick={() => loadSavedSearch(saved)}
-                  className="text-sm px-4 py-2 rounded-xl bg-[var(--color-border-soft)] text-[var(--color-foreground)] hover:bg-[var(--color-border)] transition-colors border border-[var(--color-border)]"
+                  className="text-sm px-4 py-2 rounded-xl bg-border-soft text-foreground hover:bg-border transition-colors border border-border"
                 >
                   {saved.query}
                   {saved.location ? ` · ${saved.location}` : ''}
@@ -230,55 +232,57 @@ function SearchPageContent() {
         )}
 
         {/* Search Form */}
-        <section className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm mb-8">
+        <section className="bg-surface rounded-2xl p-8 border border-border shadow-sm mb-8">
           <form onSubmit={handleSearch} className="space-y-6">
             <div className="grid md:grid-cols-3 gap-4">
               <div className="min-w-0 md:col-span-2">
-                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                  Job Titel / Stichwort
+                <label htmlFor="search-query" className="block text-sm font-medium text-foreground mb-2">
+                  Beruf oder Stichwort
                 </label>
                 <input
+                  id="search-query"
                   type="text"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  placeholder="z.B. Software Engineer, React Developer"
-                  className="w-full px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                  placeholder="z. B. Pflegefachkraft, Tischlerin, Lehrer, UX-Designer"
+                  className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
                   required
                 />
               </div>
 
               <div className="min-w-0">
-                <label className="block text-sm font-medium text-[var(--color-foreground)] mb-2">
-                  Location (optional)
+                <label htmlFor="search-location" className="block text-sm font-medium text-foreground mb-2">
+                  Ort (optional)
                 </label>
                 <div className="flex gap-2">
                   <input
+                    id="search-location"
                     type="text"
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
-                    placeholder="z.B. Berlin"
-                    className="min-w-0 flex-1 px-4 py-3 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-foreground)] placeholder:text-[var(--color-primary-soft)] focus:border-[var(--color-accent)] focus:outline-none"
+                    placeholder="z. B. Berlin"
+                    className="min-w-0 flex-1 px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
                   />
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-6 py-3 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl font-medium transition-colors disabled:opacity-50"
+                    className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
                   >
-                    {loading ? '…' : 'Suchen'}
+                    {loading ? 'Suche läuft …' : 'Suchen'}
                   </button>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-6">
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={remote}
                   onChange={(e) => setRemote(e.target.checked)}
-                  className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+                  className="w-4 h-4 rounded border-border accent-primary"
                 />
-                <span className="text-sm text-[var(--color-foreground)]">Nur Remote</span>
+                <span className="text-sm text-foreground">Nur Remote</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer">
@@ -286,9 +290,19 @@ function SearchPageContent() {
                   type="checkbox"
                   checked={semantic}
                   onChange={(e) => setSemantic(e.target.checked)}
-                  className="w-4 h-4 rounded border-[var(--color-border)] accent-[var(--color-primary)]"
+                  className="w-4 h-4 rounded border-border accent-primary"
                 />
-                <span className="text-sm text-[var(--color-foreground)]">KI-Suche (Semantisches Matching)</span>
+                <span className="text-sm text-foreground">KI-Suche (semantisches Matching)</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer" title="Ausgeschaltet werden Treffer nur angezeigt und nicht in deine Liste übernommen">
+                <input
+                  type="checkbox"
+                  checked={autoSave}
+                  onChange={(e) => setAutoSave(e.target.checked)}
+                  className="w-4 h-4 rounded border-border accent-primary"
+                />
+                <span className="text-sm text-foreground">Treffer automatisch in meine Liste übernehmen</span>
               </label>
             </div>
           </form>
@@ -296,27 +310,44 @@ function SearchPageContent() {
 
         {/* Error State */}
         {error && (
-          <section className="mb-8 p-4 bg-[var(--color-error)]/10 rounded-xl border border-[var(--color-error)]/20">
-            <p className="text-sm text-[var(--color-error)]">{error}</p>
+          <section role="alert" className="mb-8 p-4 bg-error/10 rounded-xl border border-error/20">
+            <p className="text-sm text-error">{error}</p>
+          </section>
+        )}
+
+        {/* Lade-Zustand: Skeleton statt geleerte Liste — die vorherigen Treffer
+            verschwinden nicht, bevor neue da sind */}
+        {loading && (
+          <section className="space-y-4" aria-live="polite">
+            <p className="sr-only" role="status">
+              Suche läuft …
+            </p>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="bg-surface rounded-2xl p-8 border border-border animate-pulse motion-reduce:animate-none" aria-hidden="true">
+                <div className="h-5 w-2/3 bg-border rounded mb-4" />
+                <div className="h-4 w-1/3 bg-border-soft rounded mb-6" />
+                <div className="h-4 w-full bg-border-soft rounded" />
+              </div>
+            ))}
           </section>
         )}
 
         {/* New Jobs Banner */}
         {!loading && searched && stats.newJobs > 0 && (
-          <section className="mb-8 p-4 bg-[var(--color-success)]/10 rounded-xl border border-[var(--color-success)]/20 flex items-center justify-between">
-            <p className="text-sm text-[var(--color-success)]">
+          <section className="mb-8 p-4 bg-success/10 rounded-xl border border-success/20 flex items-center justify-between">
+            <p className="text-sm text-success">
               {stats.newJobs} {stats.newJobs === 1 ? 'neuer Job' : 'neue Jobs'} zu deiner Liste hinzugefügt
             </p>
             {!justSaved && (
               <button
                 onClick={saveCurrentSearch}
-                className="text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-accent)] transition-colors"
+                className="text-sm font-medium text-primary hover:text-accent transition-colors"
               >
                 + Suche speichern
               </button>
             )}
             {justSaved && (
-              <span className="text-sm text-[var(--color-primary-soft)]">✓ Gespeichert</span>
+              <span className="text-sm text-primary-soft">Gespeichert.</span>
             )}
           </section>
         )}
@@ -342,18 +373,23 @@ function SearchPageContent() {
         )}
 
         {/* Results */}
-        {results.length > 0 && (
+        {!loading && results.length > 0 && (
           <section className="space-y-4">
             {results.map((job) => (
-              <JobCard key={job.url} job={job} onIgnore={() => ignoreJob(job)} getScoreColor={getScoreColor} getPlatformBadge={getPlatformBadge} />
+              <JobCard
+                key={job.url}
+                job={job}
+                jobId={jobIds[job.url]}
+                onIgnore={() => ignoreJob(job)}
+              />
             ))}
           </section>
         )}
 
         {/* No Results State */}
         {!loading && !error && searched && results.length === 0 && (
-          <section className="bg-[var(--color-surface)] rounded-2xl p-16 text-center border border-[var(--color-border)]">
-            <p className="text-[var(--color-primary-soft)]">
+          <section className="bg-surface rounded-2xl p-16 text-center border border-border">
+            <p className="text-primary-soft">
               Keine Jobs gefunden — versuch andere Suchbegriffe oder Orte.
             </p>
           </section>
@@ -361,11 +397,11 @@ function SearchPageContent() {
 
         {/* Empty State */}
         {!loading && results.length === 0 && query === '' && !searched && (
-          <section className="bg-[var(--color-surface)] rounded-2xl p-16 text-center border border-[var(--color-border)]">
-            <p className="text-[var(--color-primary-soft)] mb-2">
+          <section className="bg-surface rounded-2xl p-16 text-center border border-border">
+            <p className="text-primary-soft mb-2">
               Gib einen Suchbegriff ein, um Jobs zu finden.
             </p>
-            <p className="text-sm text-[var(--color-primary-soft)]">
+            <p className="text-sm text-primary-soft">
               Die KI-Suche erkennt auch Jobs mit abweichenden Titeln.
             </p>
           </section>
@@ -385,9 +421,9 @@ export default function SearchPage() {
 
 function StatCard({ title, value, highlight }: { title: string; value: string; highlight?: boolean }) {
   return (
-    <div className="bg-[var(--color-surface)] rounded-xl p-6 border border-[var(--color-border-soft)]">
-      <p className="text-sm text-[var(--color-primary-soft)] mb-1">{title}</p>
-      <p className={`text-3xl font-light ${highlight ? 'text-[var(--color-success)]' : 'text-[var(--color-foreground)]'}`}>
+    <div className="bg-surface rounded-2xl p-6 border border-border-soft">
+      <p className="text-sm text-primary-soft mb-1">{title}</p>
+      <p className={`text-3xl font-light tabular-nums ${highlight ? 'text-success' : 'text-foreground'}`}>
         {value}
       </p>
     </div>
@@ -396,52 +432,88 @@ function StatCard({ title, value, highlight }: { title: string; value: string; h
 
 function JobCard({
   job,
+  jobId,
   onIgnore,
-  getScoreColor,
-  getPlatformBadge,
 }: {
   job: SearchResult
+  jobId?: string
   onIgnore: () => void
-  getScoreColor: (score?: number) => string
-  getPlatformBadge: (platform: string) => string
 }) {
-  const scoreBadge = typeof job.aiScore === 'number'
-    ? { label: `Score ${job.aiScore}/10`, color: getScoreColor(job.aiScore) }
-    : typeof job.relevanceScore === 'number' && job.relevanceScore > 0
-      ? { label: `Match ${Math.round(job.relevanceScore * 100)}%`, color: getScoreColor(Math.round(job.relevanceScore * 10)) }
-      : { label: 'Kein Score', color: 'text-[var(--color-primary-soft)]' }
+  const [confirming, setConfirming] = useState(false)
+
+  // Eine Skala, ein Vokabular: semanticScore kommt als aiScore (1–10) an —
+  // Prozentwerte sind hier Vergangenheit, damit klassischer und semantischer
+  // Pfad dasselbe sagen
+  const scoreColor = typeof job.aiScore === 'number' ? scoreTone(job.aiScore) : 'text-primary-soft'
+
+  function handleIgnoreClick() {
+    if (!confirming) {
+      setConfirming(true)
+      // Zwei-Klick-Bestätigung mit Rückfalleitung — kein versehentliches Ignorieren,
+      // kein Modal
+      setTimeout(() => setConfirming(false), 4000)
+      return
+    }
+    setConfirming(false)
+    onIgnore()
+  }
 
   return (
-    <div className="bg-[var(--color-surface)] rounded-2xl p-8 border border-[var(--color-border)] shadow-sm">
-      <div className="flex items-start justify-between mb-5">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-3">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getPlatformBadge(job.platform)}`}>
-              {job.platform}
+    <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2 mb-3">
+            <span className="px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft text-foreground">
+              {platformLabel(job.platform)}
             </span>
-            <span className={`px-3 py-1 rounded-full text-xs font-medium border border-[var(--color-border)] bg-[var(--color-border-soft)] ${scoreBadge.color}`}>
-              {scoreBadge.label}
+            <span className={`px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft tabular-nums ${scoreColor}`}>
+              {typeof job.aiScore === 'number' ? (
+                <>
+                  <span className="sr-only">KI-Score: {job.aiScore} von 10 — {scoreLabel(job.aiScore)}</span>
+                  <span aria-hidden="true">Score {job.aiScore}/10</span>
+                </>
+              ) : (
+                'Kein Score'
+              )}
             </span>
           </div>
-          <h3 className="text-xl font-medium text-[var(--color-foreground)] mb-1">
+          <h3 className="text-xl font-medium text-foreground mb-1">
             {job.title}
           </h3>
-          <p className="text-[var(--color-primary-soft)]">
-            {job.company} • {job.location}
+          <p className="text-primary-soft">
+            {[
+              job.company || null,
+              job.location || null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'Ohne Angabe'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
+          {jobId && (
+            <Link
+              href={`/jobs/${jobId}`}
+              className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl text-sm font-medium transition-colors"
+            >
+              In deiner Liste
+            </Link>
+          )}
           <button
-            onClick={onIgnore}
-            className="px-5 py-2.5 bg-[var(--color-border-soft)] hover:bg-[var(--color-border)] text-[var(--color-foreground)] rounded-xl text-sm font-medium transition-colors"
+            onClick={handleIgnoreClick}
+            aria-label={confirming ? 'Ignorieren endgültig bestätigen' : `Job ${job.title} ignorieren`}
+            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+              confirming
+                ? 'bg-error/10 text-error border border-error/20'
+                : 'bg-border-soft hover:bg-border text-foreground'
+            }`}
           >
-            Ignorieren
+            {confirming ? 'Sicher? Erneut klicken' : 'Ignorieren'}
           </button>
           <a
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-5 py-2.5 bg-[var(--color-accent)] hover:bg-[var(--color-accent-strong)] text-[var(--color-surface)] rounded-xl text-sm font-medium transition-colors"
+            className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-on-accent rounded-xl text-sm font-medium transition-colors"
           >
             Ansehen
           </a>
@@ -449,25 +521,25 @@ function JobCard({
       </div>
 
       {job.matchReason && (
-        <div className="mb-4 p-4 bg-[var(--color-success)]/10 rounded-xl border border-[var(--color-success)]/20">
-          <p className="text-sm font-medium text-[var(--color-success)] mb-1">Warum dieser Job passt:</p>
-          <p className="text-sm text-[var(--color-foreground)]">{job.matchReason}</p>
+        <div className="mb-4 p-4 bg-success/10 rounded-xl border border-success/20">
+          <p className="text-sm font-medium text-success mb-1">Warum dieser Job passt:</p>
+          <p className="text-sm text-foreground">{job.matchReason}</p>
         </div>
       )}
 
       {job.aiReason && !job.matchReason && (
-        <div className="mb-4 p-4 bg-[var(--color-success)]/10 rounded-xl border border-[var(--color-success)]/20">
-          <p className="text-sm font-medium text-[var(--color-success)] mb-1">KI-Einschätzung:</p>
-          <p className="text-sm text-[var(--color-foreground)]">{job.aiReason}</p>
+        <div className="mb-4 p-4 bg-success/10 rounded-xl border border-success/20">
+          <p className="text-sm font-medium text-success mb-1">KI-Einschätzung:</p>
+          <p className="text-sm text-foreground">{job.aiReason}</p>
         </div>
       )}
 
       {job.strengths && job.strengths.length > 0 && (
         <div className="mb-4">
-          <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Passt gut:</p>
+          <p className="text-sm font-medium text-foreground mb-2">Passt gut:</p>
           <div className="flex flex-wrap gap-2">
             {job.strengths.map((skill, i) => (
-              <span key={i} className="px-3 py-1 bg-[var(--color-success)]/10 text-[var(--color-success)] text-sm rounded-full border border-[var(--color-success)]/20">
+              <span key={i} className="px-3 py-1 bg-success/10 text-success text-sm rounded-full border border-success/20">
                 {skill}
               </span>
             ))}
@@ -477,10 +549,10 @@ function JobCard({
 
       {job.gaps && job.gaps.length > 0 && (
         <div className="mb-4">
-          <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Fehlt:</p>
+          <p className="text-sm font-medium text-foreground mb-2">Fehlt:</p>
           <div className="flex flex-wrap gap-2">
             {job.gaps.map((gap, i) => (
-              <span key={i} className="px-3 py-1 bg-[var(--color-error)]/10 text-[var(--color-error)] text-sm rounded-full border border-[var(--color-error)]/20">
+              <span key={i} className="px-3 py-1 bg-error/10 text-error text-sm rounded-full border border-error/20">
                 {gap}
               </span>
             ))}
@@ -490,10 +562,10 @@ function JobCard({
 
       {job.transferableSkills && job.transferableSkills.length > 0 && (
         <div className="mb-4">
-          <p className="text-sm font-medium text-[var(--color-foreground)] mb-2">Transferable Skills:</p>
+          <p className="text-sm font-medium text-foreground mb-2">Übertragbare Stärken:</p>
           <div className="flex flex-wrap gap-2">
             {job.transferableSkills.map((skill, i) => (
-              <span key={i} className="px-3 py-1 bg-[var(--color-border-soft)] text-[var(--color-foreground)] text-sm rounded-full">
+              <span key={i} className="px-3 py-1 bg-border-soft text-foreground text-sm rounded-full">
                 {skill}
               </span>
             ))}
@@ -501,7 +573,7 @@ function JobCard({
         </div>
       )}
 
-      <p className="text-sm text-[var(--color-primary-soft)] line-clamp-3 leading-relaxed">
+      <p className="text-sm text-primary-soft line-clamp-3 leading-relaxed">
         {job.description ? textSnippet(job.description) : ''}
       </p>
     </div>
