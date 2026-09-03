@@ -70,7 +70,7 @@ export function MarkdownContent({
   function flushList(key: number) {
     if (listItems.length === 0) return
     elements.push(
-      <ul key={`list-${key}`} className="list-disc pl-5 space-y-1 mb-3 text--foreground text-sm last:mb-0">
+      <ul key={`list-${key}`} className="list-disc pl-5 space-y-1 mb-3 text-foreground text-sm last:mb-0">
         {listItems.map((item, i) => (
           <li key={i}>{renderInline(item)}</li>
         ))}
@@ -82,7 +82,7 @@ export function MarkdownContent({
   function flushParagraph(key: number) {
     if (!paragraph) return
     elements.push(
-      <p key={`p-${key}`} className="text--foreground text-sm leading-relaxed mb-3 last:mb-0">
+      <p key={`p-${key}`} className="text-foreground text-sm leading-relaxed mb-3 last:mb-0">
         {renderInline(paragraph)}
       </p>
     )
@@ -108,19 +108,19 @@ export function MarkdownContent({
 
     if (line.startsWith('### ')) {
       flushAll(i)
-      elements.push(<h4 key={i} className="text-sm font-medium text--foreground mt-4 mb-2">{renderInline(line.slice(4))}</h4>)
+      elements.push(<h4 key={i} className="text-sm font-medium text-foreground mt-4 mb-2">{renderInline(line.slice(4))}</h4>)
     } else if (line.startsWith('## ')) {
       flushAll(i)
       elements.push(<SectionHeader key={i} title={line.slice(3)} />)
     } else if (line.startsWith('# ')) {
       flushAll(i)
-      elements.push(<h2 key={i} className="text-lg font-medium text--foreground mt-6 mb-3">{renderInline(line.slice(2))}</h2>)
+      elements.push(<h2 key={i} className="text-lg font-medium text-foreground mt-6 mb-3">{renderInline(line.slice(2))}</h2>)
     } else if (variant === 'resume' && SECTION_TITLE.test(line) && line.length <= 60) {
       flushAll(i)
       elements.push(<SectionHeader key={i} title={line} />)
     } else if (variant === 'resume' && isSubHeading(line)) {
       flushAll(i)
-      elements.push(<h4 key={i} className="text-sm font-medium text--foreground mt-4 mb-1">{renderInline(line)}</h4>)
+      elements.push(<h4 key={i} className="text-sm font-medium text-foreground mt-4 mb-1">{renderInline(line)}</h4>)
     } else {
       // Resume variant: merge hard-wrapped lines back into flowing paragraphs
       // (join directly when the previous line ends with a hyphen).
@@ -143,10 +143,10 @@ export function MarkdownContent({
 function SectionHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center gap-3 mt-8 mb-4 first:mt-0">
-      <h3 className="flex-shrink-0 text-xs font-semibold uppercase tracking-wider text--accent">
+      <h3 className="flex-shrink-0 text-xs font-semibold uppercase tracking-wider text-accent">
         {renderInline(title)}
       </h3>
-      <div className="flex-1 h-px bg--border" />
+      <div className="flex-1 h-px bg-border" />
     </div>
   )
 }
