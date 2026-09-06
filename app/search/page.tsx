@@ -34,6 +34,33 @@ interface SavedSearch {
   lastRunAt: string | null
 }
 
+// Stream-Zeilen des Such-Endpoints: Progress unterwegs, am Ende genau ein
+// „result“ (mit der gewohnten Payload) oder „error“
+type StreamEvent =
+  | { type: 'progress'; stage: 'source'; platform: string; found: number }
+  | { type: 'progress'; stage: 'ba-details'; done: number; total: number }
+  | { type: 'progress'; stage: 'ai-matching'; total: number }
+  | {
+      type: 'result'
+      total: number
+      highMatches: number
+      newJobs?: number
+      jobs: SearchResult[]
+      ids: Record<string, string>
+      semantic?: boolean
+    }
+  | { type: 'error'; message: string }
+
+// Fortschritt für das Stufen-Panel: Quellen melden Treffer, die BA ihren
+// Detail-Stand, die KI ihren Start
+interface StageState {
+  found: number
+  sourcesDone: boolean
+  ba: { done: number; total: number } | null
+  ai: boolean
+}
+const EMPTY_STAGES: StageState = { found: 0, sourcesDone: false, ba: null, ai: false }
+
 function SearchPageContent() {
   const searchParams = useSearchParams()
   const savedId = searchParams.get('saved')
@@ -47,6 +74,7 @@ function SearchPageContent() {
   // nicht mehr ein Nebeneffekt, über den die Fläche schweigt
   const [autoSave, setAutoSave] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [stages, setStages] = useState<StageState>(EMPTY_STAGES)
   const [results, setResults] = useState<SearchResult[]>([])
   // url → Job-ID: macht den (ggf. soeben erzeugten) Listeneintrag auffindbar
   const [jobIds, setJobIds] = useState<Record<string, string>>({})
@@ -103,6 +131,7 @@ function SearchPageContent() {
     setJobIds({})
     setError(null)
     setJustSaved(false)
+    setStages(EMPTY_STAGES)
 
     try {
       const response = await fetch('/api/search', {
@@ -111,29 +140,75 @@ function SearchPageContent() {
         body: JSON.stringify({ query: q, location: loc, remote: rem, semantic: sem, autoSave }),
       })
 
-      const data = await response.json()
-      if (!response.ok) {
-        setError(data.error || 'Suche fehlgeschlagen')
+      // Fehler vor dem Stream (401/400) kommen als normale JSON-Antwort
+      if (!response.ok || !response.body) {
+        const data = await response.json().catch(() => null)
+        setError(data?.error || 'Suche fehlgeschlagen')
         setResults([])
         return
       }
-      setResults(data.jobs || [])
-      setJobIds(data.ids || {})
-      setStats({
-        total: data.total,
-        highMatches: data.highMatches,
-        newJobs: data.newJobs || 0,
-      })
-      setSearched(true)
 
-      // Update lastRunAt + „N neu"-Zähler if this was a saved search
-      if (savedSearchId) {
-        fetch(`/api/searches/${savedSearchId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lastNewJobs: data.newJobs || 0 }),
-        }).catch(() => {})
-        fetchSavedSearches()
+      // NDJSON zeilenweise lesen — jede Progress-Zeile aktualisiert das Panel,
+      // die result-Zeile wird exakt wie früher die JSON-Antwort behandelt
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let buffer = ''
+      let settled = false
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() || ''
+        for (const line of lines) {
+          if (!line.trim()) continue
+          let event: StreamEvent
+          try {
+            event = JSON.parse(line)
+          } catch {
+            continue
+          }
+          if (event.type === 'progress') {
+            if (event.stage === 'source') {
+              setStages((prev) => ({ ...prev, found: prev.found + event.found }))
+            } else if (event.stage === 'ba-details') {
+              setStages((prev) => ({ ...prev, ba: { done: event.done, total: event.total } }))
+            } else if (event.stage === 'ai-matching') {
+              setStages((prev) => ({ ...prev, sourcesDone: true, ai: true }))
+            }
+          } else if (event.type === 'result') {
+            settled = true
+            setResults(event.jobs || [])
+            setJobIds(event.ids || {})
+            setStats({
+              total: event.total,
+              highMatches: event.highMatches,
+              newJobs: event.newJobs || 0,
+            })
+            setSearched(true)
+
+            // Update lastRunAt + „N neu"-Zähler if this was a saved search
+            if (savedSearchId) {
+              fetch(`/api/searches/${savedSearchId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lastNewJobs: event.newJobs || 0 }),
+              }).catch(() => {})
+              fetchSavedSearches()
+            }
+          } else if (event.type === 'error') {
+            settled = true
+            setError(event.message || 'Suche fehlgeschlagen')
+            setResults([])
+          }
+        }
+      }
+
+      // Stream endete ohne Ergebnis — abgebrochen oder unvollständig
+      if (!settled) {
+        setError('Suche fehlgeschlagen — bitte später erneut versuchen.')
+        setResults([])
       }
     } catch {
       setError('Suche fehlgeschlagen — bitte später erneut versuchen.')
@@ -315,13 +390,28 @@ function SearchPageContent() {
           </section>
         )}
 
-        {/* Lade-Zustand: Skeleton statt geleerte Liste — die vorherigen Treffer
-            verschwinden nicht, bevor neue da sind */}
+        {/* Lade-Zustand: echte Stufen statt Stillstand — der Stream meldet, wo
+            die Suche gerade steht; die Skeleton-Karten bleiben darunter */}
         {loading && (
           <section className="space-y-4" aria-live="polite">
             <p className="sr-only" role="status">
               Suche läuft …
             </p>
+            <div className="bg-surface rounded-2xl p-6 border border-border space-y-3">
+              <StageRow
+                done={stages.sourcesDone}
+                text={stages.sourcesDone
+                  ? `Quellen durchsucht — ${stages.found} Treffer`
+                  : 'Quellen werden durchsucht …'}
+              />
+              {stages.ba && !stages.sourcesDone && (
+                <StageRow
+                  done={false}
+                  text={`Arbeitsagentur: Details geladen ${stages.ba.done}/${stages.ba.total}`}
+                />
+              )}
+              {stages.ai && <StageRow done={false} text="KI bewertet Treffer …" />}
+            </div>
             {[0, 1, 2].map((i) => (
               <div key={i} className="bg-surface rounded-2xl p-8 border border-border animate-pulse motion-reduce:animate-none" aria-hidden="true">
                 <div className="h-5 w-2/3 bg-border rounded mb-4" />
@@ -427,6 +517,19 @@ function StatCard({ title, value, highlight }: { title: string; value: string; h
         {value}
       </p>
     </div>
+  )
+}
+
+// Eine Zeile im Fortschritts-Panel: Haken wenn fertig, Punkt wenn läuft —
+// die Symbole sind dekorativ, der Text trägt die Information
+function StageRow({ done, text }: { done: boolean; text: string }) {
+  return (
+    <p className="flex items-center gap-2 text-sm">
+      <span aria-hidden="true" className={done ? 'text-success' : 'text-accent'}>
+        {done ? '✓' : '●'}
+      </span>
+      <span className={done ? 'text-success' : 'text-foreground'}>{text}</span>
+    </p>
   )
 }
 

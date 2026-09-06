@@ -20,6 +20,15 @@ export type SemanticJob = ScrapedJob & {
   transferableSkills: string[]
 }
 
+// Fortschritt für die Stufen-Anzeige: Quellen melden Trefferzahlen, die BA
+// ihren Detail-Nachlade-Stand, die Semantik ihre Bewertungsgröße
+export type SearchProgressEvent =
+  | { stage: 'source'; platform: string; found: number }
+  | { stage: 'ba-details'; done: number; total: number }
+  | { stage: 'ai-matching'; total: number }
+
+export type SearchProgressCallback = (event: SearchProgressEvent) => void
+
 // Nur die Felder der API-Antworten, die wir wirklich lesen
 interface RawJoobleJob {
   title?: string
@@ -187,23 +196,40 @@ async function baDetail(refnr: string): Promise<string> {
   return (data.stellenangebotsBeschreibung || '').replace(/\r/g, '').trim()
 }
 
-async function searchArbeitsagentur(query: string, location?: string): Promise<ScrapedJob[]> {
+async function searchArbeitsagentur(
+  query: string,
+  location: string | undefined,
+  onProgress?: SearchProgressCallback
+): Promise<ScrapedJob[]> {
   try {
-    const url = new URL(`${BA_BASE}/pc/v6/jobs`)
-    url.searchParams.set('was', query)
-    if (location) url.searchParams.set('wo', location)
-    url.searchParams.set('size', '25')
-    url.searchParams.set('page', '1')
+    // Zwei Seiten à 50 — Breite geht vor Suchzeit (die Suche soll den ganzen
+    // Arbeitsmarkt sehen, nicht nur die IT-Ecke der Partnerportale)
+    const pages = await Promise.all(
+      [1, 2].map(async (page) => {
+        const url = new URL(`${BA_BASE}/pc/v6/jobs`)
+        url.searchParams.set('was', query)
+        if (location) url.searchParams.set('wo', location)
+        url.searchParams.set('size', '50')
+        url.searchParams.set('page', String(page))
+        const response = await fetch(url, { headers: BA_HEADERS })
+        if (!response.ok) return [] as BaJob[]
+        const data = await response.json()
+        return (data.ergebnisliste || []) as BaJob[]
+      })
+    )
 
-    const response = await fetch(url, { headers: BA_HEADERS })
-    if (!response.ok) return []
-    const data = await response.json()
-    const items: BaJob[] = data.ergebnisliste || []
+    // Dedup per Referenznummer — Seite 2 kann Seite 1 überlappen
+    const byRefnr = new Map<string, BaJob>()
+    for (const job of pages.flat()) {
+      if (job.referenznummer) byRefnr.set(job.referenznummer, job)
+    }
+    const items = [...byRefnr.values()]
 
-    // Beschreibungen nachladen — in Zehner-Chunks statt 25 parallelen Requests.
+    // Beschreibungen nachladen — in Zehner-Chunks statt 100 parallelen Requests.
     // Fail-soft je Job: ohne Detailtext bleibt der Treffer unbezahlt unscoriert,
     // statt die ganze Quelle zu gefährden.
     const descriptions = new Map<string, string>()
+    let detailsDone = 0
     for (let i = 0; i < items.length; i += 10) {
       await Promise.all(
         items.slice(i, i + 10).map(async (job) => {
@@ -215,6 +241,8 @@ async function searchArbeitsagentur(query: string, location?: string): Promise<S
           }
         })
       )
+      detailsDone = Math.min(detailsDone + 10, items.length)
+      onProgress?.({ stage: 'ba-details', done: detailsDone, total: items.length })
     }
 
     return items.map((job): ScrapedJob => {
@@ -300,26 +328,36 @@ export async function searchJobs(params: {
   joobleKey?: string | null
   adzunaAppId?: string | null
   adzunaAppKey?: string | null
+  onProgress?: SearchProgressCallback
 }): Promise<ScrapedJob[]> {
   const { searchLinkedInJobs } = await import('./apify')
 
+  // Jede Quelle meldet ihre Trefferzahl, sobald sie fertig ist
+  const track = (platform: string, promise: Promise<ScrapedJob[]>) =>
+    promise.then(jobs => {
+      params.onProgress?.({ stage: 'source', platform, found: jobs.length })
+      return jobs
+    })
+
   const sources: Promise<ScrapedJob[]>[] = [
-    searchJooble(params.query, params.location, params.joobleKey),
-    searchRemotive(params.query),
-    searchArbeitnow(params.query),
-    searchArbeitsagentur(params.query, params.location),
+    track('jooble', searchJooble(params.query, params.location, params.joobleKey)),
+    track('remotive', searchRemotive(params.query)),
+    track('arbeitnow', searchArbeitnow(params.query)),
+    track('arbeitsagentur', searchArbeitsagentur(params.query, params.location, params.onProgress)),
   ]
 
   // Adzuna nur mit vollständigem Key-Paar — App-ID allein bringt nichts
   if (params.adzunaAppId && params.adzunaAppKey) {
-    sources.push(searchAdzuna(params.query, params.location, params.adzunaAppId, params.adzunaAppKey))
+    sources.push(track('adzuna', searchAdzuna(params.query, params.location, params.adzunaAppId, params.adzunaAppKey)))
   }
 
   // Add LinkedIn via Apify when token is available
   if (params.apifyToken) {
     sources.push(
-      searchLinkedInJobs(params.query, params.location, params.apifyToken)
-        .then(jobs => jobs.map(j => ({ ...j, platform: 'linkedin' })))
+      track('linkedin',
+        searchLinkedInJobs(params.query, params.location, params.apifyToken)
+          .then(jobs => jobs.map(j => ({ ...j, platform: 'linkedin' })))
+      )
     )
   }
 
@@ -359,6 +397,7 @@ export async function semanticSearch(params: {
   joobleKey?: string | null
   adzunaAppId?: string | null
   adzunaAppKey?: string | null
+  onProgress?: SearchProgressCallback
 }): Promise<SemanticJob[]> {
   const rawJobs = await searchJobs({
     query: params.query,
@@ -369,6 +408,7 @@ export async function semanticSearch(params: {
     joobleKey: params.joobleKey,
     adzunaAppId: params.adzunaAppId,
     adzunaAppKey: params.adzunaAppKey,
+    onProgress: params.onProgress,
   })
 
   const semanticJobs: SemanticJob[] = rawJobs.map(job => ({
@@ -378,15 +418,32 @@ export async function semanticSearch(params: {
     transferableSkills: [],
   }))
 
-  const result = await semanticJobSearch(
-    params.resume,
-    params.query,
-    semanticJobs,
-    params.provider || 'nebius',
-    params.model,
-    params.apiKey,
-    params.baseUrl
+  params.onProgress?.({ stage: 'ai-matching', total: semanticJobs.length })
+
+  // Ein einziger Prompt über ~175 Treffer würde träge und timeout-anfällig —
+  // darum 60er-Chunks parallel. Der Index-Mapping-Schutz bleibt pro Chunk
+  // intakt; fuzzyMatches bleiben verworfen wie bisher.
+  const CHUNK_SIZE = 60
+  const chunks: SemanticJob[][] = []
+  for (let i = 0; i < semanticJobs.length; i += CHUNK_SIZE) {
+    chunks.push(semanticJobs.slice(i, i + CHUNK_SIZE))
+  }
+
+  const results = await Promise.all(
+    chunks.map(chunk =>
+      semanticJobSearch(
+        params.resume,
+        params.query,
+        chunk,
+        params.provider || 'nebius',
+        params.model,
+        params.apiKey,
+        params.baseUrl
+      )
+    )
   )
 
-  return result.jobs.filter(job => job.relevanceScore >= 0.6)
+  return results
+    .flatMap(result => result.jobs)
+    .filter(job => job.relevanceScore >= 0.6)
 }
