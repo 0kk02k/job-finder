@@ -18,6 +18,9 @@ interface Settings {
   openaiKeyHint?: string | null
   openrouterKeyHint?: string | null
   apifyKeyHint?: string | null
+  joobleKeyHint?: string | null
+  adzunaAppIdHint?: string | null
+  adzunaAppKeyHint?: string | null
 }
 
 // Neu getippte Keys — leer heißt: gespeicherten Key behalten
@@ -27,6 +30,9 @@ interface NewKeys {
   openai: string
   openrouter: string
   apify: string
+  jooble: string
+  adzunaAppId: string
+  adzunaAppKey: string
 }
 
 interface ProfileOptimization {
@@ -37,7 +43,7 @@ interface ProfileOptimization {
   missingSkills: string[]
 }
 
-const EMPTY_KEYS: NewKeys = { nebius: '', gemini: '', openai: '', openrouter: '', apify: '' }
+const EMPTY_KEYS: NewKeys = { nebius: '', gemini: '', openai: '', openrouter: '', apify: '', jooble: '', adzunaAppId: '', adzunaAppKey: '' }
 
 export default function SettingsPage() {
   const toast = useToast()
@@ -212,6 +218,9 @@ export default function SettingsPage() {
       if (newKeys.openai.trim()) payload.openaiApiKey = newKeys.openai.trim()
       if (newKeys.openrouter.trim()) payload.openrouterApiKey = newKeys.openrouter.trim()
       if (newKeys.apify.trim()) payload.apifyApiKey = newKeys.apify.trim()
+      if (newKeys.jooble.trim()) payload.joobleApiKey = newKeys.jooble.trim()
+      if (newKeys.adzunaAppId.trim()) payload.adzunaAppId = newKeys.adzunaAppId.trim()
+      if (newKeys.adzunaAppKey.trim()) payload.adzunaAppKey = newKeys.adzunaAppKey.trim()
 
       const response = await fetch('/api/settings', {
         method: 'PUT',
@@ -705,6 +714,36 @@ export default function SettingsPage() {
                 />
                 <span className="text-sm text-foreground">Nur Remote-Jobs</span>
               </label>
+            </div>
+          </Section>
+
+          {/* Job-Quellen */}
+          <Section title="Job-Quellen" description="Zusätzliche Anbieter für die Jobsuche — ohne Angaben durchsucht die Suche Arbeitsagentur, Remotive und Arbeitnow">
+            <div className="space-y-6">
+              <InputField
+                label="Jooble API-Key (optional)"
+                type="password"
+                value={newKeys.jooble}
+                onChange={(v) => setNewKeys({ ...newKeys, jooble: v })}
+                placeholder={settings.joobleKeyHint ? `Gespeichert: ${settings.joobleKeyHint} — leer lassen zum Behalten` : 'Noch kein Key hinterlegt'}
+                help="Bündelt Stellen aus Hunderten deutschen Börsen. Kostenloser Key auf jooble.org/api."
+              />
+              <InputField
+                label="Adzuna App-ID (optional)"
+                type="text"
+                value={newKeys.adzunaAppId}
+                onChange={(v) => setNewKeys({ ...newKeys, adzunaAppId: v })}
+                placeholder={settings.adzunaAppIdHint ? `Gespeichert: ${settings.adzunaAppIdHint} — leer lassen zum Behalten` : 'Noch keine App-ID hinterlegt'}
+                help="Die App-ID ist kein Geheimnis, gehört aber zum App-Key — erst zusammen aktiv."
+              />
+              <InputField
+                label="Adzuna App-Key (optional)"
+                type="password"
+                value={newKeys.adzunaAppKey}
+                onChange={(v) => setNewKeys({ ...newKeys, adzunaAppKey: v })}
+                placeholder={settings.adzunaAppKeyHint ? `Gespeichert: ${settings.adzunaAppKeyHint} — leer lassen zum Behalten` : 'Noch kein Key hinterlegt'}
+                help="Bringt deutsche Stellen mit Gehaltsangaben in die Suche. Kostenlos auf developer.adzuna.com."
+              />
             </div>
           </Section>
 

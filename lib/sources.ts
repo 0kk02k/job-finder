@@ -14,6 +14,8 @@ const PLATFORM_LABELS: Record<string, string> = {
   jooble: 'Jooble',
   remotive: 'Remotive',
   arbeitnow: 'Arbeitnow',
+  arbeitsagentur: 'Arbeitsagentur',
+  adzuna: 'Adzuna',
 }
 
 export function platformLabel(platform: string | null | undefined): string {
@@ -25,8 +27,12 @@ export function platformLabel(platform: string | null | undefined): string {
 // Hostname-basierte Ableitung (Jobs mit `url`, z. B. Dashboard/Detail)
 const HOST_LABELS: Record<string, string> = {
   'jooble.org': 'Jooble',
+  'adzuna.de': 'Adzuna',
+  'adzuna.co.uk': 'Adzuna',
+  'adzuna.com': 'Adzuna',
   'remotive.com': 'Remotive',
   'arbeitnow.com': 'Arbeitnow',
+  'arbeitsagentur.de': 'Arbeitsagentur',
   'linkedin.com': 'LinkedIn',
   'stepstone.de': 'StepStone',
   'xing.com': 'XING',

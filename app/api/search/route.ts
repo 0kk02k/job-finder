@@ -30,6 +30,10 @@ export async function POST(request: NextRequest) {
   // Get user settings for Apify token + AI provider config
   const settings = await prisma.userSettings.findUnique({ where: { userId } })
   const apifyToken = settings?.apifyApiKey || null
+  // Quellen-Keys: Nutzereingabe gewinnt, Env-Fallback (Jooble war vorher Env-only)
+  const joobleKey = settings?.joobleApiKey || process.env.JOOBLE_API_KEY || null
+  const adzunaAppId = settings?.adzunaAppId || process.env.ADZUNA_APP_ID || null
+  const adzunaAppKey = settings?.adzunaAppKey || process.env.ADZUNA_APP_KEY || null
 
   // AI config from user settings (falls back to Nebius via env key)
   const { provider: aiProvider, model: aiModel, apiKey: aiApiKey, baseUrl: aiBaseUrl } =
@@ -70,6 +74,9 @@ export async function POST(request: NextRequest) {
         apiKey: aiApiKey,
         baseUrl: aiBaseUrl,
         apifyToken,
+        joobleKey,
+        adzunaAppId,
+        adzunaAppKey,
       })
 
       // Ignored (archived) jobs stay out of the result pool; best matches first
@@ -155,6 +162,9 @@ export async function POST(request: NextRequest) {
     platforms,
     useAI: true,
     apifyToken,
+    joobleKey,
+    adzunaAppId,
+    adzunaAppKey,
   })
 
   // Score jobs with AI (requires resume). Capped to bound LLM costs/latency —

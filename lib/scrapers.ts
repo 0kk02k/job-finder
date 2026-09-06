@@ -13,6 +13,68 @@ export interface ScrapedJob {
   platform: string
 }
 
+// Semantisches Suchergebnis: ScrapedJob plus KI-Bewertung (Relevanz 0–1)
+export type SemanticJob = ScrapedJob & {
+  relevanceScore: number
+  matchReason: string
+  transferableSkills: string[]
+}
+
+// Nur die Felder der API-Antworten, die wir wirklich lesen
+interface RawJoobleJob {
+  title?: string
+  company?: string
+  location?: string
+  snippet?: string
+  link?: string
+  updated?: string
+  salary?: string
+  source?: string
+}
+
+interface RawRemotiveJob {
+  title?: string
+  company_name?: string
+  candidate_required_location?: string
+  description?: string
+  url?: string
+  publication_date?: string
+  salary?: string
+}
+
+interface RawArbeitnowJob {
+  title?: string
+  company_name?: string
+  location?: string
+  description?: string
+  url?: string
+  created_at?: number
+  tags?: string[]
+}
+
+interface BaJob {
+  stellenangebotsTitel?: string
+  firma?: string
+  referenznummer?: string
+  externeURL?: string
+  datumErsteVeroeffentlichung?: string
+  festgehalt?: number
+  stundenlohn?: number
+  homeofficemoeglich?: boolean
+  stellenlokationen?: Array<{ adresse?: { ort?: string; plz?: string } }>
+}
+
+interface RawAdzunaJob {
+  title?: string
+  company?: { display_name?: string }
+  location?: { display_name?: string }
+  description?: string
+  redirect_url?: string
+  created?: string
+  salary_min?: number
+  salary_max?: number
+}
+
 // Scrape a single job posting URL using fetch + AI extraction (no browser needed)
 export async function scrapeJobUrl(url: string): Promise<Partial<ScrapedJob> | null> {
   try {
@@ -29,19 +91,20 @@ export async function scrapeJobUrl(url: string): Promise<Partial<ScrapedJob> | n
 }
 
 // --- Source: Jooble ---
-async function searchJooble(query: string, location?: string): Promise<ScrapedJob[]> {
-  const apiKey = process.env.JOOBLE_API_KEY
-  if (!apiKey) return []
+async function searchJooble(query: string, location?: string, apiKey?: string | null): Promise<ScrapedJob[]> {
+  const key = apiKey || process.env.JOOBLE_API_KEY
+  if (!key) return []
 
   try {
-    const response = await fetch(`https://jooble.org/api/${apiKey}`, {
+    const response = await fetch(`https://jooble.org/api/${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keywords: query, location: location || '', page: '1' }),
     })
     const data = await response.json()
+    const jobs: RawJoobleJob[] = data.jobs || []
 
-    return (data.jobs || []).map((job: any): ScrapedJob => ({
+    return jobs.map((job): ScrapedJob => ({
       title: job.title || '',
       company: job.company || '',
       location: job.location || '',
@@ -61,8 +124,9 @@ async function searchRemotive(query: string): Promise<ScrapedJob[]> {
   try {
     const response = await fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=25`)
     const data = await response.json()
+    const jobs: RawRemotiveJob[] = data.jobs || []
 
-    return (data.jobs || []).map((job: any): ScrapedJob => ({
+    return jobs.map((job): ScrapedJob => ({
       title: job.title || '',
       company: job.company_name || '',
       location: job.candidate_required_location || 'Remote',
@@ -85,13 +149,14 @@ async function searchArbeitnow(query: string): Promise<ScrapedJob[]> {
 
     const keywords = query.toLowerCase().split(/\s+/).filter(Boolean)
 
-    return (data.data || [])
-      .filter((job: any) => {
+    const jobs: RawArbeitnowJob[] = data.data || []
+    return jobs
+      .filter((job) => {
         const haystack = `${job.title} ${job.tags?.join(' ') || ''}`.toLowerCase()
         return keywords.some(kw => haystack.includes(kw))
       })
       .slice(0, 25)
-      .map((job: any): ScrapedJob => ({
+      .map((job): ScrapedJob => ({
         title: job.title || '',
         company: job.company_name || '',
         location: job.location || '',
@@ -106,6 +171,123 @@ async function searchArbeitnow(query: string): Promise<ScrapedJob[]> {
   }
 }
 
+// --- Source: Bundesagentur für Arbeit (größte deutsche Jobbörse, kein eigener Key nötig) ---
+// Liste:  pc/v6/jobs  (Titel, Firma, Ort, Gehalt, Refnr — aber keine Beschreibung)
+// Detail: pc/v4/jobdetails/{base64(Refnr)} → stellenangebotsBeschreibung als Klartext
+const BA_BASE = 'https://rest.arbeitsagentur.de/jobboerse/jobsuche-service'
+const BA_HEADERS = { 'X-API-Key': process.env.ARBEITSAGENTUR_API_KEY || 'jobboerse-jobsuche' }
+
+async function baDetail(refnr: string): Promise<string> {
+  const response = await fetch(
+    `${BA_BASE}/pc/v4/jobdetails/${Buffer.from(refnr).toString('base64')}`,
+    { headers: BA_HEADERS }
+  )
+  if (!response.ok) return ''
+  const data = await response.json()
+  return (data.stellenangebotsBeschreibung || '').replace(/\r/g, '').trim()
+}
+
+async function searchArbeitsagentur(query: string, location?: string): Promise<ScrapedJob[]> {
+  try {
+    const url = new URL(`${BA_BASE}/pc/v6/jobs`)
+    url.searchParams.set('was', query)
+    if (location) url.searchParams.set('wo', location)
+    url.searchParams.set('size', '25')
+    url.searchParams.set('page', '1')
+
+    const response = await fetch(url, { headers: BA_HEADERS })
+    if (!response.ok) return []
+    const data = await response.json()
+    const items: BaJob[] = data.ergebnisliste || []
+
+    // Beschreibungen nachladen — in Zehner-Chunks statt 25 parallelen Requests.
+    // Fail-soft je Job: ohne Detailtext bleibt der Treffer unbezahlt unscoriert,
+    // statt die ganze Quelle zu gefährden.
+    const descriptions = new Map<string, string>()
+    for (let i = 0; i < items.length; i += 10) {
+      await Promise.all(
+        items.slice(i, i + 10).map(async (job) => {
+          if (!job.referenznummer) return
+          try {
+            descriptions.set(job.referenznummer, await baDetail(job.referenznummer))
+          } catch {
+            // ohne Beschreibung weiter
+          }
+        })
+      )
+    }
+
+    return items.map((job): ScrapedJob => {
+      const adresse = job.stellenlokationen?.[0]?.adresse
+      let description = (descriptions.get(job.referenznummer || '') || '').substring(0, 2000)
+      // Home-Office-Fakt ehrlich dazuschreiben: fließt in die KI-Bewertung ein
+      // und trifft den Remote-Filter, ohne den Ort zu verfälschen
+      if (job.homeofficemoeglich) {
+        description = description ? `Home-Office möglich. ${description}` : 'Home-Office möglich.'
+      }
+      return {
+        title: job.stellenangebotsTitel || '',
+        company: job.firma || '',
+        location: adresse?.ort ? (adresse.plz ? `${adresse.ort} (${adresse.plz})` : adresse.ort) : '',
+        description,
+        // Externe Treffer verlinken direkt zum Arbeitgeber; der Rest auf die
+        // BA-Detailseite — die URL ist zugleich Dedup-Schlüssel
+        url:
+          job.externeURL ||
+          `https://www.arbeitsagentur.de/jobsuche/jobdetail/${encodeURIComponent(job.referenznummer || '')}`,
+        postedAt: job.datumErsteVeroeffentlichung ? new Date(job.datumErsteVeroeffentlichung) : undefined,
+        salary:
+          job.festgehalt
+            ? `ab ${Math.round(job.festgehalt).toLocaleString('de-DE')} €/Jahr`
+            : job.stundenlohn
+              ? `ab ${Math.round(job.stundenlohn).toLocaleString('de-DE')} €/Std.`
+              : undefined,
+        platform: 'arbeitsagentur',
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
+// --- Source: Adzuna DE (kostenloser Key: developer.adzuna.com) ---
+async function searchAdzuna(
+  query: string,
+  location: string | undefined,
+  appId: string,
+  appKey: string
+): Promise<ScrapedJob[]> {
+  try {
+    const url = new URL('https://api.adzuna.com/v1/api/jobs/de/search/1')
+    url.searchParams.set('app_id', appId)
+    url.searchParams.set('app_key', appKey)
+    url.searchParams.set('what', query)
+    if (location) url.searchParams.set('where', location)
+    url.searchParams.set('results_per_page', '25')
+
+    const response = await fetch(url)
+    if (!response.ok) return []
+    const data = await response.json()
+    const results: RawAdzunaJob[] = data.results || []
+
+    return results.map((job): ScrapedJob => ({
+      title: (job.title || '').replace(/<[^>]+>/g, '').trim(),
+      company: job.company?.display_name || '',
+      location: job.location?.display_name || '',
+      description: (job.description || '').trim().substring(0, 2000),
+      url: job.redirect_url || '',
+      postedAt: job.created ? new Date(job.created) : undefined,
+      salary:
+        job.salary_min && job.salary_max
+          ? `${Math.round(job.salary_min).toLocaleString('de-DE')}–${Math.round(job.salary_max).toLocaleString('de-DE')} €`
+          : undefined,
+      platform: 'adzuna',
+    }))
+  } catch {
+    return []
+  }
+}
+
 // Aggregated search across all sources
 export async function searchJobs(params: {
   query: string
@@ -115,14 +297,23 @@ export async function searchJobs(params: {
   useAI?: boolean
   resume?: string
   apifyToken?: string | null
+  joobleKey?: string | null
+  adzunaAppId?: string | null
+  adzunaAppKey?: string | null
 }): Promise<ScrapedJob[]> {
   const { searchLinkedInJobs } = await import('./apify')
 
   const sources: Promise<ScrapedJob[]>[] = [
-    searchJooble(params.query, params.location),
+    searchJooble(params.query, params.location, params.joobleKey),
     searchRemotive(params.query),
     searchArbeitnow(params.query),
+    searchArbeitsagentur(params.query, params.location),
   ]
+
+  // Adzuna nur mit vollständigem Key-Paar — App-ID allein bringt nichts
+  if (params.adzunaAppId && params.adzunaAppKey) {
+    sources.push(searchAdzuna(params.query, params.location, params.adzunaAppId, params.adzunaAppKey))
+  }
 
   // Add LinkedIn via Apify when token is available
   if (params.apifyToken) {
@@ -139,9 +330,10 @@ export async function searchJobs(params: {
     if (r.status === 'fulfilled') allJobs.push(...r.value)
   }
 
-  // Remote filter — Remotive is remote-only by design, others are matched on location/title
+  // Remote filter — Remotive is remote-only by design, others are matched on
+  // location/title/description (BA-Jobs tragen „Home-Office möglich" im Text)
   const filtered = params.remote
-    ? allJobs.filter(j => j.platform === 'remotive' || /remote|home\s?office/i.test(`${j.location} ${j.title}`))
+    ? allJobs.filter(j => j.platform === 'remotive' || /remote|home[\s-]?office/i.test(`${j.location} ${j.title} ${j.description}`))
     : allJobs
 
   // Deduplicate by URL
@@ -164,20 +356,26 @@ export async function semanticSearch(params: {
   apiKey?: string
   baseUrl?: string
   apifyToken?: string | null
-}): Promise<any[]> {
+  joobleKey?: string | null
+  adzunaAppId?: string | null
+  adzunaAppKey?: string | null
+}): Promise<SemanticJob[]> {
   const rawJobs = await searchJobs({
     query: params.query,
     location: params.location,
     remote: params.remote,
     useAI: true,
     apifyToken: params.apifyToken,
+    joobleKey: params.joobleKey,
+    adzunaAppId: params.adzunaAppId,
+    adzunaAppKey: params.adzunaAppKey,
   })
 
-  const semanticJobs = rawJobs.map(job => ({
+  const semanticJobs: SemanticJob[] = rawJobs.map(job => ({
     ...job,
     relevanceScore: 0,
     matchReason: '',
-    transferableSkills: [] as string[],
+    transferableSkills: [],
   }))
 
   const result = await semanticJobSearch(

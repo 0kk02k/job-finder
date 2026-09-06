@@ -81,6 +81,10 @@ model UserSettings {
   nebiusApiKey    String?
   openrouterApiKey String?
   apifyApiKey     String?
+  // Job-Quellen-Keys (Suche): Jooble-REST-Key, Adzuna app_id/app_key
+  joobleApiKey    String?
+  adzunaAppId     String?
+  adzunaAppKey    String?
   ollamaUrl       String?  @default("http://localhost:11434")
   aiProvider      String   @default("nebius")
   aiModel         String?  @default("moonshotai/Kimi-K2.5")

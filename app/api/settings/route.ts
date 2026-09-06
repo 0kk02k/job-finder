@@ -11,6 +11,9 @@ const settingsSchema = z.object({
   nebiusApiKey: z.string().nullable(),
   openrouterApiKey: z.string().nullable(),
   apifyApiKey: z.string().nullable(),
+  joobleApiKey: z.string().nullable(),
+  adzunaAppId: z.string().nullable(),
+  adzunaAppKey: z.string().nullable(),
   ollamaUrl: z.string().nullable(),
   aiProvider: z.string(),
   aiModel: z.string().nullable(),
@@ -22,7 +25,7 @@ const settingsSchema = z.object({
 
 // GET liefert API-Keys nie im Klartext — nur einen Maskiert-Hinweis („••••4f2a“).
 // Ein neuer Key wird gesetzt, indem man ihn eintippt; leer lassen heißt behalten.
-const KEY_FIELDS = ['geminiApiKey', 'openaiApiKey', 'nebiusApiKey', 'openrouterApiKey', 'apifyApiKey'] as const
+const KEY_FIELDS = ['geminiApiKey', 'openaiApiKey', 'nebiusApiKey', 'openrouterApiKey', 'apifyApiKey', 'joobleApiKey', 'adzunaAppId', 'adzunaAppKey'] as const
 
 function maskKey(value: string | null | undefined): string | null {
   if (!value) return null
@@ -46,7 +49,11 @@ export async function GET() {
     })
   }
 
-  const { geminiApiKey: _g, openaiApiKey: _o, nebiusApiKey: _n, openrouterApiKey: _r, apifyApiKey: _a, ...rest } = settings
+  const {
+    geminiApiKey: _g, openaiApiKey: _o, nebiusApiKey: _n, openrouterApiKey: _r,
+    apifyApiKey: _a, joobleApiKey: _j, adzunaAppId: _ai, adzunaAppKey: _ak,
+    ...rest
+  } = settings
   return NextResponse.json({
     ...rest,
     geminiKeyHint: maskKey(_g),
@@ -54,6 +61,9 @@ export async function GET() {
     nebiusKeyHint: maskKey(_n),
     openrouterKeyHint: maskKey(_r),
     apifyKeyHint: maskKey(_a),
+    joobleKeyHint: maskKey(_j),
+    adzunaAppIdHint: maskKey(_ai),
+    adzunaAppKeyHint: maskKey(_ak),
   })
 }
 
@@ -99,5 +109,8 @@ export async function PUT(request: NextRequest) {
     nebiusApiKey: undefined,
     openrouterApiKey: undefined,
     apifyApiKey: undefined,
+    joobleApiKey: undefined,
+    adzunaAppId: undefined,
+    adzunaAppKey: undefined,
   })
 }
