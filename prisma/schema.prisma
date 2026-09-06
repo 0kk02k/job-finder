@@ -87,7 +87,7 @@ model UserSettings {
   adzunaAppKey    String?
   ollamaUrl       String?  @default("http://localhost:11434")
   aiProvider      String   @default("nebius")
-  aiModel         String?  @default("moonshotai/Kimi-K2.5")
+  aiModel         String?  @default("moonshotai/Kimi-K3")
 
   targetTitles    String?  // JSON array of job titles
   targetLocations String?  // JSON array of locations

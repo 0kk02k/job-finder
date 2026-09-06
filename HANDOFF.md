@@ -38,7 +38,7 @@ Nebenwirkung: die Spalte `mistralApiKey` (alter Mistral-Key) wird gelöscht — 
 
 1. **Commit**: alle Änderungen liegen uncommitted im Working Tree (8 Dateien Code + DESIGN.md, siehe `git status`) — nach der Migration in einem Zug committen. `main` liegt bereits 6 Commits vor origin, **nichts gepusht** (bewusst).
 2. **Lokaler Key**: `.env` hat `NEBIUS_API_KEY=` (leer). Der echte Key liegt nur in den Vercel-Env-Vars. Für lokales Scoring/Interview den Key lokal eintragen — sonst schlägt die KI-Anbindung lokal fehl (Deployment auf Vercel funktioniert, sobald gemigriert + gepusht ist).
-3. **Modell-ID verifizieren**: Default ist `moonshotai/Kimi-K2.5` (Konstante `NEBIUS_DEFAULT_MODEL` in `lib/ai.ts`, eine Stelle). Konvention `organization/Model` ist bestätigt, die exakte ID aber nicht gegen die API geprüft — falls Scoring fehlschlägt: studio.nebius.com → „Copy model ID" → Konstante anpassen.
+3. ~~**Modell-ID verifizieren**~~ **Erledigt 07.09.2026:** Der 404 in Produktion bestätigte die Befürchtung — Nebius hat `moonshotai/Kimi-K2.5` gesunset (Docs-Beispiele sind veraltet). Jetzt `moonshotai/Kimi-K3` an allen drei Stellen (`lib/ai.ts`, Schema-Default, Settings-Zeile der DB per UPDATE). Künftig Modell-IDs immer gegen `api.tokenfactory.nebius.com/v1/models` prüfen, bevor sie hier landen.
 
 ## Heute erledigt (Details in den Commits/Reports)
 

@@ -6,7 +6,10 @@ import { generateText } from 'ai'
 
 // Ein Ort, eine Wahrheit: die Standard-Modell-ID für Nebius Token Factory.
 // (Im Studio verifizierbar über „Copy model ID".)
-export const NEBIUS_DEFAULT_MODEL = 'moonshotai/Kimi-K2.5'
+// Verifiziert gegen https://api.tokenfactory.nebius.com/v1/models (09/2026):
+// K2.5 wurde vom Provider gesunset, K3 ist der Nachfolger. Modell-IDs bei
+// Nebius immer gegen die Live-Liste prüfen, bevor sie hier landen.
+export const NEBIUS_DEFAULT_MODEL = 'moonshotai/Kimi-K3'
 
 export interface ScoreResult {
   score: number | null // 1-10, null wenn die KI nicht bewerten konnte

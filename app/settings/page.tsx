@@ -383,7 +383,7 @@ export default function SettingsPage() {
                 type="text"
                 value={settings.aiModel || ''}
                 onChange={(v) => setSettings({ ...settings, aiModel: v })}
-                placeholder="moonshotai/Kimi-K2.5"
+                placeholder="moonshotai/Kimi-K3"
                 help="Nur ändern, wenn die Bewertungen fehlschlagen — dann lohnt ein Blick auf die Modell-ID beim Anbieter."
               />
 
