@@ -12,6 +12,7 @@ export const maxDuration = 60
 type StreamEvent =
   | { type: 'progress'; stage: 'source'; platform: string; found: number }
   | { type: 'progress'; stage: 'ba-details'; done: number; total: number }
+  | { type: 'progress'; stage: 'sources-done'; total: number }
   | { type: 'progress'; stage: 'ai-matching'; total: number }
   | {
       type: 'result'

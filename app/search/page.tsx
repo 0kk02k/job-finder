@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { scoreTone } from '../components/ui'
-import { HIGH_MATCH_THRESHOLD, scoreLabel } from '@/lib/matching'
+import { HIGH_MATCH_THRESHOLD, scoreLabel, scoreWord } from '@/lib/matching'
 import { platformLabel } from '@/lib/sources'
 import { textSnippet } from '../components/Markdown'
 import { useToast } from '../components/Toast'
@@ -39,6 +39,7 @@ interface SavedSearch {
 type StreamEvent =
   | { type: 'progress'; stage: 'source'; platform: string; found: number }
   | { type: 'progress'; stage: 'ba-details'; done: number; total: number }
+  | { type: 'progress'; stage: 'sources-done'; total: number }
   | { type: 'progress'; stage: 'ai-matching'; total: number }
   | {
       type: 'result'
@@ -51,15 +52,17 @@ type StreamEvent =
     }
   | { type: 'error'; message: string }
 
-// Fortschritt für das Stufen-Panel: Quellen melden Treffer, die BA ihren
-// Detail-Stand, die KI ihren Start
+// Fortschritt für das Stufen-Panel: jede Quelle meldet sich einzeln, die BA
+// zählt ihre Details, die KI meldet ihren Start — das Panel erzählt die
+// Quellentransparenz statt einer generischen Statuszeile
 interface StageState {
-  found: number
+  sources: { platform: string; found: number }[]
   sourcesDone: boolean
+  totalFound: number | null
   ba: { done: number; total: number } | null
   ai: boolean
 }
-const EMPTY_STAGES: StageState = { found: 0, sourcesDone: false, ba: null, ai: false }
+const EMPTY_STAGES: StageState = { sources: [], sourcesDone: false, totalFound: null, ba: null, ai: false }
 
 function SearchPageContent() {
   const searchParams = useSearchParams()
@@ -75,6 +78,14 @@ function SearchPageContent() {
   const [autoSave, setAutoSave] = useState(true)
   const [loading, setLoading] = useState(false)
   const [stages, setStages] = useState<StageState>(EMPTY_STAGES)
+  // Ehrlicher Zeitvertrag: verstrichene Sekunden während des Laufs
+  const [elapsed, setElapsed] = useState(0)
+  // Resume-Status: true/false/null (null = unbekannt, dann kein Behaupten)
+  const [hasResume, setHasResume] = useState<boolean | null>(null)
+  // Phasen-Ansagen für Screenreader — Statuswechsel, nicht jeder Chunk
+  const [announce, setAnnounce] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
+  const resultsHeadingRef = useRef<HTMLHeadingElement | null>(null)
   const [results, setResults] = useState<SearchResult[]>([])
   // url → Job-ID: macht den (ggf. soeben erzeugten) Listeneintrag auffindbar
   const [jobIds, setJobIds] = useState<Record<string, string>>({})
@@ -91,6 +102,25 @@ function SearchPageContent() {
   useEffect(() => {
     fetchSavedSearches()
   }, [])
+
+  // Resume-Status beim Mount klären — ohne Lebenslauf fällt die KI-Bewertung
+  // aus, und das sagen wir vorher, statt eine „Kein Score“-Wand zu zeigen
+  useEffect(() => {
+    fetch('/api/resume')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setHasResume(Boolean(data && data.id)))
+      .catch(() => setHasResume(null))
+  }, [])
+
+  // Verstrichene Sekunden — die Fläche zeigt, dass sie lebt, und wie lange
+  useEffect(() => {
+    if (!loading) return
+    const startedAt = Date.now()
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000))
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [loading])
 
   // Auto-run a saved search when arriving via ?saved=<id>
   useEffect(() => {
@@ -126,18 +156,27 @@ function SearchPageContent() {
     sem: boolean,
     savedSearchId?: string
   ) {
+    const controller = new AbortController()
+    abortRef.current = controller
+    // Snapshot für „Abbrechen“ — der Lauf kehrt zum Zustand davor zurück,
+    // statt eine Fehlermeldung zu erfinden
+    const previous = { results, jobIds, stats, searched }
+
     setLoading(true)
     setResults([])
     setJobIds({})
     setError(null)
     setJustSaved(false)
     setStages(EMPTY_STAGES)
+    setElapsed(0)
+    setAnnounce('Suche gestartet — Quellen werden durchsucht')
 
     try {
       const response = await fetch('/api/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: q, location: loc, remote: rem, semantic: sem, autoSave }),
+        signal: controller.signal,
       })
 
       // Fehler vor dem Stream (401/400) kommen als normale JSON-Antwort
@@ -145,6 +184,7 @@ function SearchPageContent() {
         const data = await response.json().catch(() => null)
         setError(data?.error || 'Suche fehlgeschlagen')
         setResults([])
+        setAnnounce('')
         return
       }
 
@@ -171,11 +211,21 @@ function SearchPageContent() {
           }
           if (event.type === 'progress') {
             if (event.stage === 'source') {
-              setStages((prev) => ({ ...prev, found: prev.found + event.found }))
+              // Jede Quelle ihre eigene Zeile — Quellentransparenz ist das
+              // Produkt, nicht Deko
+              setStages((prev) => ({
+                ...prev,
+                sources: prev.sources.some((s) => s.platform === event.platform)
+                  ? prev.sources
+                  : [...prev.sources, { platform: event.platform, found: event.found }],
+              }))
             } else if (event.stage === 'ba-details') {
               setStages((prev) => ({ ...prev, ba: { done: event.done, total: event.total } }))
+            } else if (event.stage === 'sources-done') {
+              setStages((prev) => ({ ...prev, sourcesDone: true, totalFound: event.total }))
             } else if (event.stage === 'ai-matching') {
               setStages((prev) => ({ ...prev, sourcesDone: true, ai: true }))
+              setAnnounce('Quellen durchsucht — die KI bewertet jetzt die Treffer')
             }
           } else if (event.type === 'result') {
             settled = true
@@ -187,6 +237,9 @@ function SearchPageContent() {
               newJobs: event.newJobs || 0,
             })
             setSearched(true)
+            setAnnounce(`Suche abgeschlossen: ${event.total} Treffer, ${event.highMatches} Top Matches`)
+            // Abschlussmoment: der Sprung zur Liste — nicht lautlos unmounten
+            requestAnimationFrame(() => resultsHeadingRef.current?.focus())
 
             // Update lastRunAt + „N neu"-Zähler if this was a saved search
             if (savedSearchId) {
@@ -201,6 +254,7 @@ function SearchPageContent() {
             settled = true
             setError(event.message || 'Suche fehlgeschlagen')
             setResults([])
+            setAnnounce('')
           }
         }
       }
@@ -211,15 +265,31 @@ function SearchPageContent() {
         setResults([])
       }
     } catch {
-      setError('Suche fehlgeschlagen — bitte später erneut versuchen.')
-      setResults([])
+      if (controller.signal.aborted) {
+        // Abbruch ist kein Fehler: Zustand von vor dem Lauf zurückholen
+        setResults(previous.results)
+        setJobIds(previous.jobIds)
+        setStats(previous.stats)
+        setSearched(previous.searched)
+        setAnnounce('Suche abgebrochen')
+      } else {
+        setError('Suche fehlgeschlagen — bitte später erneut versuchen.')
+        setResults([])
+        setAnnounce('')
+      }
     } finally {
       setLoading(false)
+      abortRef.current = null
     }
   }
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault()
+    // Während des Laufs ist derselbe Button der Ausstieg — kein Refresh nötig
+    if (loading) {
+      abortRef.current?.abort()
+      return
+    }
     await runSearch(query, location, remote, semantic)
   }
 
@@ -295,7 +365,8 @@ function SearchPageContent() {
                 <button
                   key={saved.id}
                   onClick={() => loadSavedSearch(saved)}
-                  className="text-sm px-4 py-2 rounded-xl bg-border-soft text-foreground hover:bg-border transition-colors border border-border"
+                  disabled={loading}
+                  className="text-sm px-4 py-2 rounded-xl bg-border-soft text-foreground hover:bg-border transition-colors border border-border disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saved.query}
                   {saved.location ? ` · ${saved.location}` : ''}
@@ -338,12 +409,14 @@ function SearchPageContent() {
                     placeholder="z. B. Berlin"
                     className="min-w-0 flex-1 px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
                   />
+                  {/* Während des Laufs ist derselbe Button der Ausstieg — feste
+                      Mindestbreite, damit das Label nicht die Fläche verschiebt */}
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
+                    aria-label={loading ? 'Suche abbrechen' : 'Suche starten'}
+                    className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors min-w-[7.5rem] text-center"
                   >
-                    {loading ? 'Suche läuft …' : 'Suchen'}
+                    {loading ? 'Abbrechen' : 'Suchen'}
                   </button>
                 </div>
               </div>
@@ -383,6 +456,28 @@ function SearchPageContent() {
           </form>
         </section>
 
+        {/* Resume-Hinweis: ohne Lebenslauf fällt die KI-Bewertung aus — das
+            steht vorher da, nicht als „Kein Score“-Wand danach */}
+        {hasResume === false && (
+          <section className="mb-8 p-4 bg-surface rounded-xl border border-accent/30 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-foreground">
+              Kein Lebenslauf hinterlegt — die KI kann Treffer deshalb nicht bewerten.
+            </p>
+            <Link
+              href="/resume"
+              className="text-sm font-medium text-accent hover:text-accent-strong transition-colors"
+            >
+              Lebenslauf hinterlegen
+            </Link>
+          </section>
+        )}
+
+        {/* Phasen-Ansagen für Screenreader: Statuswechsel auf Wortebene —
+            die Zähler im Panel bleiben rein visuell */}
+        <p className="sr-only" role="status">
+          {announce}
+        </p>
+
         {/* Error State */}
         {error && (
           <section role="alert" className="mb-8 p-4 bg-error/10 rounded-xl border border-error/20">
@@ -390,27 +485,41 @@ function SearchPageContent() {
           </section>
         )}
 
-        {/* Lade-Zustand: echte Stufen statt Stillstand — der Stream meldet, wo
-            die Suche gerade steht; die Skeleton-Karten bleiben darunter */}
+        {/* Lade-Zustand: das Panel erzählt die Suche — welche Quelle was
+            beigetragen hat, wo die BA gerade steht, wie lange es dauert; die
+            Skeleton-Karten bleiben darunter. Zähler sind rein visuell, die
+            Phasen wechseln über die sr-only-Region oben */}
         {loading && (
-          <section className="space-y-4" aria-live="polite">
-            <p className="sr-only" role="status">
-              Suche läuft …
-            </p>
-            <div className="bg-surface rounded-2xl p-6 border border-border space-y-3">
+          <section className="space-y-4">
+            <div className="bg-surface rounded-2xl p-6 border border-border space-y-2.5">
               <StageRow
                 done={stages.sourcesDone}
                 text={stages.sourcesDone
-                  ? `Quellen durchsucht — ${stages.found} Treffer`
+                  ? `Quellen durchsucht — ${stages.totalFound ?? stages.sources.reduce((n, s) => n + s.found, 0)} Treffer`
                   : 'Quellen werden durchsucht …'}
               />
-              {stages.ba && !stages.sourcesDone && (
+              {(stages.sources.length > 0 || (stages.ba && !stages.sourcesDone)) && (
+                <div className="pl-6 space-y-1.5">
+                  {stages.sources.map((s) => (
+                    <p key={s.platform} className="text-sm text-primary-soft">
+                      {platformLabel(s.platform)} · {s.found} Treffer
+                    </p>
+                  ))}
+                  {stages.ba && !stages.sourcesDone && (
+                    <p className="text-sm text-primary-soft tabular-nums">
+                      Arbeitsagentur · Details {stages.ba.done}/{stages.ba.total}
+                    </p>
+                  )}
+                </div>
+              )}
+              {stages.ai && (
                 <StageRow
                   done={false}
-                  text={`Arbeitsagentur: Details geladen ${stages.ba.done}/${stages.ba.total}`}
+                  text="KI bewertet Treffer …"
+                  meta={`${elapsed} s`}
                 />
               )}
-              {stages.ai && <StageRow done={false} text="KI bewertet Treffer …" />}
+              <p className="text-xs text-primary-soft pt-1">Dauert meist 30–60 Sekunden.</p>
             </div>
             {[0, 1, 2].map((i) => (
               <div key={i} className="bg-surface rounded-2xl p-8 border border-border animate-pulse motion-reduce:animate-none" aria-hidden="true">
@@ -459,12 +568,29 @@ function SearchPageContent() {
                 werden die ersten 15 Treffer pro Suche, der Rest bleibt ohne Score.
               </p>
             )}
+            {/* Die „Kein Score"-Wand (0 bewertet): erklären, statt schweigen —
+                ohne Resume redet der Hinweis oben, hier bleibt das KI-Limit */}
+            {scoredCount === 0 && hasResume !== false && (
+              <p className="sm:col-span-2 text-sm text-primary">
+                Kein Treffer wurde bewertet — die KI bewertet maximal 15 Treffer pro Suche,
+                und bei KI-Ausfall bleibt ein Lauf ohne Scores. Der nächste Suchlauf kann
+                andere Treffer bewerten.
+              </p>
+            )}
           </section>
         )}
 
-        {/* Results */}
+        {/* Results — die Überschrift ist der Fokus-Anker nach Abschluss:
+            Tastatur und Screenreader landen hier, nicht im Leeren */}
         {!loading && results.length > 0 && (
           <section className="space-y-4">
+            <h2
+              ref={resultsHeadingRef}
+              tabIndex={-1}
+              className="text-lg font-light text-foreground focus:outline-none"
+            >
+              Treffer
+            </h2>
             {results.map((job) => (
               <JobCard
                 key={job.url}
@@ -522,13 +648,14 @@ function StatCard({ title, value, highlight }: { title: string; value: string; h
 
 // Eine Zeile im Fortschritts-Panel: Haken wenn fertig, Punkt wenn läuft —
 // die Symbole sind dekorativ, der Text trägt die Information
-function StageRow({ done, text }: { done: boolean; text: string }) {
+function StageRow({ done, text, meta }: { done: boolean; text: string; meta?: string }) {
   return (
     <p className="flex items-center gap-2 text-sm">
       <span aria-hidden="true" className={done ? 'text-success' : 'text-accent'}>
         {done ? '✓' : '●'}
       </span>
       <span className={done ? 'text-success' : 'text-foreground'}>{text}</span>
+      {meta && <span className="text-primary-soft tabular-nums">{meta}</span>}
     </p>
   )
 }
@@ -543,7 +670,17 @@ function JobCard({
   onIgnore: () => void
 }) {
   const [confirming, setConfirming] = useState(false)
+  // Timer-Räumung beim Unmount — sonst setzt ein toter Timeout State ab
+  const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  useEffect(() => () => {
+    if (confirmTimer.current) clearTimeout(confirmTimer.current)
+  }, [])
+  // Die Begründung erzählt von Passung — ihre Färbung folgt dem Urteil:
+  // Grün (Erfolg) nur bei echtem High Match, sonst neutral
+  const isHighMatch = typeof job.aiScore === 'number' && job.aiScore >= HIGH_MATCH_THRESHOLD
+  const reasonBoxClass = isHighMatch ? 'bg-success/10 border-success/20' : 'bg-surface border-border'
+  const reasonLabelClass = isHighMatch ? 'text-success' : 'text-foreground'
   // Eine Skala, ein Vokabular: semanticScore kommt als aiScore (1–10) an —
   // Prozentwerte sind hier Vergangenheit, damit klassischer und semantischer
   // Pfad dasselbe sagen
@@ -554,9 +691,10 @@ function JobCard({
       setConfirming(true)
       // Zwei-Klick-Bestätigung mit Rückfalleitung — kein versehentliches Ignorieren,
       // kein Modal
-      setTimeout(() => setConfirming(false), 4000)
+      confirmTimer.current = setTimeout(() => setConfirming(false), 4000)
       return
     }
+    if (confirmTimer.current) clearTimeout(confirmTimer.current)
     setConfirming(false)
     onIgnore()
   }
@@ -565,25 +703,12 @@ function JobCard({
     <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
       <div className="flex items-start justify-between gap-4 mb-5">
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2 mb-3">
-            <span className="px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft text-foreground">
-              {platformLabel(job.platform)}
-            </span>
-            <span className={`px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft tabular-nums ${scoreColor}`}>
-              {typeof job.aiScore === 'number' ? (
-                <>
-                  <span className="sr-only">KI-Score: {job.aiScore} von 10 — {scoreLabel(job.aiScore)}</span>
-                  <span aria-hidden="true">Score {job.aiScore}/10</span>
-                </>
-              ) : (
-                'Kein Score'
-              )}
-            </span>
-          </div>
+          {/* Der Titel ist die Botschaft — Badges (Meta) kommen nach unten,
+              Score vor Quelle: das Urteil zählt mehr als die Herkunft */}
           <h3 className="text-xl font-medium text-foreground mb-1">
             {job.title}
           </h3>
-          <p className="text-primary-soft">
+          <p className="text-primary-soft mb-3">
             {[
               job.company || null,
               job.location || null,
@@ -591,6 +716,21 @@ function JobCard({
               .filter(Boolean)
               .join(' · ') || 'Ohne Angabe'}
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft tabular-nums ${scoreColor}`}>
+              {typeof job.aiScore === 'number' ? (
+                <>
+                  <span className="sr-only">KI-Score: {job.aiScore} von 10 — {scoreLabel(job.aiScore)}</span>
+                  <span aria-hidden="true">Score {job.aiScore}/10 · {scoreWord(job.aiScore)}</span>
+                </>
+              ) : (
+                'Kein Score'
+              )}
+            </span>
+            <span className="px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft text-foreground">
+              {platformLabel(job.platform)}
+            </span>
+          </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
           {jobId && (
@@ -624,15 +764,15 @@ function JobCard({
       </div>
 
       {job.matchReason && (
-        <div className="mb-4 p-4 bg-success/10 rounded-xl border border-success/20">
-          <p className="text-sm font-medium text-success mb-1">Warum dieser Job passt:</p>
+        <div className={`mb-4 p-4 rounded-xl border ${reasonBoxClass}`}>
+          <p className={`text-sm font-medium mb-1 ${reasonLabelClass}`}>Warum dieser Job passt:</p>
           <p className="text-sm text-foreground">{job.matchReason}</p>
         </div>
       )}
 
       {job.aiReason && !job.matchReason && (
-        <div className="mb-4 p-4 bg-success/10 rounded-xl border border-success/20">
-          <p className="text-sm font-medium text-success mb-1">KI-Einschätzung:</p>
+        <div className={`mb-4 p-4 rounded-xl border ${reasonBoxClass}`}>
+          <p className={`text-sm font-medium mb-1 ${reasonLabelClass}`}>KI-Einschätzung:</p>
           <p className="text-sm text-foreground">{job.aiReason}</p>
         </div>
       )}

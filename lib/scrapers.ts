@@ -25,6 +25,7 @@ export type SemanticJob = ScrapedJob & {
 export type SearchProgressEvent =
   | { stage: 'source'; platform: string; found: number }
   | { stage: 'ba-details'; done: number; total: number }
+  | { stage: 'sources-done'; total: number }
   | { stage: 'ai-matching'; total: number }
 
 export type SearchProgressCallback = (event: SearchProgressEvent) => void
@@ -376,11 +377,16 @@ export async function searchJobs(params: {
 
   // Deduplicate by URL
   const seen = new Set<string>()
-  return filtered.filter(job => {
+  const deduped = filtered.filter(job => {
     if (!job.url || seen.has(job.url)) return false
     seen.add(job.url)
     return true
   })
+
+  // Alle Quellen sind durch — die Fläche kann die Stufe ehrlich abschließen,
+  // auch wenn keine KI-Phase folgt (kein Resume, KI-Suche aus)
+  params.onProgress?.({ stage: 'sources-done', total: deduped.length })
+  return deduped
 }
 
 // Semantic search - finds jobs that match even with different titles

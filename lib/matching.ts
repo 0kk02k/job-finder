@@ -13,6 +13,14 @@ export function scoreLabel(score: number): string {
   return 'wenig Passung'
 }
 
+// Kurzwort fürs Badge — dieselben Schwellen wie scoreLabel, nur sichtbar kürzer:
+// die Bedeutung steht am Bewertungspunkt, nicht in der StatCard
+export function scoreWord(score: number): string {
+  if (score >= HIGH_MATCH_THRESHOLD) return 'stark'
+  if (score >= 6) return 'solide'
+  return 'wenig Passung'
+}
+
 // Semantische Relevanz (0–1) auf dieselbe Skala bringen wie den KI-Score (1–10) —
 // eine Schwelle, eine Skala, keine zweite Wahrheit. 0.75 Relevanz ergibt Score 8
 // und damit High Match; klassische Suche und semantische Suche sagen dasselbe.
