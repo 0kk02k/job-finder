@@ -49,6 +49,90 @@ export function textSnippet(raw: string, max = 220): string {
   return firstParagraph.slice(0, max).replace(/\s+\S*$/, '') + '…'
 }
 
+// Typische Zwischenüberschriften deutschsprachiger Stellenanzeigen — viele
+// Feeds liefern die Anzeige als eine einzige Zeile, in der diese Abschnitte
+// als Sätze stecken. Kleingeschrieben verglichen, Doppelpunkt toleriert.
+const AD_SECTION_HEADINGS = new Set([
+  // Aufgaben
+  'ihre aufgaben', 'deine aufgaben', 'ihr aufgabengebiet', 'dein aufgabengebiet',
+  'aufgaben', 'ihre challengen', 'deine challengen', 'ihre rolle', 'deine rolle',
+  'was sie erwartet', 'was dich erwartet', 'was du machst', 'was sie machen',
+  // Anforderungen
+  'ihr profil', 'dein profil', 'anforderungen', 'qualifikationen',
+  'ihre qualifikationen', 'deine qualifikationen', 'was sie mitbringen',
+  'was du mitbringst', 'das bringen sie mit', 'das bringst du mit',
+  'sie bringen mit', 'du bringst mit',
+  // Angebot / Arbeitgeber
+  'wir bieten', 'wir bieten dir', 'wir bieten ihnen', 'das bieten wir',
+  'unsere benefits', 'benefits', 'das erwartet sie', 'das erwartet dich',
+  'über uns', 'das unternehmen', 'wer wir sind', 'unser angebot', 'vergütung',
+])
+
+function asAdHeading(text: string): string | null {
+  const bare = text.trim().replace(/:$/, '').trim()
+  return AD_SECTION_HEADINGS.has(bare.toLowerCase()) ? bare : null
+}
+
+// Satzgrenze: Satzzeichen + Leerraum + Großbuchstabe/Anführungszeichen/Klammer
+const SENTENCE_BOUNDARY = /(?<=[.!?;])\s+(?=[A-ZÄÖÜ„“(\d])/
+
+// Überschrift mit Inhalt in einem Satz: „Ihre Aufgaben: Entwicklung von …"
+function splitLeadingHeading(sentence: string): { heading: string; rest: string } | null {
+  const match = sentence.match(/^([^:.!?]{3,60}):\s+(.+)$/)
+  if (!match) return null
+  const heading = asAdHeading(match[1])
+  return heading ? { heading, rest: match[2] } : null
+}
+
+// Gecashte Anzeigen strukturieren: Überschriften isolieren (auch aus der
+// Textwand heraus), Wände an Satzgrenzen in Absätze von ~2 Sätzen teilen.
+// Gibt Markdown-artige „## "-Zeilen zurück, die MarkdownContent rendert.
+export function structureJobDescription(raw: string): string {
+  const lines = normalizeTextContent(raw).split('\n')
+  const out: string[] = []
+
+  for (const line of lines) {
+    if (!line.trim()) {
+      out.push('')
+      continue
+    }
+
+    const headingOnly = asAdHeading(line)
+    if (headingOnly) {
+      out.push(`## ${headingOnly}`)
+      continue
+    }
+
+    if (line.length <= 280) {
+      out.push(line)
+      continue
+    }
+
+    // Textwand: Sätze trennen, absorbieren keine Absatzstruktur
+    const paragraphs: string[] = []
+    let buffer = ''
+    for (const sentence of line.split(SENTENCE_BOUNDARY)) {
+      const leading = splitLeadingHeading(sentence)
+      if (leading) {
+        if (buffer.trim()) paragraphs.push(buffer.trim())
+        buffer = ''
+        paragraphs.push(`## ${leading.heading}`)
+        if (leading.rest) buffer = `${leading.rest} `
+        continue
+      }
+      buffer += `${sentence} `
+      if (buffer.length > 240) {
+        paragraphs.push(buffer.trim())
+        buffer = ''
+      }
+    }
+    if (buffer.trim()) paragraphs.push(buffer.trim())
+    out.push(paragraphs.join('\n\n'))
+  }
+
+  return out.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 // Short line without trailing punctuation → likely a sub-heading
 // (e.g. "Infrastruktur & Server-Management"), not a wrapped paragraph line
 function isSubHeading(line: string): boolean {

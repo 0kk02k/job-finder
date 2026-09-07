@@ -370,6 +370,43 @@ Fokus auf:
   }
 }
 
+// Prompt-Bau als eigene Funktion: Das Anschreiben soll klingen wie die Anzeige,
+// auf die es sich bewirbt — der Vertrag darüber ist getestet (tests/lib/ai.test.ts).
+export function buildCoverLetterPrompt(
+  resume: string,
+  jobDescription: string,
+  company: string,
+  jobTitle?: string
+): string {
+  return `Schreibe ein professionelles Anschreiben auf Deutsch für:
+
+Firma: ${company}
+Stelle: ${jobTitle || 'wie ausgeschrieben'}
+Job-Beschreibung: ${jobDescription}
+
+Basierend auf diesem Lebenslauf:
+${resume}
+
+Sprache und Tonalität: Übernimm die Ansprache der Anzeige — steht sie in der
+Du-Form („Dein Profil“), schreibe das Anschreiben konsequent in der Du-Form,
+steht sie in der Sie-Form, in der Sie-Form. Orientiere dich außerdem am
+Wortschatz und Schreibstil der Anzeige: benutze die Begrifflichkeiten und
+Fachbegriffe, die die Anzeige selbst verwendet, und passe die Tonalität an
+(seriös-knackig bei lockerer Anzeige, förmlich bei förmlicher).
+
+Halte es kurz (3-4 Absätze), professionell und überzeugend. Beziehe dich konkret
+auf Anforderungen aus der Stellenbeschreibung und Stärken aus dem Lebenslauf —
+keine Floskeln ohne Bezug. Beginne mit einer Anrede („Sehr geehrte Damen und Herren,“
+oder konkreter, falls ein Ansprechpartner erkennbar ist; in der Du-Form z. B.
+„Hallo Frau Schmidt,“) und schließe mit „Mit freundlichen Grüßen“.
+
+Struktur:
+1. Einleitung: Warum ich mich bewerbe
+2. Meine relevanten Skills und Erfahrungen (aus dem Lebenslauf belegt)
+3. Warum ich zur Firma passe
+4. Abschluss`
+}
+
 // Generate cover letter.
 // Wirft bei KI-Ausfall — der Aufrufer entscheidet über den ehrlichen Fallback
 // (Vorlage mit „bitte prüfen“-Hinweis), statt still eine leere Antwort zu liefern.
@@ -385,26 +422,7 @@ export async function generateCoverLetter(
 ): Promise<string> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
-  const prompt = `Schreibe ein professionelles Anschreiben auf Deutsch für:
-
-Firma: ${company}
-Stelle: ${jobTitle || 'wie ausgeschrieben'}
-Job-Beschreibung: ${jobDescription}
-
-Basierend auf diesem Lebenslauf:
-${resume}
-
-Halte es kurz (3-4 Absätze), professionell und überzeugend. Beziehe dich konkret
-auf Anforderungen aus der Stellenbeschreibung und Stärken aus dem Lebenslauf —
-keine Floskeln ohne Bezug. Beginne mit einer Anrede („Sehr geehrte Damen und Herren,“
-oder konkreter, falls ein Ansprechpartner erkennbar ist) und schließe mit
-„Mit freundlichen Grüßen“.
-
-Struktur:
-1. Einleitung: Warum ich mich bewerbe
-2. Meine relevanten Skills und Erfahrungen (aus dem Lebenslauf belegt)
-3. Warum ich zur Firma passe
-4. Abschluss`
+  const prompt = buildCoverLetterPrompt(resume, jobDescription, company, jobTitle)
 
   const { text } = await generateText({
     model: ai.chat(model || defaultModel(provider)),

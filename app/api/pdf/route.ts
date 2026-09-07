@@ -1,9 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
-import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generateCoverLetterFromJob, type CoverLetterData } from '@/lib/pdf'
+import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generateCoverLetterFromJob, resumeDataHasSubstance, type CoverLetterData } from '@/lib/pdf'
+import { renderResumeTextPDF } from '@/lib/pdf-documents'
+import { renderResumeDocx, renderCoverLetterDocx } from '@/lib/docx'
+import { resolveDocTemplate, DOC_TEMPLATES, type DocTemplateId } from '@/lib/documents'
 
-// POST /api/pdf - generate resume or cover letter PDF.
+type ExportFormat = 'pdf' | 'docx'
+
+// Dokumenten-Design serverseitig aus den Settings — der Download-Button fragt
+// nicht nach, die Einstellung gilt global (Settings-Seite).
+async function docTemplateFor(userId: string): Promise<DocTemplateId> {
+  const settings = await prisma.userSettings.findUnique({
+    where: { userId },
+    select: { docTemplate: true },
+  })
+  return resolveDocTemplate(settings?.docTemplate)
+}
+
+// POST /api/pdf - Lebenslauf oder Anschreiben als PDF oder DOCX.
 // Cover letter nimmt optional `content` entgegen — den bearbeiteten Text aus der
 // Vorschau auf dem Job-Detail. Ohne `content` fällt die Route auf die statische
 // Vorlage zurück (die KI erzeugt den Text über /api/coverletter).
@@ -14,11 +29,12 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json()
   const { type } = body
+  const format: ExportFormat = body.format === 'docx' ? 'docx' : 'pdf'
 
   if (type === 'resume') {
-    return generateResume(userId)
+    return generateResume(userId, format)
   } else if (type === 'coverletter') {
-    return generateCoverLetter(userId, body.jobId, body.content)
+    return generateCoverLetter(userId, body.jobId, format, body.content)
   } else if (type === 'coverletter-template') {
     return coverLetterTemplate(userId, body.jobId)
   }
@@ -26,10 +42,23 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ error: 'Invalid type' }, { status: 400 })
 }
 
-async function generateResume(userId: string) {
-  const resume = await prisma.resume.findFirst({
-    where: { userId, isActive: true },
+function documentResponse(buffer: Buffer, format: ExportFormat, filenameBase: string) {
+  const extension = format === 'docx' ? 'docx' : 'pdf'
+  return new NextResponse(new Uint8Array(buffer), {
+    headers: {
+      'Content-Type': format === 'docx'
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/pdf',
+      'Content-Disposition': `attachment; filename="${filenameBase}.${extension}"`,
+    },
   })
+}
+
+async function generateResume(userId: string, format: ExportFormat) {
+  const [resume, template] = await Promise.all([
+    prisma.resume.findFirst({ where: { userId, isActive: true } }),
+    docTemplateFor(userId),
+  ])
 
   if (!resume) {
     return NextResponse.json({ error: 'No resume found' }, { status: 404 })
@@ -37,24 +66,26 @@ async function generateResume(userId: string) {
 
   try {
     const resumeData = parseResumeMarkdown(resume.content)
-    const pdfBuffer = await generateResumePDF(resumeData)
+    // Nie-leer-Vertrag: Erkennt der Parser keine Struktur, wird der Rohtext
+    // gesetzt — eine leere Seite geht nie als „Lebenslauf" raus.
+    const buffer = resumeDataHasSubstance(resumeData)
+      ? format === 'docx'
+        ? await renderResumeDocx(resumeData, template)
+        : await generateResumePDF(resumeData, template)
+      : await renderResumeTextPDF(resume.content)
 
-    return new NextResponse(new Uint8Array(pdfBuffer), {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${resume.name.replace(/\s+/g, '_')}_Resume.pdf"`,
-      },
-    })
+    return documentResponse(buffer, format, resume.name.replace(/\s+/g, '_'))
   } catch (error) {
-    console.error('PDF generation error:', error)
-    return NextResponse.json({ error: 'Failed to generate PDF' }, { status: 500 })
+    console.error('Document generation error:', error)
+    return NextResponse.json({ error: 'Failed to generate document' }, { status: 500 })
   }
 }
 
-async function generateCoverLetter(userId: string, jobId: string, content?: string) {
-  const resume = await prisma.resume.findFirst({
-    where: { userId, isActive: true },
-  })
+async function generateCoverLetter(userId: string, jobId: string, format: ExportFormat, content?: string) {
+  const [resume, template] = await Promise.all([
+    prisma.resume.findFirst({ where: { userId, isActive: true } }),
+    docTemplateFor(userId),
+  ])
 
   if (!resume) {
     return NextResponse.json({ error: 'No resume found' }, { status: 404 })
@@ -75,16 +106,17 @@ async function generateCoverLetter(userId: string, jobId: string, content?: stri
       content && content.trim().length > 0
         ? coverLetterDataFromText(content, resumeData.name, company)
         : generateCoverLetterFromJob(resumeData, job.description ?? '', company, job.title)
-    const pdfBuffer = await generateCoverLetterPDF(coverLetterData)
+    const buffer = format === 'docx'
+      ? await renderCoverLetterDocx(coverLetterData, template)
+      : await generateCoverLetterPDF(coverLetterData, template)
 
-    return new NextResponse(new Uint8Array(pdfBuffer), {
-      headers: {
-        'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="Anschreiben_${company.replace(/\s+/g, '_').replace(/["\\]/g, '')}.pdf"`,
-      },
-    })
+    return documentResponse(
+      buffer,
+      format,
+      `Anschreiben_${company.replace(/\s+/g, '_').replace(/["\\]/g, '')}`
+    )
   } catch (error) {
-    console.error('Cover letter PDF error:', error)
+    console.error('Cover letter generation error:', error)
     return NextResponse.json({ error: 'Failed to generate cover letter' }, { status: 500 })
   }
 }
@@ -138,12 +170,7 @@ function coverLetterDataFromText(text: string, name: string, company: string): C
   }
 }
 
-// GET /api/pdf - get available PDF templates
+// GET /api/pdf - verfügbare Dokumenten-Designs (echte Liste aus lib/documents.ts)
 export async function GET() {
-  return NextResponse.json({
-    templates: [
-      { id: 'modern', name: 'Modern Single Column' },
-      { id: 'classic', name: 'Classic Single Column' },
-    ],
-  })
+  return NextResponse.json({ templates: DOC_TEMPLATES })
 }

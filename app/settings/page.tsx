@@ -7,6 +7,7 @@ interface Settings {
   id: string
   aiProvider: string
   aiModel: string | null
+  docTemplate: string | null
   ollamaUrl: string | null
   targetTitles: string | null
   targetLocations: string | null
@@ -369,7 +370,7 @@ export default function SettingsPage() {
                   onChange={(e) => setSettings({ ...settings, aiProvider: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground"
                 >
-                  <option value="nebius">Nebius Token Factory (Kimi K2.5)</option>
+                  <option value="nebius">Nebius Token Factory (Kimi K3)</option>
                   <option value="ollama">Ollama (lokal)</option>
                   <option value="gemini">Google Gemini</option>
                   <option value="openai">OpenAI</option>
@@ -714,6 +715,24 @@ export default function SettingsPage() {
                 />
                 <span className="text-sm text-foreground">Nur Remote-Jobs</span>
               </label>
+            </div>
+          </Section>
+
+          {/* Bewerbungsdokumente */}
+          <Section title="Bewerbungsdokumente" description="Design für Lebenslauf und Anschreiben — als PDF und DOCX">
+            <div>
+              <label htmlFor="settings-doc-template" className="block text-sm font-medium text-foreground mb-2">Dokumenten-Design</label>
+              <select
+                id="settings-doc-template"
+                value={settings.docTemplate || 'modern'}
+                onChange={(e) => setSettings({ ...settings, docTemplate: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground"
+              >
+                <option value="modern">Modern — Sans-Schrift, blaue Akzente</option>
+                <option value="klassisch">Klassisch — Serifenschrift, schwarz-weiß</option>
+                <option value="kompakt">Kompakt — kleine Schrift, viel auf eine Seite</option>
+              </select>
+              <p className="mt-2 text-xs text-primary-soft">Gilt für alle Downloads von Lebenslauf und Anschreiben.</p>
             </div>
           </Section>
 

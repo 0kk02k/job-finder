@@ -3,7 +3,7 @@
 import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '../../components/Toast'
-import { MarkdownContent, normalizeTextContent } from '../../components/Markdown'
+import { MarkdownContent, structureJobDescription } from '../../components/Markdown'
 import { Button, StatusBadge, buttonClasses, scoreTone } from '../../components/ui'
 import { scoreLabel } from '@/lib/matching'
 
@@ -121,7 +121,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
-  async function handleDownloadPDF(type: 'resume' | 'letter') {
+  async function handleDownloadPDF(type: 'resume' | 'letter', format: 'pdf' | 'docx' = 'pdf') {
     if (!job) return
 
     setBusy(type)
@@ -132,6 +132,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         body: JSON.stringify({
           type: type === 'resume' ? 'resume' : 'coverletter',
           jobId: job.id,
+          format,
           ...(type === 'letter' && letter?.text ? { content: letter.text } : {}),
         }),
       })
@@ -141,16 +142,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = type === 'resume' ? 'Lebenslauf.pdf' : `Anschreiben_${job.company ?? 'Bewerbung'}.pdf`
+        a.download = type === 'resume' ? `Lebenslauf.${format}` : `Anschreiben_${job.company ?? 'Bewerbung'}.${format}`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
       } else {
-        toast.error('Das PDF konnte nicht erzeugt werden — versuch es erneut.')
+        toast.error('Das Dokument konnte nicht erzeugt werden — versuch es erneut.')
       }
     } catch {
-      toast.error('Netzwerkfehler — das PDF konnte nicht geladen werden.')
+      toast.error('Netzwerkfehler — das Dokument konnte nicht geladen werden.')
     } finally {
       setBusy(null)
     }
@@ -275,9 +276,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             Beschreibung
           </h2>
           <div className="prose max-w-none">
-            {/* Normalisiert (Entities, Bullets, Absätze) und als Fließtext mit Listen gerendert —
-                keine Formatierungsartefakte aus den Job-Börsen-Feeds */}
-            <MarkdownContent content={normalizeTextContent(job.description ?? '')} variant="description" />
+            {/* Strukturiert (Entities, Bullets, Satz-Absätze, Anzeigen-Überschriften) gerendert —
+                keine Formatierungsartefakte und keine Textwände aus den Job-Börsen-Feeds */}
+            <MarkdownContent content={structureJobDescription(job.description ?? '')} variant="description" />
           </div>
         </div>
 
@@ -333,8 +334,11 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 className="w-full rounded-xl bg-background border border-border p-4 text-sm leading-relaxed text-foreground"
               />
               <div className="flex flex-wrap items-center gap-3 mt-4">
-                <Button size="sm" onClick={() => void handleDownloadPDF('letter')} disabled={busy !== null}>
-                  {busy === 'letter' ? 'Wird geladen …' : 'Als PDF herunterladen'}
+                <Button size="sm" onClick={() => void handleDownloadPDF('letter', 'pdf')} disabled={busy !== null}>
+                  {busy === 'letter' ? 'Wird geladen …' : 'Als PDF'}
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => void handleDownloadPDF('letter', 'docx')} disabled={busy !== null}>
+                  {busy === 'letter' ? 'Wird geladen …' : 'Als DOCX'}
                 </Button>
                 <Button
                   size="sm"
@@ -361,15 +365,26 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </h2>
 
           <div className="grid md:grid-cols-2 gap-4">
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => void handleDownloadPDF('resume')}
-              disabled={busy !== null}
-            >
-              {busy === 'resume' ? 'Wird geladen …' : 'Lebenslauf als PDF'}
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => void handleDownloadPDF('resume', 'pdf')}
+                disabled={busy !== null}
+              >
+                {busy === 'resume' ? 'Wird geladen …' : 'Lebenslauf als PDF'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => void handleDownloadPDF('resume', 'docx')}
+                disabled={busy !== null}
+              >
+                {busy === 'resume' ? 'Wird geladen …' : 'Lebenslauf als DOCX'}
+              </Button>
+            </div>
             <a
               href={job.url}
               target="_blank"

@@ -17,6 +17,7 @@ const settingsSchema = z.object({
   ollamaUrl: z.string().nullable(),
   aiProvider: z.string(),
   aiModel: z.string().nullable(),
+  docTemplate: z.enum(['modern', 'klassisch', 'kompakt']),
   targetTitles: z.string().nullable(),
   targetLocations: z.string().nullable(),
   minSalary: z.number().int().nullable(),

@@ -119,29 +119,29 @@ export default function ResumePage() {
     }
   }
 
-  async function handleDownloadPDF() {
+  async function handleDownloadPDF(format: 'pdf' | 'docx' = 'pdf') {
     setDownloading(true)
     try {
       const response = await fetch('/api/pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'resume' }),
+        body: JSON.stringify({ type: 'resume', format }),
       })
       if (response.ok) {
         const blob = await response.blob()
         const url = window.URL.createObjectURL(blob)
         const a = document.createElement('a')
         a.href = url
-        a.download = 'Resume.pdf'
+        a.download = `Lebenslauf.${format}`
         document.body.appendChild(a)
         a.click()
         window.URL.revokeObjectURL(url)
         document.body.removeChild(a)
       } else {
-        toast.error('PDF Generierung fehlgeschlagen')
+        toast.error('Dokument konnte nicht erzeugt werden')
       }
     } catch {
-      toast.error('PDF Generierung fehlgeschlagen')
+      toast.error('Dokument konnte nicht erzeugt werden')
     } finally {
       setDownloading(false)
     }
@@ -170,11 +170,18 @@ export default function ResumePage() {
           {resume && mode === 'view' && (
             <div className="flex gap-3">
               <button
-                onClick={handleDownloadPDF}
+                onClick={() => void handleDownloadPDF('pdf')}
                 disabled={downloading}
                 className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
               >
                 {downloading ? 'Wird geladen …' : 'Als PDF'}
+              </button>
+              <button
+                onClick={() => void handleDownloadPDF('docx')}
+                disabled={downloading}
+                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+              >
+                {downloading ? 'Wird geladen …' : 'Als DOCX'}
               </button>
               <button
                 onClick={() => setMode('edit')}

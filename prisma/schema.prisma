@@ -88,6 +88,8 @@ model UserSettings {
   ollamaUrl       String?  @default("http://localhost:11434")
   aiProvider      String   @default("nebius")
   aiModel         String?  @default("moonshotai/Kimi-K3")
+  // Design der generierten Bewerbungsdokumente (lib/documents.ts)
+  docTemplate     String   @default("modern")
 
   targetTitles    String?  // JSON array of job titles
   targetLocations String?  // JSON array of locations

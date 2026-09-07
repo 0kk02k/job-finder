@@ -1,5 +1,7 @@
 # Handoff — Stand 02.09.2026 (Abend)
 
+> **Update 07.09.2026 (Abend):** Dokumenten-Paket umgesetzt und gepusht: Lebenslauf-PDF ist nie mehr leer (Klartext-Parser + Rohtext-Fallback in `lib/pdf.ts`), Anzeigen-Beschreibung wird strukturiert (`structureJobDescription` in `app/components/Markdown.tsx`), Anschreiben spiegelt Du/Sie + Wortschatz der Anzeige (`buildCoverLetterPrompt` in `lib/ai.ts`), Dokumenten-Design wählbar in Settings (`docTemplate`, DB-Spalte ist gepusht) und alle Dokumente gehen als PDF **und DOCX** (`lib/docx.ts`). Erstmals Tests im Repo: `npm test` (21, node:test + tsx). Offen weiter: Re-Kritik `/search`, Live-Suchlauf, Bulk-Scoring.
+
 > **Update 03.09.2026:** DB-Migration ist durchgeführt (`prisma db push --accept-data-loss`, danach Settings-Zeile auf `nebius`/`moonshotai/Kimi-K2.5` migriert — verifiziert). Die App ist nicht mehr schema-seitig gebrochen. Erledigt damit: alles unter „ZUERST". Weiter offen: lokaler Nebius-Key, Modell-ID-Verifikation, Bulk-Scoring (jetzt „Stufe 2" des Hero-Plans), Minor-Liste. Critique Lauf 5 lief am 03.09. (24/40, Snapshot in `.impeccable/critique/`), dessen Fixes sind im selben Commit wie die Migration.
 
 Zustand nach dem heutigen Design-Tag: 4 Critique-Läufe am Dashboard (13 → 24 → 24 → 28/40), alle gefundenen Punkte bis auf einen (P2 „Bedienpult") umgesetzt, Text-Rendering repariert, KI-Provider auf Nebius/Kimi K2.5 umgestellt.
