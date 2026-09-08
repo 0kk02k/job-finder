@@ -3,7 +3,7 @@
 // Struktur ziehen und darf niemals ein leeres Dokument zulassen.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseResumeMarkdown, resumeDataHasSubstance } from '../../lib/pdf'
+import { parseResumeMarkdown, resumeDataHasSubstance, generateCoverLetterFromJob } from '../../lib/pdf'
 
 // Realistischer unpdf-Extrakt: Kontaktkopf, Abschnitte als Überschriftenzeilen,
 // Einträge als Titelzeile + „Firma | Von – Bis", Bullets als •-Zeilen.
@@ -180,4 +180,20 @@ test('real shape: education detail lines attach to their entry', () => {
 test('plain skills split on commas, but not inside parentheses', () => {
   const data = parseResumeMarkdown('Kenntnisse\n- React (inkl. Hooks, Context)\n- Node.js')
   assert.deepEqual(data.skills, ['React (inkl. Hooks, Context)', 'Node.js'])
+})
+
+test('static cover letter template follows the ad language (English variant)', () => {
+  const resume = parseResumeMarkdown(PLAIN_TEXT_RESUME)
+  const letter = generateCoverLetterFromJob(resume, 'We are hiring a software engineer.', 'ACME Ltd', 'Software Engineer', 'en')
+  assert.match(letter.salutation, /^Dear /)
+  assert.match(letter.body[0], /ACME Ltd/)
+  assert.match(letter.closing, /Sincerely|Best regards/)
+  assert.ok(!letter.body.join(' ').match(/\bIch\b/), 'englische Vorlage darf keine deutschen Sätze enthalten')
+})
+
+test('static cover letter template stays German for German ads', () => {
+  const resume = parseResumeMarkdown(PLAIN_TEXT_RESUME)
+  const letter = generateCoverLetterFromJob(resume, 'Wir suchen eine Softwareentwicklerin.', 'ACME GmbH', 'Softwareentwickler', 'de')
+  assert.match(letter.salutation, /^Sehr geehrte/)
+  assert.match(letter.closing, /Mit freundlichen Grüßen/)
 })

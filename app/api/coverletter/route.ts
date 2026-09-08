@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { generateCoverLetter, aiConfigFromSettings } from '@/lib/ai'
+import { detectLanguage } from '@/lib/language'
 
 // POST /api/coverletter — Anschreiben-Text aus dem echten Lebenslauf + dieser
 // Stellenanzeige erzeugen (KI). Wird bewusst nicht persistiert: der Text gehört
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
 
   const cfg = aiConfigFromSettings(settings)
   try {
+    // Das Anschreiben spricht die Sprache der Anzeige — nicht die des Lebenslaufs
+    const language = detectLanguage(job.description ?? '')
     const text = await generateCoverLetter(
       resume.content,
       job.description ?? '',
@@ -43,7 +46,8 @@ export async function POST(request: NextRequest) {
       cfg.model,
       cfg.apiKey,
       cfg.baseUrl,
-      job.title
+      job.title,
+      language
     )
     return NextResponse.json({ text, source: 'ki' })
   } catch (error) {

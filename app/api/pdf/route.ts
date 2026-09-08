@@ -5,6 +5,8 @@ import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generat
 import { renderResumeTextPDF } from '@/lib/pdf-documents'
 import { renderResumeDocx, renderCoverLetterDocx, renderResumeTextDocx } from '@/lib/docx'
 import { resolveDocTemplate, DOC_TEMPLATES, type DocTemplateId } from '@/lib/documents'
+import { detectLanguage } from '@/lib/language'
+import { translateResume, aiConfigFromSettings } from '@/lib/ai'
 
 type ExportFormat = 'pdf' | 'docx'
 
@@ -16,6 +18,37 @@ async function docTemplateFor(userId: string): Promise<DocTemplateId> {
     select: { docTemplate: true },
   })
   return resolveDocTemplate(settings?.docTemplate)
+}
+
+// Lebenslauf in der Sprache der Anzeige: Bei fremdsprachiger Anzeige wird der
+// Lebenslauf per KI übersetzt (nur für diesen Download, nichts wird gespeichert).
+// Kein stiller Fallback: Schlägt die Übersetzung fehl, gibt es einen ehrlichen
+// Fehler statt eines Dokuments in der falschen Sprache.
+async function resumeContentForDownload(userId: string, resumeContent: string, jobId?: string): Promise<{ content: string; error?: NextResponse }> {
+  if (!jobId) return { content: resumeContent }
+
+  const job = await prisma.job.findFirst({ where: { id: jobId, userId }, select: { description: true } })
+  if (!job) return { content: resumeContent }
+
+  const adLanguage = detectLanguage(job.description ?? '')
+  const resumeLanguage = detectLanguage(resumeContent)
+  if (adLanguage === resumeLanguage) return { content: resumeContent }
+
+  try {
+    const settings = await prisma.userSettings.findUnique({ where: { userId } })
+    const cfg = aiConfigFromSettings(settings)
+    const translated = await translateResume(resumeContent, adLanguage, cfg.provider, cfg.model, cfg.apiKey, cfg.baseUrl)
+    return { content: translated }
+  } catch (error) {
+    console.error('Resume translation error:', error)
+    return {
+      content: resumeContent,
+      error: NextResponse.json(
+        { error: 'Der Lebenslauf konnte nicht in die Sprache der Anzeige übersetzt werden — es wurde kein Dokument erzeugt. Deine Daten sind unverändert.' },
+        { status: 503 }
+      ),
+    }
+  }
 }
 
 // POST /api/pdf - Lebenslauf oder Anschreiben als PDF oder DOCX.
@@ -32,7 +65,7 @@ export async function POST(request: NextRequest) {
   const format: ExportFormat = body.format === 'docx' ? 'docx' : 'pdf'
 
   if (type === 'resume') {
-    return generateResume(userId, format)
+    return generateResume(userId, format, body.jobId)
   } else if (type === 'coverletter') {
     return generateCoverLetter(userId, body.jobId, format, body.content)
   } else if (type === 'coverletter-template') {
@@ -54,7 +87,7 @@ function documentResponse(buffer: Buffer, format: ExportFormat, filenameBase: st
   })
 }
 
-async function generateResume(userId: string, format: ExportFormat) {
+async function generateResume(userId: string, format: ExportFormat, jobId?: string) {
   const [resume, template] = await Promise.all([
     prisma.resume.findFirst({ where: { userId, isActive: true } }),
     docTemplateFor(userId),
@@ -64,8 +97,11 @@ async function generateResume(userId: string, format: ExportFormat) {
     return NextResponse.json({ error: 'No resume found' }, { status: 404 })
   }
 
+  const { content, error } = await resumeContentForDownload(userId, resume.content, jobId)
+  if (error) return error
+
   try {
-    const resumeData = parseResumeMarkdown(resume.content)
+    const resumeData = parseResumeMarkdown(content)
     // Nie-leer-Vertrag: Erkennt der Parser keine Struktur, wird der Rohtext
     // gesetzt — eine leere Seite geht nie als „Lebenslauf" raus (im angefragten Format).
     const buffer = resumeDataHasSubstance(resumeData)
@@ -73,8 +109,8 @@ async function generateResume(userId: string, format: ExportFormat) {
         ? await renderResumeDocx(resumeData, template)
         : await generateResumePDF(resumeData, template)
       : format === 'docx'
-        ? await renderResumeTextDocx(resume.content)
-        : await renderResumeTextPDF(resume.content)
+        ? await renderResumeTextDocx(content)
+        : await renderResumeTextPDF(content)
 
     return documentResponse(buffer, format, resume.name.replace(/\s+/g, '_'))
   } catch (error) {
@@ -104,10 +140,11 @@ async function generateCoverLetter(userId: string, jobId: string, format: Export
   try {
     const resumeData = parseResumeMarkdown(resume.content)
     const company = job.company || 'Firma'
+    const adLanguage = detectLanguage(job.description ?? '')
     const coverLetterData =
       content && content.trim().length > 0
         ? coverLetterDataFromText(content, resumeData.name, company)
-        : generateCoverLetterFromJob(resumeData, job.description ?? '', company, job.title)
+        : generateCoverLetterFromJob(resumeData, job.description ?? '', company, job.title, adLanguage)
     const buffer = format === 'docx'
       ? await renderCoverLetterDocx(coverLetterData, template)
       : await generateCoverLetterPDF(coverLetterData, template)
@@ -136,7 +173,13 @@ async function coverLetterTemplate(userId: string, jobId: string) {
   }
 
   const resumeData = parseResumeMarkdown(resume.content)
-  const letter = generateCoverLetterFromJob(resumeData, job.description ?? '', job.company || 'Firma', job.title)
+  const letter = generateCoverLetterFromJob(
+    resumeData,
+    job.description ?? '',
+    job.company || 'Firma',
+    job.title,
+    detectLanguage(job.description ?? '')
+  )
   return NextResponse.json({ text: [letter.salutation, ...letter.body, letter.closing, letter.name].join('\n\n') })
 }
 

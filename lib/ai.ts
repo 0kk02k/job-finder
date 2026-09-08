@@ -370,15 +370,33 @@ Fokus auf:
   }
 }
 
-// Prompt-Bau als eigene Funktion: Das Anschreiben soll klingen wie die Anzeige,
-// auf die es sich bewirbt — der Vertrag darüber ist getestet (tests/lib/ai.test.ts).
+// Prompt-Bau als eigene Funktion: Das Anschreiben soll die Sprache UND den Ton
+// der Anzeige treffen — der Vertrag darüber ist getestet (tests/lib/ai.test.ts).
 export function buildCoverLetterPrompt(
   resume: string,
   jobDescription: string,
   company: string,
-  jobTitle?: string
+  jobTitle?: string,
+  language: 'de' | 'en' = 'de'
 ): string {
-  return `Schreibe ein professionelles Anschreiben auf Deutsch für:
+  const languageRules =
+    language === 'en'
+      ? `Sprache: Die Stellenanzeige ist auf Englisch — schreibe das komplette
+Anschreiben auf Englisch, unabhängig von der Sprache des Lebenslaufs. Übernimm
+Tonalität und Schreibstil der Anzeige und benutze ihre Begrifflichkeiten.
+Beginne mit einer Anrede („Dear Hiring Team,“ oder konkreter, falls ein
+Ansprechpartner erkennbar ist) und schließe mit „Sincerely,“ oder „Best regards,.`
+      : `Sprache: Schreibe das Anschreiben auf Deutsch. Übernimm die Ansprache der
+Anzeige — steht sie in der Du-Form („Dein Profil“), schreibe das Anschreiben
+konsequent in der Du-Form, steht sie in der Sie-Form, in der Sie-Form. Orientiere
+dich außerdem am Wortschatz und Schreibstil der Anzeige: benutze die
+Begrifflichkeiten und Fachbegriffe, die die Anzeige selbst verwendet, und passe
+die Tonalität an (seriös-knackig bei lockerer Anzeige, förmlich bei förmlicher).
+Beginne mit einer Anrede („Sehr geehrte Damen und Herren,“ oder konkreter, falls
+ein Ansprechpartner erkennbar ist; in der Du-Form z. B. „Hallo Frau Schmidt,“)
+und schließe mit „Mit freundlichen Grüßen“.`
+
+  return `Schreibe ein professionelles Anschreiben für:
 
 Firma: ${company}
 Stelle: ${jobTitle || 'wie ausgeschrieben'}
@@ -387,24 +405,59 @@ Job-Beschreibung: ${jobDescription}
 Basierend auf diesem Lebenslauf:
 ${resume}
 
-Sprache und Tonalität: Übernimm die Ansprache der Anzeige — steht sie in der
-Du-Form („Dein Profil“), schreibe das Anschreiben konsequent in der Du-Form,
-steht sie in der Sie-Form, in der Sie-Form. Orientiere dich außerdem am
-Wortschatz und Schreibstil der Anzeige: benutze die Begrifflichkeiten und
-Fachbegriffe, die die Anzeige selbst verwendet, und passe die Tonalität an
-(seriös-knackig bei lockerer Anzeige, förmlich bei förmlicher).
+${languageRules}
 
 Halte es kurz (3-4 Absätze), professionell und überzeugend. Beziehe dich konkret
 auf Anforderungen aus der Stellenbeschreibung und Stärken aus dem Lebenslauf —
-keine Floskeln ohne Bezug. Beginne mit einer Anrede („Sehr geehrte Damen und Herren,“
-oder konkreter, falls ein Ansprechpartner erkennbar ist; in der Du-Form z. B.
-„Hallo Frau Schmidt,“) und schließe mit „Mit freundlichen Grüßen“.
+keine Floskeln ohne Bezug.
 
 Struktur:
 1. Einleitung: Warum ich mich bewerbe
-2. Meine relevanten Skills und Erfahrungen (aus dem Lebenslauf belegt)
+2. Meine relevante Skills und Erfahrungen (aus dem Lebenslauf belegt)
 3. Warum ich zur Firma passe
 4. Abschluss`
+}
+
+// Übersetzungs-Prompt für Lebensläufe: strikte Übersetzung, keine inhaltliche
+// Freiheit — jeder Fakt, jede Zahl, jede Firma bleibt exakt erhalten.
+export function buildTranslateResumePrompt(content: string, targetLang: 'de' | 'en'): string {
+  const target = targetLang === 'en' ? 'Englische' : 'Deutsche'
+  return `Übersetze den folgenden Lebenslauf ${targetLang === 'en' ? 'ins Englische' : 'ins Deutsche'}. ${target} Übersetzung, strikt:
+
+- Übersetze jeden Satz vollständig — keine Kürzungen, keine Zusammenfassungen.
+- Erfinde nichts und ergänze nichts: Kein Satz, keine Zahl, kein Datum, kein
+  Firmenname darf hinzukommen oder sich ändern. Namen von Personen und Firmen
+  sowie Produkt- und Technologienamen bleiben unverändert.
+- Behalte die Zeilenstruktur exakt bei (Überschriften bleiben Überschriften,
+  Listenpunkte Listenpunkte, Einrückungen Einrückungen).
+- Gib AUSSCHLIESSLICH die Übersetzung aus — kein Vorwort, keine Anmerkungen.
+
+Lebenslauf:
+${content}`
+}
+
+// Lebenslauf übersetzen (Download in der Sprache der Anzeige). Wirft bei
+// KI-Ausfall — die Route antwortet ehrlich mit einem Fehler, statt ein Dokument
+// in der falschen Sprache auszuliefern.
+export async function translateResume(
+  content: string,
+  targetLang: 'de' | 'en',
+  provider: string = 'nebius',
+  model?: string,
+  apiKey?: string,
+  baseUrl?: string
+): Promise<string> {
+  const ai = getAIClient(provider, apiKey, baseUrl)
+
+  const { text } = await generateText({
+    model: ai.chat(model || defaultModel(provider)),
+    messages: [{ role: 'user', content: buildTranslateResumePrompt(content, targetLang) }],
+  })
+
+  if (!text || text.trim().length === 0) {
+    throw new Error('Die KI hat keine Übersetzung geliefert')
+  }
+  return text.trim()
 }
 
 // Generate cover letter.
@@ -418,11 +471,12 @@ export async function generateCoverLetter(
   model?: string,
   apiKey?: string,
   baseUrl?: string,
-  jobTitle?: string
+  jobTitle?: string,
+  language: 'de' | 'en' = 'de'
 ): Promise<string> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
-  const prompt = buildCoverLetterPrompt(resume, jobDescription, company, jobTitle)
+  const prompt = buildCoverLetterPrompt(resume, jobDescription, company, jobTitle, language)
 
   const { text } = await generateText({
     model: ai.chat(model || defaultModel(provider)),

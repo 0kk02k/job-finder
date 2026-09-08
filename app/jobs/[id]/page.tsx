@@ -131,6 +131,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: type === 'resume' ? 'resume' : 'coverletter',
+          // jobId auch beim Lebenslauf: der Download folgt der Sprache der Anzeige
           jobId: job.id,
           format,
           ...(type === 'letter' && letter?.text ? { content: letter.text } : {}),
