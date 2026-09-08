@@ -3,7 +3,7 @@
 // müssen sich im Dokument niederschlagen.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { renderResumeDocx, renderCoverLetterDocx, resumeParagraphs, DOCX_THEMES } from '../../lib/docx'
+import { renderResumeDocx, renderCoverLetterDocx, renderResumeTextDocx, resumeParagraphs, DOCX_THEMES } from '../../lib/docx'
 import type { ResumeData, CoverLetterData } from '../../lib/pdf'
 
 const SAMPLE_RESUME: ResumeData = {
@@ -59,4 +59,21 @@ test('themes produce different documents', async () => {
   const modern = await renderResumeDocx(SAMPLE_RESUME, 'modern')
   const klassisch = await renderResumeDocx(SAMPLE_RESUME, 'klassisch')
   assert.notEqual(modern.length, klassisch.length)
+})
+
+test('project-style entries without dates get no invented „Heute"', () => {
+  const data: ResumeData = {
+    ...SAMPLE_RESUME,
+    experience: [{ company: '', title: 'Projekt A', startDate: '', endDate: '', description: ['Dinge getan.'] }],
+  }
+  const text = JSON.stringify(resumeParagraphs(data, DOCX_THEMES.modern))
+  assert.ok(!text.includes('Heute'), 'ohne Zeitraum darf kein „Heute" erscheinen')
+})
+
+// Nie-leer-Vertrag auch editierbar: Unparsebarer Lebenslauf + DOCX-Download
+// muss eine echte DOCX sein — kein PDF-Byteberg mit falscher Endung.
+test('renders raw-text resume as a real DOCX container', async () => {
+  const buffer = await renderResumeTextDocx('Ein Absatz ohne erkennbare Struktur.\nZweite Zeile.')
+  assert.ok(buffer.length > 1000)
+  assert.equal(buffer.subarray(0, 2).toString('latin1'), 'PK', 'docx ist ein ZIP-Container')
 })

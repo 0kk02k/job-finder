@@ -152,8 +152,12 @@ function ResumeDocument({ data, template }: { data: ResumeData; template: DocTem
           {data.experience.map((exp, i) => (
             <View key={i} style={{ marginBottom: t.itemGap }}>
               <View style={s.itemHeader}>
-                <Text style={s.company}>{exp.company}</Text>
-                <Text style={s.date}>{exp.startDate} – {exp.endDate || 'Heute'}</Text>
+                {exp.company ? <Text style={s.company}>{exp.company}</Text> : null}
+                {exp.startDate || exp.endDate ? (
+                  <Text style={s.date}>
+                    {exp.startDate}{exp.startDate && exp.endDate ? ' – ' : ''}{exp.startDate && !exp.endDate ? 'Heute' : ''}{exp.endDate}
+                  </Text>
+                ) : null}
               </View>
               <Text style={s.itemTitle}>{exp.title}</Text>
               {exp.description.map((d, j) => (

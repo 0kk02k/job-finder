@@ -105,14 +105,21 @@ export function resumeParagraphs(data: ResumeData, t: DocxTheme): Paragraph[] {
   if (data.experience.length) {
     out.push(sectionTitle('Berufserfahrung'))
     for (const exp of data.experience) {
-      out.push(new Paragraph({
-        spacing: { after: 20 },
-        children: [new TextRun({ text: exp.company, bold: true, size: t.baseSize + 2, font: t.font })],
-      }))
+      if (exp.company) {
+        out.push(new Paragraph({
+          spacing: { after: 20 },
+          children: [new TextRun({ text: exp.company, bold: true, size: t.baseSize + 2, font: t.font })],
+        }))
+      }
+      // Zeitraum nur, wenn einer existiert — projektförmige Einträge ohne Daten
+      // bekommen kein erfundenes „Heute"
+      const period = exp.startDate && exp.endDate
+        ? `${exp.startDate} – ${exp.endDate}`
+        : exp.startDate || exp.endDate || ''
       out.push(new Paragraph({
         spacing: { after: 60 },
         children: [new TextRun({
-          text: [exp.title, [exp.startDate, exp.endDate || 'Heute'].filter(Boolean).join(' – ')].filter(Boolean).join(' · '),
+          text: [exp.title, period].filter(Boolean).join(' · '),
           size: t.smallSize,
           font: t.font,
           color: t.mutedColor,
@@ -205,4 +212,19 @@ export async function renderResumeDocx(data: ResumeData, template: DocTemplateId
 
 export async function renderCoverLetterDocx(data: CoverLetterData, template: DocTemplateId = DEFAULT_DOC_TEMPLATE): Promise<Buffer> {
   return Buffer.from(await Packer.toBuffer(toDocx(letterParagraphs(data, DOCX_THEMES[template]))))
+}
+
+// Nie-leer-Fallback als DOCX (Pendant zu renderResumeTextPDF): Der Parser hat
+// nichts Strukturiertes erkannt — dann bekommt die Nutzerin ihren Rohtext als
+// schlichte, editierbare Datei statt PDF-Bytes mit falscher Endung.
+export async function renderResumeTextDocx(rawText: string): Promise<Buffer> {
+  const paragraphs = rawText
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => new Paragraph({
+      spacing: { after: 120 },
+      children: [new TextRun({ text: line, size: 20, font: 'Arial' })],
+    }))
+  return Buffer.from(await Packer.toBuffer(new Document({ sections: [{ properties: {}, children: paragraphs }] })))
 }

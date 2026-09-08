@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generateCoverLetterFromJob, resumeDataHasSubstance, type CoverLetterData } from '@/lib/pdf'
 import { renderResumeTextPDF } from '@/lib/pdf-documents'
-import { renderResumeDocx, renderCoverLetterDocx } from '@/lib/docx'
+import { renderResumeDocx, renderCoverLetterDocx, renderResumeTextDocx } from '@/lib/docx'
 import { resolveDocTemplate, DOC_TEMPLATES, type DocTemplateId } from '@/lib/documents'
 
 type ExportFormat = 'pdf' | 'docx'
@@ -67,12 +67,14 @@ async function generateResume(userId: string, format: ExportFormat) {
   try {
     const resumeData = parseResumeMarkdown(resume.content)
     // Nie-leer-Vertrag: Erkennt der Parser keine Struktur, wird der Rohtext
-    // gesetzt — eine leere Seite geht nie als „Lebenslauf" raus.
+    // gesetzt — eine leere Seite geht nie als „Lebenslauf" raus (im angefragten Format).
     const buffer = resumeDataHasSubstance(resumeData)
       ? format === 'docx'
         ? await renderResumeDocx(resumeData, template)
         : await generateResumePDF(resumeData, template)
-      : await renderResumeTextPDF(resume.content)
+      : format === 'docx'
+        ? await renderResumeTextDocx(resume.content)
+        : await renderResumeTextPDF(resume.content)
 
     return documentResponse(buffer, format, resume.name.replace(/\s+/g, '_'))
   } catch (error) {

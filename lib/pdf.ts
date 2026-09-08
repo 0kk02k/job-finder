@@ -54,6 +54,8 @@ const SECTION_ALIASES: Record<string, 'profil' | 'erfahrung' | 'ausbildung' | 's
   werdegang: 'erfahrung',
   'beruflicher werdegang': 'erfahrung',
   'berufliche erfahrung': 'erfahrung',
+  'ausgewählte projekte': 'erfahrung',
+  projekte: 'erfahrung',
   ausbildung: 'ausbildung',
   bildung: 'ausbildung',
   schullaufbahn: 'ausbildung',
@@ -66,8 +68,39 @@ const SECTION_ALIASES: Record<string, 'profil' | 'erfahrung' | 'ausbildung' | 's
   sprachen: 'skills',
 }
 
-function isSectionTitleLine(line: string): boolean {
-  return line.length <= 60 && !/[.,;:!?]$/.test(line) && line.toLowerCase() in SECTION_ALIASES
+// Abschnittstitel erkennen — exakt („Profil") oder mit Zusatz („Kenntnisse &
+// Fähigkeiten", „Ausgewählte Projekte & Erfahrung"). Rückgabe ist der passende
+// Alias, damit die Sektion auch im Präfix-Fall korrekt aufgelöst wird. Der
+// Zusatz-Fall kostet im Zweifel eine inhaltsvolle Zeile, die Alternative
+// verschluckt ganze Abschnitte als Fließtext — der Fehlalarm ist der billigere.
+function sectionAliasOf(line: string): string | null {
+  if (line.length > 60 || /[.!?]$/.test(line)) return null
+  const lower = line.toLowerCase()
+  return Object.keys(SECTION_ALIASES).find((alias) => lower === alias || lower.startsWith(alias + ' ')) ?? null
+}
+
+// Konventionelle Kenntnis-Labels („Betriebssysteme Linux (…)", „Methoden &
+// Frameworks Datenanalyse, …"): Die PDF-Extraktion trennt Label und Wert nur
+// per Leerzeichen — ohne Wörterbuch würde jede Kommaliste zum Label.
+const SKILL_LABEL_WORDS = new Set([
+  'betriebssysteme', 'technologien', 'tools', 'programmiersprachen', 'sprachen',
+  'frameworks', 'methoden', 'ki', 'ai', 'machine learning', 'datenbanken',
+  'softskills', 'hardware', 'cloud', 'devops', 'kenntnisse', 'kompetenzen',
+])
+
+function skillLabelOf(line: string): { label: string; value: string } | null {
+  // Jede Wortgrenze als Label/Wert-Grenze probieren — der erste Regex-Treffer
+  // wäre zu kurz („Technologien &" statt „Technologien & Tools").
+  const words = line.split(' ')
+  for (let i = 1; i < words.length; i++) {
+    const label = words.slice(0, i).join(' ')
+    const value = words.slice(i).join(' ')
+    if (!/^[A-ZÄÖÜ]/.test(value)) continue
+    if (label.length > 30 || /[,(]/.test(label)) return null
+    const parts = label.toLowerCase().split(/\s*&\s*/).map((p) => p.trim())
+    if (parts.every((p) => SKILL_LABEL_WORDS.has(p))) return { label, value }
+  }
+  return null
 }
 
 // Mindestens 7 Ziffern, sonst nur telefontypische Zeichen — „01/2020 – Heute"
@@ -84,8 +117,24 @@ function isDateLine(line: string): boolean {
   return /\d/.test(line) && line.replace(/[\d\s/.,:–—-]|heute|bis/gi, '') === ''
 }
 
-function splitSkills(line: string): string[] {
-  return line.split(',').map((s) => s.trim()).filter(Boolean)
+// Komma-Split, der Kommas in Klammern ignoriert — „Linux (Ubuntu, Pop!_OS), SteamOS"
+// sind zwei Kenntnisse, nicht vier.
+function splitSkillsParenAware(line: string): string[] {
+  const out: string[] = []
+  let depth = 0
+  let current = ''
+  for (const ch of line) {
+    if (ch === '(') depth++
+    if (ch === ')') depth = Math.max(0, depth - 1)
+    if (ch === ',' && depth === 0) {
+      if (current.trim()) out.push(current.trim())
+      current = ''
+    } else {
+      current += ch
+    }
+  }
+  if (current.trim()) out.push(current.trim())
+  return out
 }
 
 // „01/2020 – Heute" → ['01/2020', 'Heute']; ohne Enddatum → ['2019']
@@ -185,24 +234,40 @@ function parseStructuredResume(markdown: string): ResumeData {
 }
 
 // Klartext-Lebenslauf aus der PDF-Extraktion: kein Markdown, aber erkennbare
-// Struktur — Kontaktkopf, Überschriftenzeilen, Einträge als Titelzeile plus
-// „Firma | Von – Bis", Bullets als •/-/*. Heuristik, kein Silberstreifen:
-// Was nicht erkannt wird, fließt nicht in das strukturierte Dokument — die
-// Route fängt das über resumeDataHasSubstance und rendert dann den Rohtext.
+// Struktur — Kopfbereich (Datums-Artefakte, Name, Berufstitel), Überschriften-
+// zeilen (auch mit Zusätzen wie „Kenntnisse & Fähigkeiten"), hart umgebrochene
+// Absätze, Einträge als Titelzeile plus „Firma | Von – Bis", Bullets als •/-/*,
+// Skills als „Label␣␣Wert"-Zeilen. Heuristik, kein Silberstreifen: Was nicht
+// erkannt wird, fließt nicht in das strukturierte Dokument — die Route fängt
+// das über resumeDataHasSubstance und rendert dann den Rohtext.
 function parsePlainTextResume(text: string): ResumeData {
   const data = emptyResumeData()
   let section: 'profil' | 'erfahrung' | 'ausbildung' | 'skills' | 'sonstiges' | null = null
   let experience: ResumeData['experience'][number] | null = null
   let education: ResumeData['education'][number] | null = null
-  // Titel- bzw. Abschluss-Kandidat, der auf seine „Firma | Zeitraum"-Zeile wartet
+  // Titel- bzw. Abschluss-Kandidat, der auf Inhalt bzw. „Firma | Zeitraum" wartet
   let pendingExperienceTitle = ''
   let pendingEducationDegree = ''
-  let firstLine = true
+  // Hart umgebrochener Satz in der Berufserfahrung, der auf seinen Punkt wartet
+  let openParagraph = ''
+
+  const isHeadingish = (line: string): boolean =>
+    line.length <= 60 && !/[.!?]$/.test(line) && !/\)$/.test(line) && !isDateLine(line)
+
+  // Umbruch-Absatz abschließen und der zuletzt erstellten Station zuordnen
+  const closeParagraph = () => {
+    if (!openParagraph) return
+    const target = experience ?? data.experience[data.experience.length - 1]
+    if (target) target.description.push(openParagraph)
+    openParagraph = ''
+  }
 
   const flushPendingExperience = (): ResumeData['experience'][number] | null => {
+    closeParagraph()
     if (pendingExperienceTitle) {
       experience = { title: pendingExperienceTitle, company: '', startDate: '', description: [] }
       data.experience.push(experience)
+      // Erststation als Berufstitel, wenn der Kopfbereich keinen hergab
       if (!data.title) data.title = pendingExperienceTitle
       pendingExperienceTitle = ''
       return experience
@@ -223,13 +288,16 @@ function parsePlainTextResume(text: string): ResumeData {
     const line = rawLine.trim()
     if (!line) continue
 
-    // Abschnittsüberschrift — beendet Eintrag und Sektion
-    if (isSectionTitleLine(line)) {
+    // Abschnittsüberschrift — beendet Eintrag und Sektion. Ein Zeilenanfang,
+    // der auf den AKTUELLEN Abschnitt passt („Ausbildung zum Fachinformatiker"
+    // während wir schon in der Ausbildung sind), ist Inhalt, keine Überschrift.
+    const sectionAlias = sectionAliasOf(line)
+    if (sectionAlias && SECTION_ALIASES[sectionAlias] !== section) {
       flushPendingExperience()
       flushPendingEducation()
       experience = null
       education = null
-      section = SECTION_ALIASES[line.toLowerCase()] ?? 'sonstiges'
+      section = SECTION_ALIASES[sectionAlias] ?? 'sonstiges'
       continue
     }
 
@@ -250,23 +318,28 @@ function parsePlainTextResume(text: string): ResumeData {
       }
     }
 
-    // Name: erste Zeile vor jeder Sektion — kurz und ohne Satzeichen/Ziffern,
-    // damit kein Fließtext zum Namen erklärt wird (Abkürzungen wie „Dr." opfert
-    // die Heuristik bewusst; sie kostet sonst das Nie-leer-Fallback)
-    if (firstLine) {
-      firstLine = false
-      if (!section && !/[.,;:!?@]|\d/.test(line) && line.split(/\s+/).length <= 6) {
+    // Kopfbereich vor der ersten Sektion: Datums-Artefakte überspringen, dann
+    // Name (kurz, ohne Ziffern/Satzeichen) und Berufstitel (länger, ohne Punkt)
+    if (!section) {
+      if (!data.name && !/[\d@]|\d/.test(line) && !/[.,;:!?]$/.test(line) && line.split(/\s+/).length <= 6) {
         data.name = line
         continue
       }
+      if (!data.title && line.length > 10 && line.length <= 80 && !/[.!?]$/.test(line) && !isDateLine(line)) {
+        data.title = line
+        continue
+      }
+      continue
     }
 
     // Bullets: • · ▪ ◦ * -
     const bullet = line.match(/^[•·▪◦‣]\s+(.*)$/) ?? line.match(/^[-*]\s+(.*)$/)
     if (bullet) {
       const content = bullet[1].trim()
-      if (section === 'erfahrung' && experience) {
-        experience.description.push(content)
+      if (section === 'erfahrung') {
+        closeParagraph()
+        flushPendingExperience()
+        experience?.description.push(content)
       } else if (section === 'skills') {
         data.skills.push(content)
       }
@@ -279,7 +352,20 @@ function parsePlainTextResume(text: string): ResumeData {
     }
 
     if (section === 'skills') {
-      data.skills.push(...splitSkills(line))
+      // Label-Zeilen (Doppel-Leerzeichen oder konventionelles Labelwort) werden
+      // ein Eintrag mit Doppelpunkt; kurze Fortsetzungszeilen („ARM64)") hängen
+      // an den letzten Eintrag.
+      const doubleSpaceMatch = line.match(/^(.{2,30}?)\s{2,}(\S.*)$/)
+      const label = doubleSpaceMatch
+        ? { label: doubleSpaceMatch[1], value: doubleSpaceMatch[2] }
+        : skillLabelOf(line)
+      if (label) {
+        data.skills.push(`${label.label}: ${label.value}`)
+      } else if (line.length <= 12 && !line.includes(',') && data.skills.length > 0) {
+        data.skills[data.skills.length - 1] += ` ${line}`
+      } else {
+        data.skills.push(...splitSkillsParenAware(line))
+      }
       continue
     }
 
@@ -295,19 +381,34 @@ function parsePlainTextResume(text: string): ResumeData {
           if (parts[2]) current.endDate = parts[2]
           else if (end) current.endDate = end
         }
-      } else if (isDateLine(line) && pendingExperienceTitle) {
+      } else if (isDateLine(line) && pendingExperienceTitle && !openParagraph) {
         // nackter Zeitraum unter dem Titel — Firma fehlt
         const range = line.split(/–|—|\s-\s|\bbis\b/i)
         experience = { title: pendingExperienceTitle, company: '', startDate: range[0]?.trim() ?? '', endDate: range[1]?.trim() ?? '', description: [] }
         data.experience.push(experience)
-        if (!data.title) data.title = pendingExperienceTitle
         pendingExperienceTitle = ''
-      } else if (pendingExperienceTitle) {
-        // zweite Titelzeile ohne Firmenzeile — vorherigen Titel als Eintrag sichern
+      } else if (openParagraph) {
+        // Umbruch-Fortsetzung: Trennstrich zusammenführen (deutsche Wortbildung
+        // kleinschreibt den Nachlauf: „Workflow-" + „Optimierung" → „Workflowoptimierung")
+        openParagraph = openParagraph.endsWith('-')
+          ? openParagraph.slice(0, -1) + line.charAt(0).toLowerCase() + line.slice(1)
+          : `${openParagraph} ${line}`
+        if (/[.!?]\)?$/.test(line)) {
+          closeParagraph()
+        }
+      } else if (isHeadingish(line)) {
+        // Unter-Überschrift → neue Station; wartender Vorgänger wird gesichert
         flushPendingExperience()
         pendingExperienceTitle = line
+      } else if (pendingExperienceTitle) {
+        // erster Inhalt unter der wartenden Überschrift → Station anlegen
+        flushPendingExperience()
+        openParagraph = line
+        if (/[.!?]\)?$/.test(line)) closeParagraph()
       } else {
-        pendingExperienceTitle = line
+        // Inhalt ohne Überschrift — als Absatz führen, ggf. an letzte Station
+        openParagraph = line
+        if (/[.!?]\)?$/.test(line)) closeParagraph()
       }
       continue
     }
@@ -320,7 +421,13 @@ function parsePlainTextResume(text: string): ResumeData {
           if (parts[0] && !current.school) current.school = parts[0]
           if (parts.length > 1 && !current.graduationYear) current.graduationYear = parts.slice(1).join(' – ')
         }
-      } else if (pendingEducationDegree) {
+      } else if (/:\s/.test(line)) {
+        // Detailzeile („Fachrichtung: …") gehört zur letzten Ausbildung — notfalls
+        // wartet sie als erster Eintrag, statt eine eigene Station zu werden
+        const current = flushPendingEducation()
+        if (current) current.degree = `${current.degree} · ${line}`
+        else pendingEducationDegree = pendingEducationDegree ? `${pendingEducationDegree} · ${line}` : line
+      } else if (isHeadingish(line) || pendingEducationDegree) {
         flushPendingEducation()
         pendingEducationDegree = line
       } else {
