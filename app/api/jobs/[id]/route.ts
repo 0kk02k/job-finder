@@ -83,3 +83,25 @@ export async function PATCH(
     throw error
   }
 }
+
+// DELETE /api/jobs/[id] - Anzeige endgültig entfernen (Aktivitäten kaskadieren)
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Nicht authentifiziert' }, { status: 401 })
+
+  const { id } = await params
+  // Only the owner may delete a job
+  const existing = await prisma.job.findFirst({
+    where: { id, userId: session.user.id },
+  })
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Job nicht gefunden' }, { status: 404 })
+  }
+
+  await prisma.job.delete({ where: { id } })
+  return NextResponse.json({ ok: true })
+}

@@ -71,6 +71,24 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
+  // Löschen ist unwiderruflich (Historie kaskadiert mit) — deshalb zweistufig
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+
+  async function handleDelete() {
+    if (!job) return
+    try {
+      const response = await fetch(`/api/jobs/${job.id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        toast.error('Löschen fehlgeschlagen — die Anzeige bleibt erhalten.')
+        return
+      }
+      toast.success('Anzeige gelöscht.')
+      router.push('/jobs')
+    } catch {
+      toast.error('Löschen fehlgeschlagen — die Anzeige bleibt erhalten.')
+    }
+  }
+
   async function fetchJob(jobId: string) {
     try {
       const response = await fetch(`/api/jobs/${jobId}`)
@@ -426,6 +444,36 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             >
               Anzeige im Portal ansehen
             </a>
+          </div>
+
+          {/* Löschen — zweistufig bestätigt, weil auch die Status-Historie verschwindet */}
+          <div className="mt-5 pt-4 border-t border-border flex justify-end">
+            {confirmingDelete ? (
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                <span className="text-sm text-primary">
+                  Anzeige wirklich löschen? Auch die Status-Historie verschwindet.
+                </span>
+                <button
+                  onClick={() => void handleDelete()}
+                  className="text-sm font-medium text-error underline decoration-error/60 underline-offset-4 hover:decoration-error"
+                >
+                  Ja, löschen
+                </button>
+                <button
+                  onClick={() => setConfirmingDelete(false)}
+                  className="text-sm text-primary underline decoration-border underline-offset-4 hover:text-foreground"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingDelete(true)}
+                className="text-sm text-error hover:underline underline-offset-4"
+              >
+                Anzeige löschen
+              </button>
+            )}
           </div>
         </div>
       </main>
