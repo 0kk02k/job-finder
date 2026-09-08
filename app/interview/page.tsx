@@ -384,6 +384,7 @@ export default function InterviewPage() {
                 onChange={(e) => setInput(e.target.value)}
                 placeholder="Deine Antwort…"
                 disabled={sending}
+                className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft disabled:opacity-50"
               />
               <button
                 type="submit"
