@@ -444,13 +444,15 @@ function parsePlainTextResume(text: string): ResumeData {
 
 // Generate cover letter from job description and resume.
 // Vorlage-Fallback (Stufe 1): benennt Job und Beruf ehrlich, statt Floskeln
-// mit leerem Berufsfeld auszuliefern. Die KI (generateCoverLetter in lib/ai.ts)
-// ist der Primärweg — diese Vorlage ist ausdrücklich als „bitte prüfen" markiert.
+// mit leerem Berufsfeld auszuliefern — in der Sprache der Anzeige. Die KI
+// (generateCoverLetter in lib/ai.ts) ist der Primärweg; diese Vorlage ist
+// ausdrücklich als „bitte prüfen" markiert.
 export function generateCoverLetterFromJob(
   resumeData: ResumeData,
   jobDescription: string,
   company: string,
-  jobTitle: string
+  jobTitle: string,
+  language: 'de' | 'en' = 'de'
 ): CoverLetterData {
   const today = new Date().toLocaleDateString('de-DE', {
     year: 'numeric',
@@ -462,6 +464,24 @@ export function generateCoverLetterFromJob(
   const profile = resumeData.title
     ? `Als ${resumeData.title} bringe ich Erfahrung mit ${resumeData.skills.slice(0, 3).join(', ')} mit.`
     : `Meine Schwerpunkte liegen in ${resumeData.skills.slice(0, 3).join(', ')}.`
+
+  if (language === 'en') {
+    const skills = resumeData.skills.slice(0, 3).join(', ')
+    return {
+      name: resumeData.name,
+      recipientCompany: company,
+      date: today,
+      salutation: 'Dear Hiring Team,',
+      body: [
+        `I am applying to ${company} for the position as ${jobTitle || 'advertised'}.`,
+        resumeData.title
+          ? `As a ${resumeData.title}, I bring experience with ${skills}. My background is summarised in the attached resume.`
+          : `My core strengths lie in ${skills}; my background is summarised in the attached resume.`,
+        `I would welcome the opportunity to discuss my background in a personal interview.`,
+      ],
+      closing: 'Sincerely',
+    }
+  }
 
   return {
     name: resumeData.name,
