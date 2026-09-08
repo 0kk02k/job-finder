@@ -102,11 +102,14 @@ Du kannst jederzeit Fragen stellen, Abschweifungen sind okay — wir kommen scho
 
 Dann legen wir los: **Erzähl mir kurz von dir — wer bist du beruflich, und was machst du aktuell?**`
 
-const MINI_TASK_CATALOG = `Wenn du die Mini-Aufgabe stellst, wähle EINE passend zum Profil des Kandidaten:
-- Code-Review: ein ~15-zeiliger Code-Schnipsel mit 2 absichtlichen Fehlern, den der Kandidat kommentieren soll
-- Kommunikation: "Erkläre einem Nicht-Techniker [Konzept aus seinem Bereich] in 5 Sätzen"
-- Priorisierung: 5 fiktive Tickets/Bugs, die priorisiert und begründet werden sollen
-Bewerte die Antwort nach Korrektheit, Begründungsqualität und Vollständigkeit und gib kurzes, ehrliches Feedback.`
+// Exportiert für den Prompt-Vertragstest (tests/lib/interview.test.ts)
+export const MINI_TASK_CATALOG = `Wenn du die Mini-Aufgabe stellst, wähle EINEN Aufgabentyp und baue die konkrete Aufgabe aus der Fachrichtung des Kandidaten (Lebenslauf) — die Arbeitsprobe muss klingen wie der Job, auf den sie vorbereitet:
+- Fallvignette: eine knappe, typische Situation aus dem Fachgebiet — „X meldet sich mit Y. Was ist dein erster Schritt, und warum?"
+- Priorisierung: 4-5 Fälle oder Aufgaben aus dem Fachgebiet, die unter knappen Ressourcen (Zeit, Personal, Budget) sortiert und begründet werden müssen
+- Erkläraufgabe: ein Konzept aus dem Bereich, verständlich erklärt für jemanden ohne Fachhintergrund (Angehörige, Kunden, Verwaltung)
+- Rollenspiel: ein typisches Gespräch der Rolle (Beratung, Beschwerde, Übergabe) — du spielst die Gegenseite, in 3-4 Nachrichten
+- Dokumentationsaufgabe: ein Ergebnis der Rolle strukturiert festhalten (Bericht, Übergabeprotokoll, Anleitung)
+Technische Arbeitsproben (Code-Review, Ticket-Priorisierung) sind NUR passend, wenn der Lebenslauf technisch ist — für alle anderen Fachrichtungen gehören sie nicht in die enge Wahl. Bewerte die Antwort nach Korrektheit, Begründungsqualität und Vollständigkeit und gib kurzes, ehrliches Feedback.`
 
 interface AIConfig {
   provider?: string
