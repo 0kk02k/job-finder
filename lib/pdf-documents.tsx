@@ -1,5 +1,5 @@
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
-import type { ResumeData, CoverLetterData } from './pdf'
+import type { ResumeData, CoverLetterData, InterviewReport } from './pdf'
 import { DEFAULT_DOC_TEMPLATE, type DocTemplateId } from './documents'
 
 // Theme-Basiswerte für die drei Dokumenten-Designs (siehe lib/documents.ts).
@@ -256,6 +256,113 @@ export async function renderResumePDF(data: ResumeData, template: DocTemplateId 
 
 export async function renderCoverLetterPDF(data: CoverLetterData, template: DocTemplateId = DEFAULT_DOC_TEMPLATE): Promise<Buffer> {
   return toBuffer(<CoverLetterDocument data={data} template={template} />)
+}
+
+const reportStyles = StyleSheet.create({
+  block: { marginBottom: 16 },
+  blockTitle: { fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  paragraph: { fontSize: 10.5, lineHeight: 1.5 },
+  item: { marginBottom: 8, paddingLeft: 10, borderLeftWidth: 2 },
+  itemName: { fontSize: 10, fontWeight: 'bold' },
+  itemText: { fontSize: 9.5, lineHeight: 1.4 },
+  barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+  barLabel: { width: 110, fontSize: 9.5 },
+  barTrack: { flex: 1, height: 6, backgroundColor: '#e5e7eb', borderRadius: 3 },
+  barFill: { height: 6, borderRadius: 3 },
+  barValue: { width: 30, fontSize: 9, textAlign: 'right', color: '#6b7280' },
+  scoreChip: { marginRight: 6, fontSize: 9, backgroundColor: '#f3f4f6', paddingVertical: 3, paddingHorizontal: 8, borderRadius: 3 },
+  footnote: { marginTop: 24, fontSize: 8, color: '#9ca3af' },
+})
+
+// Stärken/Entwicklungsfelder als dezente Rand-Akzente — bleibt in jedem Theme
+// und in Graustufen lesbar.
+const TONE_SUCCESS = { borderLeftColor: '#15803d', color: '#15803d' }
+const TONE_WARNING = { borderLeftColor: '#b45309', color: '#b45309' }
+
+function InterviewReportDocument({ report, template }: { report: InterviewReport; template: DocTemplateId }) {
+  const t = THEMES[template]
+  const s = reportStyles
+  return (
+    <Document>
+      <Page size="A4" style={{ paddingTop: 50, paddingBottom: 50, paddingHorizontal: 55, fontFamily: t.fontFamily, fontSize: t.baseFontSize, color: t.textColor }}>
+        {/* Kopf */}
+        <View style={{ borderBottomWidth: t.headerBorderWidth, borderBottomColor: t.accentColor, paddingBottom: 14, marginBottom: 18 }}>
+          <Text style={{ fontSize: 20, fontWeight: 'bold', color: t.nameColor }}>Interview-Auswertung</Text>
+          <Text style={{ fontSize: 9.5, color: t.mutedColor, marginTop: 4 }}>
+            {report.date}
+            {report.personalityType ? `  ·  16Personalities-Typ: ${report.personalityType}` : ''}
+          </Text>
+        </View>
+
+        {report.summary ? (
+          <View style={s.block}>
+            <Text style={[s.blockTitle, { color: t.nameColor }]}>Gesamteindruck</Text>
+            <Text style={s.paragraph}>{report.summary}</Text>
+          </View>
+        ) : null}
+
+        {/* Kompetenz-Profil als Balken (Skala 1-5) */}
+        <View style={s.block}>
+          <Text style={[s.blockTitle, { color: t.nameColor }]}>Kompetenz-Profil</Text>
+          {report.competencies.map((c) => (
+            <View key={c.key} style={s.barRow}>
+              <Text style={s.barLabel}>{c.label}</Text>
+              <View style={s.barTrack}>
+                <View style={[s.barFill, { width: `${(c.value / 5) * 100}%`, backgroundColor: t.accentColor }]} />
+              </View>
+              <Text style={s.barValue}>{c.value}/5</Text>
+            </View>
+          ))}
+        </View>
+
+        {report.strengths.length > 0 && (
+          <View style={s.block}>
+            <Text style={[s.blockTitle, { color: t.nameColor }]}>Stärken mit Belegen</Text>
+            {report.strengths.map((item, i) => (
+              <View key={i} style={[s.item, TONE_SUCCESS]}>
+                <Text style={[s.itemName, { color: TONE_SUCCESS.color }]}>{item.name}</Text>
+                <Text style={s.itemText}>{item.starExample}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {report.weaknesses.length > 0 && (
+          <View style={s.block}>
+            <Text style={[s.blockTitle, { color: t.nameColor }]}>Entwicklungsfelder</Text>
+            {report.weaknesses.map((item, i) => (
+              <View key={i} style={[s.item, TONE_WARNING]}>
+                <Text style={[s.itemName, { color: TONE_WARNING.color }]}>{item.name}</Text>
+                <Text style={s.itemText}>Gegenmaßnahme: {item.mitigation}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {report.miniTask && (
+          <View style={s.block}>
+            <Text style={[s.blockTitle, { color: t.nameColor }]}>Praxisaufgabe</Text>
+            <Text style={s.itemText}><Text style={{ fontWeight: 'bold' }}>Aufgabe: </Text>{report.miniTask.task}</Text>
+            <Text style={[s.itemText, { marginTop: 4 }]}><Text style={{ fontWeight: 'bold' }}>Antwort: </Text>{report.miniTask.answer}</Text>
+            <Text style={[s.itemText, { marginTop: 4 }]}><Text style={{ fontWeight: 'bold' }}>Bewertung: </Text>{report.miniTask.assessment}</Text>
+            <View style={{ flexDirection: 'row', marginTop: 8 }}>
+              <Text style={s.scoreChip}>Korrektheit: {report.miniTask.scores.correctness}/5</Text>
+              <Text style={s.scoreChip}>Begründung: {report.miniTask.scores.reasoning}/5</Text>
+              <Text style={s.scoreChip}>Vollständigkeit: {report.miniTask.scores.completeness}/5</Text>
+            </View>
+          </View>
+        )}
+
+        <Text style={s.footnote}>
+          KI-gestützte Auswertung des HR-Interviews — nur aus dem Transkript belegte Aussagen. Die Einordnung deiner Entwicklungsfelder bleibt dir überlassen.
+        </Text>
+      </Page>
+    </Document>
+  )
+}
+
+export async function renderInterviewReportPDF(report: InterviewReport, template: DocTemplateId = DEFAULT_DOC_TEMPLATE): Promise<Buffer> {
+  return toBuffer(<InterviewReportDocument report={report} template={template} />)
 }
 
 const rawTextStyles = StyleSheet.create({

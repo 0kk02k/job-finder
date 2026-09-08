@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
-import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generateCoverLetterFromJob, resumeDataHasSubstance, type CoverLetterData } from '@/lib/pdf'
-import { renderResumeTextPDF } from '@/lib/pdf-documents'
+import { generateResumePDF, generateCoverLetterPDF, parseResumeMarkdown, generateCoverLetterFromJob, resumeDataHasSubstance, buildInterviewReport, type CoverLetterData, type InterviewReportInput } from '@/lib/pdf'
+import { renderResumeTextPDF, renderInterviewReportPDF } from '@/lib/pdf-documents'
 import { renderResumeDocx, renderCoverLetterDocx, renderResumeTextDocx } from '@/lib/docx'
 import { resolveDocTemplate, DOC_TEMPLATES, type DocTemplateId } from '@/lib/documents'
 import { detectLanguage } from '@/lib/language'
@@ -70,6 +70,16 @@ export async function POST(request: NextRequest) {
     return generateCoverLetter(userId, body.jobId, format, body.content)
   } else if (type === 'coverletter-template') {
     return coverLetterTemplate(userId, body.jobId)
+  } else if (type === 'interview-report') {
+    // Die Akte lebt im Client-State — sie kommt als Payload, wird gerendert
+    // und nie gespeichert (gleiche Linie wie das Anschreiben)
+    if (!body.report || typeof body.report !== 'object') {
+      return NextResponse.json({ error: 'Fehlende Auswertungsdaten' }, { status: 400 })
+    }
+    const report = buildInterviewReport(body.report as InterviewReportInput)
+    const template = await docTemplateFor(userId)
+    const buffer = await renderInterviewReportPDF(report, template)
+    return documentResponse(buffer, format, 'Interview-Auswertung')
   }
 
   return NextResponse.json({ error: 'Invalid type' }, { status: 400 })

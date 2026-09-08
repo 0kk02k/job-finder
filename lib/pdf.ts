@@ -2,6 +2,7 @@
 // Uses @react-pdf/renderer (pure JS, no browser needed)
 
 import { renderResumePDF, renderCoverLetterPDF } from './pdf-documents'
+import { COMPETENCIES } from './competencies'
 
 export interface ResumeData {
   name: string
@@ -34,6 +35,78 @@ export interface CoverLetterData {
   salutation: string
   body: string[]
   closing: string
+}
+
+// Interview-Auswertung: das gerenderte Abbild der Akte aus dem HR-Interview.
+// Scores einheitlich 1-5, Kompetenzen nur die vier bekannten Keys.
+export interface InterviewReport {
+  summary: string
+  strengths: Array<{ name: string; starExample: string }>
+  weaknesses: Array<{ name: string; mitigation: string }>
+  miniTask: {
+    task: string
+    answer: string
+    assessment: string
+    scores: { correctness: number; reasoning: number; completeness: number }
+  } | null
+  competencies: Array<{ key: string; label: string; value: number }>
+  personalityType?: string
+  date: string
+}
+
+export interface InterviewReportInput {
+  insights: {
+    summary: string
+    strengths: Array<{ name: string; starExample: string }>
+    weaknesses: Array<{ name: string; mitigation: string }>
+    miniTask: {
+      task: string
+      answer: string
+      assessment: string
+      scores: { correctness: number; reasoning: number; completeness: number }
+    } | null
+    competencies: Record<string, number>
+  }
+  personalityType?: string
+  date?: Date
+}
+
+const clampScore = (value: unknown): number =>
+  Math.min(5, Math.max(1, Math.round(typeof value === 'number' && Number.isFinite(value) ? value : 1)))
+
+// Normalisiert die rohen KI-Insights in den Report: nur bekannte Kompetenzen
+// in fester Reihenfolge, Scores geklemmt, deutsches Datum. Alles, was die KI
+// extra erfindet, fällt weg.
+export function buildInterviewReport(input: InterviewReportInput): InterviewReport {
+  const { insights } = input
+  return {
+    summary: insights.summary ?? '',
+    strengths: Array.isArray(insights.strengths) ? insights.strengths : [],
+    weaknesses: Array.isArray(insights.weaknesses) ? insights.weaknesses : [],
+    miniTask: insights.miniTask
+      ? {
+          task: insights.miniTask.task,
+          answer: insights.miniTask.answer,
+          assessment: insights.miniTask.assessment,
+          scores: {
+            correctness: clampScore(insights.miniTask.scores?.correctness),
+            reasoning: clampScore(insights.miniTask.scores?.reasoning),
+            completeness: clampScore(insights.miniTask.scores?.completeness),
+          },
+        }
+      : null,
+    competencies: COMPETENCIES.map(({ key, label }) => ({
+      key,
+      label,
+      value: clampScore(insights.competencies?.[key]),
+    })),
+    personalityType: input.personalityType || undefined,
+    date: (input.date ?? new Date()).toLocaleDateString('de-DE', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }),
+  }
 }
 
 // Generate resume PDF as buffer

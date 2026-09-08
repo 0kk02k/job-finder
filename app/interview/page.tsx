@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { MarkdownContent } from '../components/Markdown'
+import { COMPETENCIES } from '@/lib/competencies'
 
 interface Message {
   role: 'assistant' | 'user'
@@ -40,17 +41,15 @@ interface InterviewState {
   personalityType: string | null
 }
 
-const COMPETENCY_LABELS: Record<string, string> = {
-  teamwork: 'Teamwork',
-  communication: 'Kommunikation',
-  problemSolving: 'Problemlösung',
-  selfReflection: 'Selbstreflexion',
-}
+const COMPETENCY_LABELS: Record<string, string> = Object.fromEntries(
+  COMPETENCIES.map(({ key, label }) => [key, label])
+)
 
 export default function InterviewPage() {
   const [interview, setInterview] = useState<InterviewState | null>(null)
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
+  const [downloadingReport, setDownloadingReport] = useState(false)
   const [input, setInput] = useState('')
   const [error, setError] = useState<string | null>(null)
 
@@ -130,6 +129,43 @@ export default function InterviewPage() {
       setInput(message)
     } finally {
       setSending(false)
+    }
+  }
+
+  // Auswertung als PDF: die Akte kommt als Payload, der Server rendert im
+  // eingestellten Dokumenten-Design. Nichts wird gespeichert.
+  async function downloadReport() {
+    if (!interview?.insights) return
+    setDownloadingReport(true)
+    try {
+      const response = await fetch('/api/pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'interview-report',
+          report: {
+            insights: interview.insights,
+            personalityType: interview.personalityType ?? undefined,
+          },
+        }),
+      })
+      if (!response.ok) {
+        setError('Das PDF konnte nicht erzeugt werden — versuch es erneut.')
+        return
+      }
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'Interview-Auswertung.pdf'
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch {
+      setError('Netzwerkfehler — das PDF konnte nicht geladen werden.')
+    } finally {
+      setDownloadingReport(false)
     }
   }
 
@@ -402,12 +438,21 @@ export default function InterviewPage() {
           <section className="space-y-4">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-medium text-foreground">Deine Akte</h2>
-              <button
-                onClick={restart}
-                className="text-sm text-primary hover:text-accent transition-colors"
-              >
-                Neues Interview starten
-              </button>
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => void downloadReport()}
+                  disabled={downloadingReport}
+                  className="text-sm text-primary hover:text-accent transition-colors disabled:opacity-50"
+                >
+                  {downloadingReport ? 'Wird erzeugt …' : 'Auswertung als PDF'}
+                </button>
+                <button
+                  onClick={restart}
+                  className="text-sm text-primary hover:text-accent transition-colors"
+                >
+                  Neues Interview starten
+                </button>
+              </div>
             </div>
 
             {interview.insights.summary && (
