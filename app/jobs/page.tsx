@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
-import { ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
+import { ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
 import { scoreLabel } from '@/lib/matching'
+import { STATUS_LABELS } from '@/lib/status'
 
 interface Job {
   id: string
@@ -28,17 +29,6 @@ const ALL_STATUSES = [
   'REJECTED',
   'ARCHIVED',
 ] as const
-
-const STATUS_LABELS: Record<string, string> = {
-  DISCOVERED: 'Entdeckt',
-  SCORED: 'Bewertet',
-  HIGH_MATCH: 'Top Match',
-  APPLIED: 'Beworben',
-  INTERVIEW: 'Interview',
-  OFFER: 'Angebot',
-  REJECTED: 'Abgelehnt',
-  ARCHIVED: 'Archiviert',
-}
 
 const DEFAULT_HIDDEN = new Set(['ARCHIVED', 'REJECTED'])
 
@@ -388,9 +378,14 @@ export default function JobsPage() {
                           active={job.status === 'APPLIED'}
                         />
                         <StatusButton
-                          label="Interview"
+                          label="Gespräch"
                           onClick={() => updateStatus(job.id, 'INTERVIEW')}
                           active={job.status === 'INTERVIEW'}
+                        />
+                        <StatusButton
+                          label="Abgelehnt"
+                          onClick={() => updateStatus(job.id, 'REJECTED')}
+                          active={job.status === 'REJECTED'}
                         />
                         <StatusButton
                           label="Archiv"
@@ -432,18 +427,3 @@ function SkeletonJobCard() {
   )
 }
 
-function StatusButton({ label, onClick, active }: { label: string; onClick: () => void; active?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      aria-pressed={active}
-      className={`text-sm px-4 py-2 rounded-xl font-medium transition-colors ${
-        active
-          ? 'bg-accent text-on-accent'
-          : 'bg-border-soft text-foreground hover:bg-border'
-      }`}
-    >
-      {label}
-    </button>
-  )
-}

@@ -4,8 +4,9 @@ import { use, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '../../components/Toast'
 import { MarkdownContent, structureJobDescription } from '../../components/Markdown'
-import { Button, StatusBadge, buttonClasses, scoreTone } from '../../components/ui'
+import { Button, StatusBadge, StatusButton, buttonClasses, scoreTone } from '../../components/ui'
 import { scoreLabel } from '@/lib/matching'
+import { STATUS_LABELS } from '@/lib/status'
 
 interface Job {
   id: string
@@ -51,6 +52,24 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // bearbeitet ihn und lädt das PDF selbst. Nichts wird persistiert.
   const [letter, setLetter] = useState<{ text: string; source: 'ki' | 'vorlage' } | null>(null)
   const [letterError, setLetterError] = useState<string | null>(null)
+
+  async function updateStatus(status: string) {
+    if (!job) return
+    try {
+      const response = await fetch(`/api/jobs/${job.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      if (!response.ok) {
+        toast.error('Status konnte nicht aktualisiert werden')
+        return
+      }
+      setJob({ ...job, status })
+    } catch {
+      toast.error('Status konnte nicht aktualisiert werden')
+    }
+  }
 
   async function fetchJob(jobId: string) {
     try {
@@ -197,7 +216,20 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               )}
             </p>
           </div>
-          <StatusBadge status={job.status} />
+          <div className="flex flex-col items-end gap-3">
+            <StatusBadge status={job.status} />
+            {/* Status-Wechsler: dieselben Schnellstufen wie in der Übersicht */}
+            <div className="flex flex-wrap justify-end gap-2">
+              {['APPLIED', 'INTERVIEW', 'REJECTED', 'ARCHIVED'].map((status) => (
+                <StatusButton
+                  key={status}
+                  label={STATUS_LABELS[status]}
+                  onClick={() => void updateStatus(status)}
+                  active={job.status === status}
+                />
+              ))}
+            </div>
+          </div>
         </div>
 
         {job.score != null ? (

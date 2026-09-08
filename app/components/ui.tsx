@@ -99,3 +99,21 @@ export function StatusBadge({ status }: { status: string }) {
     </span>
   )
 }
+
+// Status-Wechsler: aktiver Zustand akzentuiert (aria-pressed), inaktiv dezent.
+// Genutzt in der Job-Liste (Schnell-Buttons) und auf dem Job-Detail.
+export function StatusButton({ label, onClick, active }: { label: string; onClick: () => void; active?: boolean }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={active}
+      className={`text-sm px-4 py-2 rounded-xl font-medium transition-colors ${
+        active
+          ? 'bg-accent text-on-accent'
+          : 'bg-border-soft text-foreground hover:bg-border'
+      }`}
+    >
+      {label}
+    </button>
+  )
+}

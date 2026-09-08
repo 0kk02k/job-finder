@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { JobStatus } from '@prisma/client'
+import { appliedAtFor, STATUS_LABELS } from '@/lib/status'
 
 const VALID_STATUSES = Object.values(JobStatus)
 
@@ -58,7 +59,11 @@ export async function PATCH(
   try {
     const job = await prisma.job.update({
       where: { id },
-      data: { status },
+      data: {
+        status,
+        // Erster Bewerbungsversand wird festgehalten und nie überschrieben
+        appliedAt: appliedAtFor(status, existing.appliedAt, new Date()),
+      },
     })
 
     // Add activity
@@ -66,7 +71,7 @@ export async function PATCH(
       data: {
         jobId: id,
         type: 'STATUS_CHANGE',
-        description: `Status geändert zu ${status}`,
+        description: `Status geändert zu ${STATUS_LABELS[status] ?? status}`,
       },
     })
 
