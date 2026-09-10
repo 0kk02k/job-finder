@@ -66,7 +66,7 @@ export default function NewJobPage() {
               aria-pressed={!manualMode}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 !manualMode
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-selection text-on-selection'
                   : 'bg-border-soft text-foreground hover:bg-border'
               }`}
             >
@@ -77,7 +77,7 @@ export default function NewJobPage() {
               aria-pressed={manualMode}
               className={`flex-1 py-2.5 rounded-xl font-medium text-sm transition-colors ${
                 manualMode
-                  ? 'bg-accent text-on-accent'
+                  ? 'bg-selection text-on-selection'
                   : 'bg-border-soft text-foreground hover:bg-border'
               }`}
             >

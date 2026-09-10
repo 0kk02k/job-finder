@@ -711,7 +711,7 @@ export default function SettingsPage() {
                   type="checkbox"
                   checked={settings.remote}
                   onChange={(e) => setSettings({ ...settings, remote: e.target.checked })}
-                  className="w-5 h-5 rounded border-border accent-primary"
+                  className="w-5 h-5 rounded border-border accent-selection"
                 />
                 <span className="text-sm text-foreground">Nur Remote-Jobs</span>
               </label>

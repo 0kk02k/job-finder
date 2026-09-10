@@ -34,9 +34,6 @@ const PIPELINE_AHEAD = ['APPLIED', 'INTERVIEW', 'OFFER']
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const WEEK_MS = 7 * DAY_MS
-// Das Angebot im Hero: so viele am längsten wartende Jobs zeigt es konkret.
-// Bewusst knapp — die Liste darf die eigene Handlung (CTA) nicht unters Fold schieben.
-const OFFER_COUNT = 5
 
 // Quelle sichtbar machen: das Portal, das den Treffer geliefert hat (aus der URL
 // abgeleitet — Herkunft ist Teil der Klick-Entscheidung, Jooble klickt sich anders an
@@ -79,20 +76,13 @@ function relativeDays(iso: string): string {
 type JobsState = 'loading' | 'ok' | 'auth' | 'error'
 type JobsError = { kind: 'network' | 'server'; status?: number }
 
-// Das Angebot im Hero: Jobs mit ausgerechneter Wartezeit (Ladezeit, nicht Renderzeit)
-type OfferJob = Job & { daysWaiting: number }
-
-interface NextStep {
-  title: string
+// Der Hero ist ein Launcher, kein Einbahn-Befehl: die App wählt nicht mehr,
+// sie fragt. Eine Option = eine echte Antwort; was nicht existiert, wird nicht gezeigt.
+interface LauncherOption {
+  label: string
   description: string
   href: string
-  cta: string
-  // Das Angebot als konkrete Liste statt nackter Zahl — nur im unbewertet-Zweig
-  jobs?: OfferJob[]
-  // Altersspalte nur, wenn sie unterscheidet; bei identischen Werten steht sie einmal im Text
-  showAgeColumn?: boolean
-  // Das Widerwort gegen die Kaskaden-Meinung: der unterdrückte Zweig als Textlink
-  alternative?: { label: string; href: string }
+  primary?: boolean
 }
 
 export default function Dashboard() {
@@ -102,7 +92,6 @@ export default function Dashboard() {
   const [waitingCount, setWaitingCount] = useState(0)
   const [unscoredCount, setUnscoredCount] = useState(0)
   const [unscoredAllCount, setUnscoredAllCount] = useState(0)
-  const [oldestUnscored, setOldestUnscored] = useState<OfferJob[]>([])
   const [newThisWeek, setNewThisWeek] = useState(0)
   const [topMatches, setTopMatches] = useState<Job[]>([])
   // null = unbekannt (lädt oder Resume-API fehlgeschlagen) — niemals „kein Resume" behaupten, wenn wir es nicht wissen
@@ -160,13 +149,6 @@ export default function Dashboard() {
       const unscoredAll = active.filter((j) => j.score == null)
       // Handlungsfähiger Teil: unbewertet UND nicht schon in der Pipeline
       const unscored = unscoredAll.filter((j) => !PIPELINE_AHEAD.includes(j.status))
-      const oldest = [...unscored]
-        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-        .slice(0, OFFER_COUNT)
-        .map((j) => ({
-          ...j,
-          daysWaiting: Math.max(0, Math.floor((Date.now() - new Date(j.createdAt).getTime()) / DAY_MS)),
-        }))
       const weekAgo = Date.now() - WEEK_MS
       const fresh = active.filter((j) => new Date(j.createdAt).getTime() >= weekAgo)
 
@@ -179,7 +161,6 @@ export default function Dashboard() {
       setWaitingCount(waiting.length)
       setUnscoredCount(unscored.length)
       setUnscoredAllCount(unscoredAll.length)
-      setOldestUnscored(oldest)
       setNewThisWeek(fresh.length)
 
       // Top 3 bewertete Jobs
@@ -229,68 +210,71 @@ export default function Dashboard() {
     void loadAll()
   }, [loadAll])
 
-  function getNextStep(): NextStep | null {
-    if (jobsState !== 'ok' || !stats) return null
+  // Der Launcher: was es gibt, als gleichwertige Wege — keine Empfehlung mit
+  // verkleidetem Vorwurf. „Vergangene Funde" ohne Altersangabe: ein Fehlstand
+  // ist ein Zustand des Bewertungsmodells (Scores entstehen bei der Suche),
+  // keine Versäumnis des Nutzers.
+  function getLauncherOptions(): LauncherOption[] {
+    if (jobsState !== 'ok' || !stats) return []
 
-    // Resume — nur behaupten, wenn der Zustand sicher bekannt ist
+    // Resume — nur behaupten, wenn der Zustand sicher bekannt ist. Fehlt der
+    // Lebenslauf, gibt es genau eine echte Antwort; die Frage bleibt trotzdem stehen.
     if (hasResume === false) {
-      return {
-        title: 'Lade deinen Lebenslauf hoch',
-        description:
-          'Ohne Lebenslauf kann die KI keine Matches berechnen. Deine Daten bleiben bei dir — nichts verlässt diese App.',
-        href: '/resume',
-        cta: 'Lebenslauf hochladen',
-      }
+      return [
+        {
+          label: 'Lebenslauf hochladen',
+          description:
+            'Ohne Lebenslauf kann die KI keine Matches berechnen. Deine Daten bleiben bei dir — nichts verlässt diese App.',
+          href: '/resume',
+          primary: true,
+        },
+      ]
     }
 
-    // Angebot statt Rückstand: die Ältesten als konkreten Einstieg — aber die
-    // Primäraktion führt zur Suche, denn bewertet wird dort (Limit: 15 pro Suche),
-    // nicht beim Ansehen der Liste. „Ohne Bewertung" statt „unbewertet": Zustand,
-    // kein Vorwurf. Die Zahl im Satz ist dieselbe Menge wie die Liste darunter.
-    if (unscoredCount > 0 && unscoredCount >= waitingCount) {
-      // Identische Wartezeiten nicht 5× wiederholen — der Wert steht einmal im Satz
-      const uniformDays =
-        oldestUnscored.length > 1 &&
-        oldestUnscored.every((j) => j.daysWaiting === oldestUnscored[0].daysWaiting)
-      return {
-        title: 'Nimm dir zuerst die Ältesten vor',
-        description: uniformDays
-          ? `Diese ${oldestUnscored.length} von ${unscoredCount} Jobs ohne Bewertung liegen seit ${oldestUnscored[0].daysWaiting} Tagen in deiner Liste.`
-          : `Diese ${oldestUnscored.length} von ${unscoredCount} Jobs ohne Bewertung sind die Ältesten in deiner Liste.`,
+    const options: LauncherOption[] = [
+      {
+        label: 'Neue Suche starten',
+        description: 'Treffer finden und gegen deinen Lebenslauf bewerten lassen.',
         href: '/search',
-        cta: 'Neue Suche starten',
-        jobs: oldestUnscored,
-        showAgeColumn: !uniformDays,
-        alternative:
-          waitingCount > 0
-            ? { label: 'Lieber die High Matches ansehen', href: '/jobs?filter=high_match' }
-            : undefined,
-      }
+        primary: true,
+      },
+    ]
+    if (unscoredCount > 0) {
+      options.push({
+        label: 'Vergangene Funde durchsehen',
+        description:
+          unscoredCount === 1
+            ? '1 Fund aus deinen Suchen hat noch keine Bewertung.'
+            : `${unscoredCount} Funde aus deinen Suchen haben noch keine Bewertung.`,
+        href: '/jobs?filter=unscored&sort=oldest',
+      })
     }
-
     if (waitingCount > 0) {
-      return {
-        title: `${waitingCount} ${waitingCount === 1 ? 'High Match wartet' : 'High Matches warten'} auf dich`,
-        description: 'Starke Treffer, die noch nicht in deiner Pipeline sind.',
+      options.push({
+        label: 'High Matches ansehen',
+        description:
+          waitingCount === 1
+            ? '1 starker Treffer ist noch nicht in deiner Pipeline.'
+            : `${waitingCount} starke Treffer sind noch nicht in deiner Pipeline.`,
         href: '/jobs?filter=high_match',
-        cta: 'High Matches ansehen',
-        alternative:
-          unscoredCount > 0
-            ? { label: 'Lieber die unbewerteten ansehen', href: '/jobs?filter=unscored&sort=oldest' }
-            : undefined,
-      }
+      })
     }
-
-    return {
-      title: 'Starte eine neue Suche',
-      description: 'Deine Pipeline ist aufgeräumt — Zeit für neue Kandidaten.',
-      href: '/search',
-      cta: 'Jobs suchen',
+    if (savedSearches.length > 0) {
+      options.push({
+        label: 'Gespeicherte Suchen ansehen',
+        description: `${savedSearches.length} ${savedSearches.length === 1 ? 'Suche' : 'Suchen'} ${
+          newThisWeek === 0
+            ? 'ohne neue Funde diese Woche'
+            : `mit ${newThisWeek} ${newThisWeek === 1 ? 'neuem Fund' : 'neuen Funden'} diese Woche`
+        }.`,
+        href: '#gespeicherte-suchen',
+      })
     }
+    return options
   }
 
-  const nextStep = getNextStep()
   const newJobsTotal = savedSearches.reduce((n, s) => n + (s.lastNewJobs ?? 0), 0)
+  const launcherOptions = getLauncherOptions()
   // Onboarding nur bei sicher bekanntem Zustand — ein Resume-API-Fehler wird nicht zum
   // Onboarding umgedeutet. „Leer" heißt: wirklich leer (totalAll, alle Jobs inkl.
   // archiviert/abgelehnt) — wer eine geleerte Pipeline hat, bekommt kein Anfänger-Onboarding zurück.
@@ -373,7 +357,7 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Nächster Schritt — die eine Akzentfläche der Seite, mit der einzigen Primär-Aktion */}
+        {/* Lade-Skelett in der Form des Launchers — Inhalt springt beim Laden nicht */}
         {jobsState === 'loading' && (
           <>
             {/* Lade-Text für Screenreader: das Skeleton allein ist aria-hidden und sagt nichts */}
@@ -381,9 +365,12 @@ export default function Dashboard() {
               Daten werden geladen …
             </p>
             <div className="mb-6 bg-accent-soft/30 rounded-2xl p-8 border border-accent/20 animate-pulse motion-reduce:animate-none" aria-hidden="true">
-              <div className="h-9 w-2/3 bg-border rounded mb-4" />
-              <div className="h-4 w-1/2 bg-border rounded mb-6" />
-              <div className="h-12 w-44 bg-border rounded-xl" />
+              <div className="h-9 w-2/3 bg-border rounded mb-6" />
+              <div className="flex flex-wrap gap-3">
+                <div className="h-24 w-full sm:w-64 bg-surface/60 rounded-xl" />
+                <div className="h-24 w-full sm:w-64 bg-surface/60 rounded-xl" />
+                <div className="h-24 w-full sm:w-64 bg-surface/60 rounded-xl" />
+              </div>
             </div>
             {/* Skelette für die unteren Sektionen — ohne sie springt der Inhalt beim Laden nach unten */}
             <div className="mt-12 space-y-4 animate-pulse motion-reduce:animate-none" aria-hidden="true">
@@ -399,78 +386,49 @@ export default function Dashboard() {
             </div>
           </>
         )}
-        {jobsState !== 'loading' && jobsState !== 'auth' && jobsState !== 'error' && nextStep && (
+        {/* Einstiegs-Launcher — die eine Akzentfläche der Seite. Die App fragt,
+            womit man starten will, statt einen nächsten Schritt zu verordnen.
+            Genau eine Option ist primär (die eine Ocker-Fläche), die anderen
+            sind gleichwertige Wege — auch der zurückhaltende. */}
+        {jobsState !== 'loading' && jobsState !== 'auth' && jobsState !== 'error' && launcherOptions.length > 0 && (
           <section className="mb-6 bg-accent-soft/30 rounded-2xl p-8 border border-accent/20">
-            <h1 className="text-3xl sm:text-4xl font-light text-foreground mb-3 tabular-nums">
-              {nextStep.title}
+            <h1 className="text-3xl sm:text-4xl font-light text-foreground mb-6">
+              Womit willst du starten?
             </h1>
-            <p className="text-primary leading-relaxed max-w-prose mb-6">
-              {nextStep.description}
-            </p>
 
-            {/* Die Handlung zuerst — die Liste darf sie nicht unters Fold schieben.
-                Im Onboarding bleibt der Slot ganz weg: die Karte unten trägt die eine Aktion. */}
-            {!showOnboarding && (
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-6">
-                <ButtonLink href={nextStep.href}>{nextStep.cta}</ButtonLink>
-                {nextStep.alternative && (
-                  <Link
-                    href={nextStep.alternative.href}
-                    className="text-sm font-medium text-primary underline decoration-accent/60 underline-offset-4 hover:text-foreground hover:decoration-accent"
+            <div className="flex flex-wrap gap-3">
+              {launcherOptions.map((option) => (
+                <Link
+                  key={option.href}
+                  href={option.href}
+                  className={`flex-1 min-w-[15rem] rounded-xl border p-4 transition-colors ${
+                    option.primary
+                      ? 'bg-accent hover:bg-accent-strong text-on-accent border-transparent'
+                      : 'bg-surface hover:border-selection border-border'
+                  }`}
+                >
+                  <span className="block font-medium">{option.label}</span>
+                  <span
+                    className={`block mt-1 text-sm leading-relaxed ${
+                      option.primary ? 'text-on-accent' : 'text-primary-soft'
+                    }`}
                   >
-                    {nextStep.alternative.label}
-                  </Link>
-                )}
-              </div>
-            )}
-
-            {/* Das Angebot als konkrete Liste: die am längsten wartenden, direkt anklickbar */}
-            {nextStep.jobs && nextStep.jobs.length > 0 && (
-              <>
-                <ul className="border-y border-accent/20 divide-y divide-accent/20">
-                  {nextStep.jobs.map((job) => (
-                    <li key={job.id}>
-                      <Link
-                        href={`/jobs/${job.id}`}
-                        className="flex items-center justify-between gap-4 py-2.5 group"
-                      >
-                        <span className="min-w-0">
-                          <span className="block text-sm font-medium text-foreground truncate group-hover:text-accent-strong">
-                            {job.title}
-                          </span>
-                          <span className="block text-xs text-primary truncate">
-                            {job.company ?? 'Ohne Angabe'}
-                          </span>
-                        </span>
-                        {nextStep.showAgeColumn && (
-                          <span className="flex-shrink-0 text-xs text-primary tabular-nums whitespace-nowrap">
-                            seit {job.daysWaiting} {job.daysWaiting === 1 ? 'Tag' : 'Tagen'}
-                          </span>
-                        )}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-                {unscoredCount > nextStep.jobs.length && (
-                  <Link
-                    href="/jobs?filter=unscored&sort=oldest"
-                    className="mt-2 inline-block text-xs text-primary underline decoration-accent/60 underline-offset-4 hover:text-foreground hover:decoration-accent"
-                  >
-                    … und {unscoredCount - nextStep.jobs.length} weitere ansehen
-                  </Link>
-                )}
-              </>
-            )}
+                    {option.description}
+                  </span>
+                </Link>
+              ))}
+            </div>
           </section>
         )}
 
-        {/* Erste Schritte — direkt nach dem Hero: genau ein aktueller Schritt, die Karte trägt die eine Aktion */}
+        {/* Erste Schritte — direkt nach dem Launcher. Ohne eigenen Button: der Hero
+            trägt die eine Aktion, die Karte ist die Landkarte, nicht das zweite Steuer. */}
         {showOnboarding && (
           <section className="bg-surface rounded-2xl p-10 border border-border mb-6">
             <h2 className="text-2xl font-medium text-foreground mb-8">Erste Schritte</h2>
             {/* ol statt div-Reihe: die Reihenfolge ist echtes Inhalt —
                 Screenreader kündigen Position an, ohne aria-label auf div zu setzen */}
-            <ol className="space-y-6 mb-10">
+            <ol className="space-y-6">
               {onboardingSteps.map((step, i) => (
                 <OnboardingStep
                   key={step.step}
@@ -481,8 +439,6 @@ export default function Dashboard() {
                 />
               ))}
             </ol>
-
-            {nextStep && <ButtonLink href={nextStep.href}>{nextStep.cta}</ButtonLink>}
           </section>
         )}
 
@@ -551,7 +507,7 @@ export default function Dashboard() {
                   <Link
                     key={job.id}
                     href={`/jobs/${job.id}`}
-                    className="bg-surface rounded-2xl p-5 border border-border-soft hover:border-accent transition-colors block"
+                    className="bg-surface rounded-2xl p-5 border border-border-soft hover:border-selection transition-colors block"
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <p className="font-medium text-foreground line-clamp-2 text-sm" title={job.title}>
@@ -613,9 +569,11 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Saved Searches — der Wiederkomm-Trigger; im Onboarding ausgeblendet */}
+        {/* Saved Searches — der Wiederkomm-Trigger; im Onboarding ausgeblendet.
+            Anker-Ziel des Launcher-Options „Gespeicherte Suchen ansehen“;
+            scroll-mt hält den Abstand zur klebenden Navigation. */}
         {jobsState === 'ok' && !showOnboarding && savedSearches.length > 0 && (
-          <section className="mb-12">
+          <section id="gespeicherte-suchen" className="mb-12 scroll-mt-24">
             <h2 className="text-xl font-medium text-foreground mb-4">
               Deine gespeicherten Suchen
             </h2>
@@ -748,7 +706,7 @@ function OnboardingStep({
     state === 'done'
       ? 'bg-success/10 text-success border-success/20'
       : state === 'current'
-        ? 'bg-accent text-on-accent border-transparent'
+        ? 'bg-selection text-on-selection border-transparent'
         : 'bg-transparent text-primary-soft border-border'
   return (
     <li className="flex items-start gap-5" aria-current={state === 'current' ? 'step' : undefined}>

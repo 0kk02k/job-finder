@@ -34,6 +34,11 @@ const DEFAULT_HIDDEN = new Set(['ARCHIVED', 'REJECTED'])
 
 type SortOption = 'newest' | 'oldest' | 'score' | 'company'
 
+// Bewertungsstand als Drei-Wege-Auswahl statt Checkbox: „unbewertet" ist ein
+// normaler Zustand des Modells (Scores entstehen bei der Suche, 15 pro Suche;
+// manuell hinzugefügte Jobs warten) — kein Mangel, den man abhaken müsste.
+type ScoreFilter = 'all' | 'scored' | 'unscored'
+
 export default function JobsPage() {
   const router = useRouter()
   const toast = useToast()
@@ -45,12 +50,15 @@ export default function JobsPage() {
     () => new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s)))
   )
   // Deep-Links aus dem Dashboard: /jobs?filter=high_match · /jobs?filter=unscored
+  // (und neu: /jobs?filter=scored — „all" ist die Abwesenheit des Parameters)
   const [highMatchOnly, setHighMatchOnly] = useState(
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('filter') === 'high_match'
   )
-  const [unscoredOnly, setUnscoredOnly] = useState(
-    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('filter') === 'unscored'
-  )
+  const [scoreFilter, setScoreFilter] = useState<ScoreFilter>(() => {
+    if (typeof window === 'undefined') return 'all'
+    const filter = new URLSearchParams(window.location.search).get('filter')
+    return filter === 'unscored' ? 'unscored' : filter === 'scored' ? 'scored' : 'all'
+  })
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     if (typeof window === 'undefined') return 'newest'
     // Deep-Link aus dem Dashboard: die am längsten wartenden zuerst
@@ -104,8 +112,10 @@ export default function JobsPage() {
       result = result.filter((job) => (job.score ?? 0) >= HIGH_MATCH_THRESHOLD)
     }
 
-    if (unscoredOnly) {
+    if (scoreFilter === 'unscored') {
       result = result.filter((job) => job.score == null)
+    } else if (scoreFilter === 'scored') {
+      result = result.filter((job) => job.score != null)
     }
 
     if (search.trim()) {
@@ -138,7 +148,7 @@ export default function JobsPage() {
     }
 
     return result
-  }, [jobs, activeStatuses, highMatchOnly, unscoredOnly, search, sortBy])
+  }, [jobs, activeStatuses, highMatchOnly, scoreFilter, search, sortBy])
 
   function toggleStatus(status: string) {
     setActiveStatuses((prev) => {
@@ -156,7 +166,7 @@ export default function JobsPage() {
     setSearch('')
     setActiveStatuses(new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s))))
     setHighMatchOnly(false)
-    setUnscoredOnly(false)
+    setScoreFilter('all')
     setSortBy('newest')
   }
 
@@ -187,7 +197,7 @@ export default function JobsPage() {
   const hasActiveFilters =
     search.trim() !== '' ||
     highMatchOnly ||
-    unscoredOnly ||
+    scoreFilter !== 'all' ||
     activeStatuses.size !== defaultActive.size ||
     [...activeStatuses].some((s) => !defaultActive.has(s))
 
@@ -256,7 +266,7 @@ export default function JobsPage() {
                       aria-pressed={active}
                       className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border ${
                         active
-                          ? 'bg-accent text-on-accent border-accent'
+                          ? 'bg-selection text-on-selection border-selection'
                           : 'bg-border-soft text-primary-soft border-border'
                       }`}
                     >
@@ -266,30 +276,59 @@ export default function JobsPage() {
                 })}
               </div>
 
-              <div className="flex flex-wrap gap-6">
+              <div className="flex flex-wrap items-center gap-6">
                 <label className="inline-flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={highMatchOnly}
                     onChange={(e) => setHighMatchOnly(e.target.checked)}
-                    className="w-4 h-4 accent-accent"
+                    className="w-4 h-4 accent-selection"
                   />
                   <span className="text-sm text-foreground">
                     Nur High Matches (≥{HIGH_MATCH_THRESHOLD})
                   </span>
                 </label>
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={unscoredOnly}
-                    onChange={(e) => setUnscoredOnly(e.target.checked)}
-                    className="w-4 h-4 accent-accent"
-                  />
-                  <span className="text-sm text-foreground">
-                    Nur ohne KI-Bewertung
-                  </span>
-                </label>
+
+                {/* Drei-Wege-Auswahl statt Checkbox: an/aus passt nicht zu
+                    alle/bewertet/unbewertet. Aktiv = Tinten-Blau (Zustand). */}
+                <div
+                  role="group"
+                  aria-label="Bewertungsstand"
+                  className="inline-flex items-center gap-1 rounded-xl border border-border bg-background p-1"
+                >
+                  {(
+                    [
+                      ['all', 'Alle'],
+                      ['scored', 'Bewertet'],
+                      ['unscored', 'Unbewertet'],
+                    ] as const
+                  ).map(([value, label]) => {
+                    const active = scoreFilter === value
+                    return (
+                      <button
+                        key={value}
+                        onClick={() => setScoreFilter(value)}
+                        aria-pressed={active}
+                        className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
+                          active
+                            ? 'bg-selection text-on-selection'
+                            : 'text-primary-soft hover:text-foreground'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
+
+              {/* Die eine Zeile, die dem Filter seinen Sinn gibt: „unbewertet" ist
+                  der Zustand vor dem Scoring, kein Mangel in der eigenen Liste. */}
+              {scoreFilter === 'unscored' && (
+                <p className="text-xs text-primary-soft">
+                  Scores entstehen bei der Suche — manuell hinzugefügte Jobs haben noch keine.
+                </p>
+              )}
             </section>
 
             {/* Result Counter */}
@@ -300,7 +339,7 @@ export default function JobsPage() {
               {hasActiveFilters && (
                 <button
                   onClick={resetFilters}
-                  className="text-sm text-primary hover:text-accent transition-colors"
+                  className="text-sm text-primary hover:text-selection transition-colors"
                 >
                   Filter zurücksetzen
                 </button>
@@ -331,7 +370,7 @@ export default function JobsPage() {
                     <div className="flex items-start justify-between mb-5">
                       <div className="min-w-0 flex-1">
                         <Link href={`/jobs/${job.id}`}>
-                          <h2 className="text-xl font-medium text-foreground hover:text-accent transition-colors mb-1">
+                          <h2 className="text-xl font-medium text-foreground hover:text-selection transition-colors mb-1">
                             {job.title}
                           </h2>
                         </Link>
@@ -365,7 +404,7 @@ export default function JobsPage() {
                           href={job.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-primary hover:text-accent transition-colors"
+                          className="text-sm text-primary hover:text-selection transition-colors"
                         >
                           Job ansehen →
                         </a>

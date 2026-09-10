@@ -442,13 +442,13 @@ export default function InterviewPage() {
                 <button
                   onClick={() => void downloadReport()}
                   disabled={downloadingReport}
-                  className="text-sm text-primary hover:text-accent transition-colors disabled:opacity-50"
+                  className="text-sm text-primary hover:text-selection transition-colors disabled:opacity-50"
                 >
                   {downloadingReport ? 'Wird erzeugt …' : 'Auswertung als PDF'}
                 </button>
                 <button
                   onClick={restart}
-                  className="text-sm text-primary hover:text-accent transition-colors"
+                  className="text-sm text-primary hover:text-selection transition-colors"
                 >
                   Neues Interview starten
                 </button>

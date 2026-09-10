@@ -1,6 +1,6 @@
 ---
 name: Job-Finder
-description: Private Job-Suche & Bewerbungs-Management für einen Freundeskreis — ein warmes Feldnotizbuch mit gebranntem Ocker als einziger Signalfarbe.
+description: Private Job-Suche & Bewerbungs-Management für einen Freundeskreis — ein warmes Feldnotizbuch mit zwei Stiften: Ocker für Handlung, Tinten-Blau für Auswahl und Zustand.
 colors:
   paper: "#faf9f7"
   ink: "#1c1917"
@@ -14,6 +14,9 @@ colors:
   ochre-deep: "#92400e"
   ochre-tint: "#f0e2cd"
   on-ochre: "#ffffff"
+  ink-blue: "#3f5873"
+  ink-blue-strong: "#32485f"
+  on-ink-blue: "#ffffff"
   moss: "#55724f"
   khaki: "#7d6740"
   clay: "#96553f"
@@ -83,8 +86,8 @@ components:
     rounded: "{rounded.full}"
     padding: "6px 12px"
   chip-active:
-    backgroundColor: "{colors.ochre}"
-    textColor: "{colors.on-ochre}"
+    backgroundColor: "{colors.ink-blue}"
+    textColor: "{colors.on-ink-blue}"
     rounded: "{rounded.full}"
     padding: "6px 12px"
   chip-idle:
@@ -102,12 +105,12 @@ components:
 
 **Creative North Star: "Das Feldnotizbuch"**
 
-Job-Finder sieht aus wie das Notizbuch, in dem jemand ernsthaft an seiner Zukunft schreibt: warmes Papier, Tinte, gerade noch so viel Struktur, dass man beim Blättern nicht den Faden verliert. Und wie in einem echten Notizbuch gibt es genau einen farbigen Stift — einen gebrannten Ocker — der das anrandert, was gerade zählt. Alles andere ist Material, nicht Botschaft. Die App ist ein Arbeitsgerät für eine feste kleine Gruppe, kein Schaufenster: Dichte entsteht durch Inhalt, nicht durch Dekoration, und die einzige Frage, die jede Fläche beantworten muss, ist „Was ist mein nächster Schritt?".
+Job-Finder sieht aus wie das Notizbuch, in dem jemand ernsthaft an seiner Zukunft schreibt: warmes Papier, Tinte, gerade noch so viel Struktur, dass man beim Blättern nicht den Faden verliert. Und wie in einem echten Notizbuch gibt es zwei Stifte: einen gebrannten Ocker, der die Handlung anrandert — den einen Button, der weiterführt — und eine blaugeschriebene Tinte, die den Zustand markiert: Auswahl, aktive Filter, Links, wo man gerade ist. Alles andere ist Material, nicht Botschaft. Die App ist ein Arbeitsgerät für eine feste kleine Gruppe, kein Schaufenster: Dichte entsteht durch Inhalt, nicht durch Dekoration, und die einzige Frage, die jede Fläche beantworten muss, ist „Was ist mein nächster Schritt?".
 
 Die Atmosphäre ist ehrlich und ungeschminkt — sie zeigt Lücken, Ablehnungen und fehlende KI-Scores so, wie sie sind, in gedämpften statt schreienden Signalen. Sie ist ruhig: keine Dringlichkeits-Maschinerie, kein Hustle-SaaS-Vokabular, nichts blinkt den Nutzer an. Komponenten sind zurückhaltend-selbstsicher: sie versprechen wenig und halten exakt, was sie versprechen — ein Button ist ein Button, eine Karte ist ein Blatt im Notizbuch.
 
 **Key Characteristics:**
-- Ein einziger Akzent (gebrannter Ocker), der nur kommuniziert und nie dekoriert
+- Zwei Stifte mit exklusiven Rollen: gebrannter Ocker für Handlung, Tinten-Blau für Auswahl/Zustand — beide kommunizieren, keiner dekoriert
 - Warmes Steinpapier als Grundmaterial; Karten sind dunklere/hellere Blätter desselben Materials
 - Tiefe aus 1px-Kanten und Hell/Dunkel, nicht aus Schatten oder Gradients
 - Große Type ist leicht (300), kleine Type ist kräftig (500); alle dynamischen Zahlen tabellarisch
@@ -115,7 +118,7 @@ Die Atmosphäre ist ehrlich und ungeschminkt — sie zeigt Lücken, Ablehnungen 
 
 ## Colors
 
-Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Ocker als Werkzeug, drei gedämpfte Signalfarben für Bedeutung. Jeder Token hat einen Dark-Mode-Partner im selben Farbton (nur Hell/Dunkel verschiebt sich, nie der Charakter):
+Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Ocker und ein Tinten-Blau als Werkzeuge, drei gedämpfte Signalfarben für Bedeutung. Jeder Token hat einen Dark-Mode-Partner im selben Farbton (nur Hell/Dunkel verschiebt sich, nie der Charakter):
 
 | Token | Light | Dark |
 |---|---|---|
@@ -125,10 +128,15 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 | `stone` / `stone-soft` | `#57534e` / `#78716c` | `#d6d3d1` / `#9d968f` |
 | `ochre` / `ochre-deep` | `#b45309` / `#92400e` | `#dfa04e` / `#ecb668` |
 | `ochre-tint` / `on-ochre` | `#f0e2cd` / `#ffffff` | `#5c452a` / `#1c1917` |
+| `ink-blue` / `ink-blue-strong` | `#3f5873` / `#32485f` | `#93b2cc` / `#a9c3d9` |
+| `on-ink-blue` | `#ffffff` | `#1c1917` |
 | `moss` / `khaki` / `clay` | `#55724f` / `#7d6740` / `#96553f` | `#89ab84` / `#b5a077` / `#c99284` |
 
-### Primary
-- **Gebrannter Ocker** (`#b45309`, dunkel `#dfa04e`): die einzige kommunizierende Farbe. Primär-Buttons, aktive Nav-Underline, aktive Filter-Chips, Fokusring, Link-Hover, Step-Nummern. Im Dark Mode wird sie heller und wärmer, nicht kräftiger — derselbe Bleistift bei Kerzenlicht.
+### Primary (Handlung)
+- **Gebrannter Ocker** (`#b45309`, dunkel `#dfa04e`): ausschließlich Handlung und Aufmerksamkeit im Gebrauch — Primär-Buttons und Fokusring, sonst nirgends. Im Dark Mode wird sie heller und wärmer, nicht kräftiger — derselbe Bleistift bei Kerzenlicht.
+
+### Selection (Auswahl/Zustand)
+- **Tinten-Blau** (`#3f5873`, dunkel `#93b2cc`, Hover `#32485f`/`#a9c3d9`): der zweite Stift — alles, was einen Zustand markiert statt eine Aktion auslöst: aktive Filter-Chips, aktive Segmente, gesetzte Checkboxen, Text-Links, die aktive Nav-Unterlinie, der aktuelle Schritt. Entsättigt und petrol geneigt, damit es im warmen Heft bleibt und nicht nach SaaS schmeckt. Im Dark Mode heller, nie kräftiger.
 
 ### Neutral
 - **Warm Stone Papier** (`#faf9f7`): Seitenhintergrund, Input-Füllung (inset in Karten).
@@ -143,7 +151,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 - **Ton** (`#96553f`): Abgeschminkt — „Abgelehnt", Score < 6. Ein warmes, nicht feueriges Rot.
 
 ### Named Rules
-**The One Color Rule.** Ocker kommuniziert — alles andere ist Material. Auf einem Screen ist Ocker CTA, aktivem Zustand und Fokus vorbehalten und macht dort einen kleinen Bruchteil der Fläche aus; seine Seltenheit ist seine Aussage. Semantische Farben gelten nur für Status- und Score-Bedeutung, nie für Deko.
+**The One Role Per Color Rule.** Eine Farbe, eine Rolle: Ocker löst aus (CTA, Fokus), Tinten-Blau markiert Zustand (Auswahl, aktive Filter, Links, aktive Nav), semantische Farben bedeuten (Score, Pipeline-Status). Keine Farbe leiht sich die Rolle der anderen — wer eine Fläche setzt, fragt zuerst: Handlung, Zustand oder Bedeutung? Seltenheit bleibt die Aussage beider Stifte; zusammen machen sie auch in filterreichen Toolbars nur einen kleinen Bruchteil der Fläche aus.
 
 **The Honest Signal Rule.** Bedeutung wird gedämpft ausgedrückt: semantische Farben erscheinen als 10%-Tint-Fläche mit 20%-Border, nie als Vollfläche. Ein „Abgelehnt" darf lesbar sein, ohne den Nutzer anzuschreien.
 
@@ -199,7 +207,7 @@ Zurückhaltend-selbstsicher: Primär ist die eine Ocker-Fläche im Viewport, Sek
 ### Chips
 Etiketten mit Filter-Funktion, `aria-pressed` als Pflicht.
 - **Style:** rund (9999px), 6×12px, 0.75rem, 1px-Border in Haarkante, Stein-Text.
-- **State:** aktiv = Ocker-Fläche mit Weiß-Text; inaktiv = transparent mit Stein-Text. Border-los in beiden Fällen? Nein — inaktiv zeigt die Haarkante, aktiv braucht sie nicht.
+- **State:** aktiv = Tinten-Blau-Fläche mit Weiß-Text (dunkel: Tusche-Text); inaktiv = transparent mit Stein-Text. Border-los in beiden Fällen? Nein — inaktiv zeigt die Haarkante, aktiv braucht sie nicht.
 
 ### Status Badges (Signature)
 Der beschreibende Kern der App: acht deutsche Status-Pills, die Bedeutung über gedämpfte Tints tragen (`px-3 py-1.5`, 0.75rem, 500).
@@ -218,12 +226,12 @@ Der beschreibende Kern der App: acht deutsche Status-Pills, die Bedeutung über 
 - **Focus:** Ocker-Ring; kein Glow, kein Farbwechsel des Feldes.
 
 ### Navigation
-Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtbar. Links sind Label (0.875rem, 500): inaktiv Weicher Stein mit Hover zu Tusche, aktiv Tusche mit 2px-Ocker-Unterlinie (offset 8px) und `aria-current="page"`. Abmelden ist ein Textlink, kein Button. Mobil: 40px-Icon-Button (12px Radius), Panel mit vollem Link-Set.
+Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtbar. Links sind Label (0.875rem, 500): inaktiv Weicher Stein mit Hover zu Tusche, aktiv Tusche mit 2px-Tinten-Blau-Unterlinie (offset 8px) und `aria-current="page"` — „wo bin ich" ist Zustand, also der blauen Tinte. Abmelden ist ein Textlink, kein Button. Mobil: 40px-Icon-Button (12px Radius), Panel mit vollem Link-Set.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** Ocker nur für Kommunikation verwenden: CTA, aktiver Zustand, Fokus, Step-Nummern.
+- **Do** Ocker nur für Handlung verwenden: CTA und Fokus. Zustand und Auswahl (aktive Chips, Checkboxen, Links, aktive Nav) tragen Tinten-Blau.
 - **Do** alle Status- und Score-Farben als 10%-Tint mit 20%-Border und Vollton-Text setzen.
 - **Do** `tabular-nums` auf jede dynamische Zahl (Stats, Scores, „N neue Jobs").
 - **Do** Shared Components nutzen (`app/components/ui.tsx`: `Button`, `ButtonLink`, `Card`, `StatusBadge`) statt Class-Strings zu kopieren.
@@ -231,7 +239,7 @@ Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtb
 - **Do** deutsche, sachlich-warme Copy — auch in Fehlern („Nicht authentifiziert", kein „Oops!").
 
 ### Don't:
-- **Don't** zweite kommunikative Farben einführen — keine Blau-Links, keine grünen Success-Buttons, kein Regenbogen in der Nav.
+- **Don't** den Rollen der beiden Stifte mischen — kein Tinten-Blau auf CTA-Buttons, kein Ocker auf Auswahl-Zuständen, keine dritte kommunizierende Farbe (kein grüner Success-Button, kein Regenbogen in der Nav).
 - **Don't** Gradients, gestapelte Schatten oder Glow-Effekte verwenden — Tiefe kommt aus Kanten und Hell/Dunkel.
 - **Don't** `alert()` oder Browser-Dialoge — Feedback läuft über das Toast-System.
 - **Don't** fette (≥600) Überschriften oder dünne Button-Texte — das Gewichtsgefälle ist 300 groß / 500 klein.

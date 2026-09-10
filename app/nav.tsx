@@ -16,7 +16,8 @@ const links = [
 function linkClasses(active: boolean) {
   return `text-sm font-medium transition-colors ${
     active
-      ? 'text-foreground underline decoration-accent decoration-2 underline-offset-8'
+      // „Wo bin ich" ist Zustand — die Unterlinie trägt Tinten-Blau, nicht Ocker
+      ? 'text-foreground underline decoration-selection decoration-2 underline-offset-8'
       : 'text-primary-soft hover:text-foreground'
   }`
 }

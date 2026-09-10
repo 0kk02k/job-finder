@@ -428,7 +428,7 @@ function SearchPageContent() {
                   type="checkbox"
                   checked={remote}
                   onChange={(e) => setRemote(e.target.checked)}
-                  className="w-4 h-4 rounded border-border accent-primary"
+                  className="w-4 h-4 rounded border-border accent-selection"
                 />
                 <span className="text-sm text-foreground">Nur Remote</span>
               </label>
@@ -438,7 +438,7 @@ function SearchPageContent() {
                   type="checkbox"
                   checked={semantic}
                   onChange={(e) => setSemantic(e.target.checked)}
-                  className="w-4 h-4 rounded border-border accent-primary"
+                  className="w-4 h-4 rounded border-border accent-selection"
                 />
                 <span className="text-sm text-foreground">KI-Suche (semantisches Matching)</span>
               </label>
@@ -448,7 +448,7 @@ function SearchPageContent() {
                   type="checkbox"
                   checked={autoSave}
                   onChange={(e) => setAutoSave(e.target.checked)}
-                  className="w-4 h-4 rounded border-border accent-primary"
+                  className="w-4 h-4 rounded border-border accent-selection"
                 />
                 <span className="text-sm text-foreground">Treffer automatisch in meine Liste übernehmen</span>
               </label>
@@ -459,13 +459,13 @@ function SearchPageContent() {
         {/* Resume-Hinweis: ohne Lebenslauf fällt die KI-Bewertung aus — das
             steht vorher da, nicht als „Kein Score“-Wand danach */}
         {hasResume === false && (
-          <section className="mb-8 p-4 bg-surface rounded-xl border border-accent/30 flex flex-wrap items-center justify-between gap-3">
+          <section className="mb-8 p-4 bg-surface rounded-xl border border-selection/30 flex flex-wrap items-center justify-between gap-3">
             <p className="text-sm text-foreground">
               Kein Lebenslauf hinterlegt — die KI kann Treffer deshalb nicht bewerten.
             </p>
             <Link
               href="/resume"
-              className="text-sm font-medium text-accent hover:text-accent-strong transition-colors"
+              className="text-sm font-medium text-selection hover:text-selection-strong transition-colors"
             >
               Lebenslauf hinterlegen
             </Link>
@@ -540,7 +540,7 @@ function SearchPageContent() {
             {!justSaved && (
               <button
                 onClick={saveCurrentSearch}
-                className="text-sm font-medium text-primary hover:text-accent transition-colors"
+                className="text-sm font-medium text-primary hover:text-selection transition-colors"
               >
                 + Suche speichern
               </button>
@@ -651,7 +651,7 @@ function StatCard({ title, value, highlight }: { title: string; value: string; h
 function StageRow({ done, text, meta }: { done: boolean; text: string; meta?: string }) {
   return (
     <p className="flex items-center gap-2 text-sm">
-      <span aria-hidden="true" className={done ? 'text-success' : 'text-accent'}>
+      <span aria-hidden="true" className={done ? 'text-success' : 'text-selection'}>
         {done ? '✓' : '●'}
       </span>
       <span className={done ? 'text-success' : 'text-foreground'}>{text}</span>

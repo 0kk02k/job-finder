@@ -120,7 +120,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-sm text-primary-soft mt-4">
           Schon ein Account?{' '}
-          <Link href="/login" className="text-primary hover:text-accent">
+          <Link href="/login" className="text-primary hover:text-selection transition-colors">
             Anmelden
           </Link>
         </p>

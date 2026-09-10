@@ -210,7 +210,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <p className="text-primary-soft mb-4">{error || 'Job nicht gefunden'}</p>
           <button
             onClick={() => router.push('/jobs')}
-            className="text-sm text-primary hover:text-accent transition-colors"
+            className="text-sm text-primary hover:text-selection transition-colors"
           >
             Zurück zur Job-Übersicht
           </button>
@@ -401,7 +401,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 </Button>
                 <button
                   onClick={() => setLetter(null)}
-                  className="text-sm text-primary underline decoration-accent/60 underline-offset-4 hover:text-foreground hover:decoration-accent"
+                  className="text-sm text-primary underline decoration-selection/60 underline-offset-4 hover:text-foreground hover:decoration-selection"
                 >
                   Verwerfen
                 </button>

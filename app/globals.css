@@ -1,6 +1,8 @@
 @import "tailwindcss";
 
-/* Warm notebook palette — stone neutrals with a single ochre accent.
+/* Warm notebook palette — stone neutrals, ochre acts, ink-blue marks state.
+   Rollenregel „Eine Rolle, eine Farbe“: Ocker = Handlung (CTA, Fokus),
+   Tinten-Blau = Auswahl/Zustand (aktive Filter, Checkboxen, Links, aktive Nav).
    Roh-Tokens tragen eigene Namen (--paper, --stone, --ochre …); die @theme-Keys
    (--color-*) verweisen darauf. Früher hießen beide Ebenen gleich
    (--color-primary: var(--color-primary) in @theme) — eine zirkuläre Referenz,
@@ -20,11 +22,18 @@
   /* secondary text: stone-500 — 4.6:1 auf paper (AA); stone-400 war 2.4:1 */
   --stone-soft: #78716c;
 
-  /* Ochre accent — the one color that communicates (CTAs, active states, focus) */
+  /* Ochre accent — Handlung: CTA-Flächen und Fokusring, sonst nirgends */
   --ochre: #b45309;
   --ochre-deep: #92400e;
   --ochre-tint: #f0e2cd;
   --on-ochre: #ffffff;
+
+  /* Ink-blue selection — der zweite Stift: Auswahl/Zustand (aktive Filter,
+     Checkboxen, Segments, Links, aktive Nav). Kontraste: Weiß auf #3f5873
+     7.3:1, Tusche auf #93b2cc 7.8:1, Link-Blau auf paper 6.7:1 — alles ≥ AA. */
+  --ink-blue: #3f5873;
+  --ink-blue-strong: #32485f;
+  --on-ink-blue: #ffffff;
 
   /* Signalfarben auf Textstärke angehoben: ≥4.5:1 auf paper UND auf der eigenen /10-Tint-Fläche */
   --moss: #55724f;
@@ -54,6 +63,10 @@
     --ochre-tint: #5c452a;
     --on-ochre: #1c1917;
 
+    --ink-blue: #93b2cc;
+    --ink-blue-strong: #a9c3d9;
+    --on-ink-blue: #1c1917;
+
     --moss: #89ab84;
     --khaki: #b5a077;
     --clay: #c99284;
@@ -73,6 +86,9 @@
   --color-accent-strong: var(--ochre-deep);
   --color-accent-soft: var(--ochre-tint);
   --color-on-accent: var(--on-ochre);
+  --color-selection: var(--ink-blue);
+  --color-selection-strong: var(--ink-blue-strong);
+  --color-on-selection: var(--on-ink-blue);
   --color-success: var(--moss);
   --color-warning: var(--khaki);
   --color-error: var(--clay);
