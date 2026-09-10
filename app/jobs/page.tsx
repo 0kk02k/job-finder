@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
-import { ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
+import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
 import { scoreLabel } from '@/lib/matching'
 import { STATUS_LABELS } from '@/lib/status'
 
@@ -59,6 +59,10 @@ export default function JobsPage() {
     const filter = new URLSearchParams(window.location.search).get('filter')
     return filter === 'unscored' ? 'unscored' : filter === 'scored' ? 'scored' : 'all'
   })
+  // Batch-Scoring: der Server begrenzt jeden Lauf, die Fläche loopt bis der
+  // Rückstand trocken ist — Fortschritt aus gezählter Antwort, nicht aus Annahme
+  const [batchRunning, setBatchRunning] = useState(false)
+  const [batchDone, setBatchDone] = useState(0)
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     if (typeof window === 'undefined') return 'newest'
     // Deep-Link aus dem Dashboard: die am längsten wartenden zuerst
@@ -168,6 +172,36 @@ export default function JobsPage() {
     setHighMatchOnly(false)
     setScoreFilter('all')
     setSortBy('newest')
+  }
+
+  async function runScoreBatch() {
+    setBatchRunning(true)
+    setBatchDone(0)
+    try {
+      // 20 Läufe à max. 20 Jobs decken jeden Freundeskreis-Rückstand ab; Abbruch,
+      // wenn nichts mehr unbewertet ist oder ein Lauf nichts schafft (nur Skipped)
+      for (let run = 0; run < 20; run++) {
+        const response = await fetch('/api/jobs/score-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ limit: 20 }),
+        })
+        const data = (await response.json().catch(() => undefined)) as
+          | { scored: number; failed: number; skipped: number; remaining: number; error?: string }
+          | undefined
+        if (!response.ok || !data) {
+          toast.error(data?.error ?? 'Bewertung fehlgeschlagen.')
+          return
+        }
+        setBatchDone((done) => done + data.scored + data.failed + data.skipped)
+        if (data.remaining === 0 || (data.scored === 0 && data.failed === 0)) break
+      }
+    } catch {
+      toast.error('Bewertung fehlgeschlagen.')
+    } finally {
+      setBatchRunning(false)
+      fetchJobs()
+    }
   }
 
   const getScoreColor = scoreTone
@@ -323,11 +357,25 @@ export default function JobsPage() {
               </div>
 
               {/* Die eine Zeile, die dem Filter seinen Sinn gibt: „unbewertet" ist
-                  der Zustand vor dem Scoring, kein Mangel in der eigenen Liste. */}
+                  die Warteschlange vor dem Scoring — hier wird sie abgetragen. */}
               {scoreFilter === 'unscored' && (
-                <p className="text-xs text-primary-soft">
-                  Scores entstehen bei der Suche — manuell hinzugefügte Jobs haben noch keine.
-                </p>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-primary-soft">
+                    Scores entstehen bei der Suche — der Rest wartet hier auf seine Bewertung.
+                  </p>
+                  {filteredJobs.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => void runScoreBatch()}
+                      disabled={batchRunning}
+                    >
+                      {batchRunning
+                        ? `Bewerte … ${batchDone}/${filteredJobs.length}`
+                        : `Unbewertete bewerten (${filteredJobs.length})`}
+                    </Button>
+                  )}
+                </div>
               )}
             </section>
 

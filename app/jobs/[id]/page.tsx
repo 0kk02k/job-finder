@@ -47,7 +47,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [error, setError] = useState<string | null>(null)
   // Ein „beschäftigt“-Zustand pro Handlung — ein gemeinsamer sperrt beide Buttons
   // und behauptet, was nicht passiert
-  const [busy, setBusy] = useState<'resume' | 'generate' | 'letter' | null>(null)
+  const [busy, setBusy] = useState<'resume' | 'generate' | 'letter' | 'score' | null>(null)
   // Anschreiben: bewusst nur Client-State — der Text gehört der Nutzerin, sie
   // bearbeitet ihn und lädt das PDF selbst. Nichts wird persistiert.
   const [letter, setLetter] = useState<{ text: string; source: 'ki' | 'vorlage' } | null>(null)
@@ -68,6 +68,26 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       setJob({ ...job, status })
     } catch {
       toast.error('Status konnte nicht aktualisiert werden')
+    }
+  }
+
+  // Scoring auf Abruf: der Job muss nicht mehr auf die nächste Suche warten.
+  // Fehler ehrlich benannt — ohne erreichbare KI bleibt der Score offen.
+  async function scoreNow() {
+    if (!job || busy) return
+    setBusy('score')
+    try {
+      const response = await fetch(`/api/jobs/${job.id}/score`, { method: 'POST' })
+      if (!response.ok) {
+        const data = (await response.json().catch(() => undefined)) as { error?: string } | undefined
+        toast.error(data?.error ?? 'Bewertung fehlgeschlagen — der Score bleibt offen.')
+        return
+      }
+      setJob(await response.json())
+    } catch {
+      toast.error('Bewertung fehlgeschlagen — der Score bleibt offen.')
+    } finally {
+      setBusy(null)
     }
   }
 
@@ -315,10 +335,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         ) : (
           <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
-            <p className="text-sm text-primary">
-              Noch keine Bewertung — entsteht bei der nächsten Suche oder beim erneuten Suchen
-              dieses Jobs.
+            <p className="text-sm text-primary mb-4">
+              Noch keine Bewertung. Die KI bewertet bei der Suche automatisch die ersten 15
+              Treffer — dieser Job lag darüber oder wurde manuell hinzugefügt. Er muss nicht
+              auf die nächste Suche warten:
             </p>
+            <Button size="sm" variant="secondary" onClick={() => void scoreNow()} disabled={busy !== null}>
+              {busy === 'score' ? 'Bewertung läuft …' : 'Jetzt bewerten'}
+            </Button>
           </div>
         )}
 
