@@ -7,6 +7,7 @@ import { MarkdownContent, structureJobDescription } from '../../components/Markd
 import { Button, StatusBadge, StatusButton, buttonClasses, scoreTone } from '../../components/ui'
 import { scoreLabel } from '@/lib/matching'
 import { STATUS_LABELS } from '@/lib/status'
+import { isDue } from '@/lib/applications'
 
 interface Job {
   id: string
@@ -20,6 +21,8 @@ interface Job {
   scoreReason: string | null
   matchDetails: string | null
   appliedAt: string | null
+  followUpAt: string | null
+  notes: string | null
   createdAt: string
 }
 
@@ -52,6 +55,17 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // bearbeitet ihn und lädt das PDF selbst. Nichts wird persistiert.
   const [letter, setLetter] = useState<{ text: string; source: 'ki' | 'vorlage' } | null>(null)
   const [letterError, setLetterError] = useState<string | null>(null)
+  // Notiz & Wiedervorlage — dieselben Felder wie im Cockpit, derselbe Schreibweg (PATCH).
+  // Sync beim Job-Wechsel als Render-Zeit-Muster: Status-Buttons (eigene setJob-Aufrufe)
+  // dürfen laufende Eingaben nicht wegwalzen, nur echter Job-Wechsel setzt zurück.
+  const [loadedJobId, setLoadedJobId] = useState<string | null>(null)
+  const [notes, setNotes] = useState('')
+  const [followUp, setFollowUp] = useState('')
+  if (job && job.id !== loadedJobId) {
+    setLoadedJobId(job.id)
+    setNotes(job.notes ?? '')
+    setFollowUp(job.followUpAt ? job.followUpAt.slice(0, 10) : '')
+  }
 
   async function updateStatus(status: string) {
     if (!job) return
@@ -88,6 +102,33 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       toast.error('Bewertung fehlgeschlagen — der Score bleibt offen.')
     } finally {
       setBusy(null)
+    }
+  }
+
+  async function saveCockpitField(body: Record<string, unknown>) {
+    if (!job) return false
+    const response = await fetch(`/api/jobs/${job.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    if (!response.ok) {
+      toast.error('Speichern fehlgeschlagen — der Eintrag bleibt unverändert.')
+      return false
+    }
+    return true
+  }
+
+  async function saveNotes() {
+    if (!job || notes === (job.notes ?? '')) return
+    const next = notes === '' ? null : notes
+    if (await saveCockpitField({ notes })) setJob({ ...job, notes: next })
+  }
+
+  async function saveFollowUp(value: string) {
+    if (!job) return
+    if (await saveCockpitField({ followUpAt: value === '' ? null : value })) {
+      setJob({ ...job, followUpAt: value === '' ? null : value })
     }
   }
 
@@ -343,6 +384,43 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <Button size="sm" variant="secondary" onClick={() => void scoreNow()} disabled={busy !== null}>
               {busy === 'score' ? 'Bewertung läuft …' : 'Jetzt bewerten'}
             </Button>
+          </div>
+        )}
+
+        {/* Notiz & Wiedervorlage — dieselben Felder wie im Cockpit: der Überblick
+            dort, das Einzelheim hier, ein Schreibweg */}
+        {job && (
+          <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
+              <h2 className="text-sm font-medium text-primary-soft">Notiz & Wiedervorlage</h2>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-primary-soft">Wiedervorlage</span>
+                <input
+                  type="date"
+                  value={followUp}
+                  onChange={(e) => {
+                    setFollowUp(e.target.value)
+                    void saveFollowUp(e.target.value)
+                  }}
+                  aria-label="Wiedervorlage"
+                  className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-foreground text-sm tabular-nums"
+                />
+              </label>
+              {job.followUpAt != null && isDue(job.followUpAt, new Date()) && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
+                  Fällig
+                </span>
+              )}
+            </div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => void saveNotes()}
+              rows={3}
+              placeholder="Gesprächsverlauf, Ansprechpartner, nächster Schritt …"
+              aria-label="Notiz zu diesem Job"
+              className="w-full px-4 py-3 rounded-xl bg-background border border-border text-foreground placeholder:text-primary-soft text-sm leading-relaxed resize-y"
+            />
           </div>
         )}
 

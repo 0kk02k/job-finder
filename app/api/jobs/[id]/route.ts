@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
-import { JobStatus } from '@prisma/client'
-import { appliedAtFor, STATUS_LABELS } from '@/lib/status'
+import { JobStatus, Prisma } from '@prisma/client'
+import { appliedAtFor, rejectedAtFor, STATUS_LABELS } from '@/lib/status'
 
 const VALID_STATUSES = Object.values(JobStatus)
 
@@ -31,7 +31,8 @@ export async function GET(
   return NextResponse.json(job)
 }
 
-// PATCH /api/jobs/[id] - update job status
+// PATCH /api/jobs/[id] - Status ändern; optional auch Notiz und Wiedervorlage
+// (das Cockpit und die Detailseite teilen sich diesen einen Schreibweg)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -41,11 +42,20 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const { status } = body
+  const { status, notes, followUpAt } = body
 
-  if (!status || !VALID_STATUSES.includes(status)) {
+  if (status !== undefined && !VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: 'Ungültiger Status' }, { status: 400 })
   }
+
+  let followUp: Date | null = null
+  if (followUpAt !== undefined && followUpAt !== null) {
+    followUp = new Date(followUpAt)
+    if (isNaN(followUp.getTime())) {
+      return NextResponse.json({ error: 'Ungültiges Datum für die Wiedervorlage' }, { status: 400 })
+    }
+  }
+  const hasFollowUp = followUpAt !== undefined
 
   // Only the owner may modify a job
   const existing = await prisma.job.findFirst({
@@ -57,23 +67,33 @@ export async function PATCH(
   }
 
   try {
-    const job = await prisma.job.update({
-      where: { id },
-      data: {
-        status,
-        // Erster Bewerbungsversand wird festgehalten und nie überschrieben
-        appliedAt: appliedAtFor(status, existing.appliedAt, new Date()),
-      },
-    })
+    const data: Prisma.JobUpdateInput = {}
+    if (status !== undefined) {
+      data.status = status
+      // Erster Bewerbungsversand und erste Absage werden festgehalten und nie überschrieben
+      data.appliedAt = appliedAtFor(status, existing.appliedAt, new Date())
+      data.rejectedAt = rejectedAtFor(status, existing.rejectedAt, new Date())
+    }
+    if (notes !== undefined) {
+      // Eine geleerte Notiz ist eine gelöschte — kein Unsichtbarer Restwert
+      data.notes = notes === '' ? null : notes
+    }
+    if (hasFollowUp) {
+      data.followUpAt = followUpAt === null ? null : followUp
+    }
 
-    // Add activity
-    await prisma.activity.create({
-      data: {
-        jobId: id,
-        type: 'STATUS_CHANGE',
-        description: `Status geändert zu ${STATUS_LABELS[status] ?? status}`,
-      },
-    })
+    const job = await prisma.job.update({ where: { id }, data })
+
+    // Activity nur beim Statuswechsel — Notizen sind ein lebendiges Feld, kein Ereignis
+    if (status !== undefined) {
+      await prisma.activity.create({
+        data: {
+          jobId: id,
+          type: 'STATUS_CHANGE',
+          description: `Status geändert zu ${STATUS_LABELS[status] ?? status}`,
+        },
+      })
+    }
 
     return NextResponse.json(job)
   } catch (error) {

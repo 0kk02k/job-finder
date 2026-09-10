@@ -89,7 +89,6 @@ export default function Dashboard() {
   const [jobsState, setJobsState] = useState<JobsState>('loading')
   const [jobsError, setJobsError] = useState<JobsError | null>(null)
   const [stats, setStats] = useState<{ total: number; totalAll: number; scored: number; applied: number } | null>(null)
-  const [waitingCount, setWaitingCount] = useState(0)
   const [unscoredCount, setUnscoredCount] = useState(0)
   const [unscoredAllCount, setUnscoredAllCount] = useState(0)
   const [newThisWeek, setNewThisWeek] = useState(0)
@@ -141,10 +140,6 @@ export default function Dashboard() {
       // Eine Menge, eine Semantik: alle Kennzahlen über dieselben aktiven Jobs
       const active = jobs.filter((j) => !['ARCHIVED', 'REJECTED'].includes(j.status))
       const scored = active.filter((j) => j.score != null)
-      // Wartende High Matches: starke Treffer, die noch nicht in der Pipeline sind
-      const waiting = active.filter(
-        (j) => (j.score ?? 0) >= HIGH_MATCH_THRESHOLD && !PIPELINE_AHEAD.includes(j.status)
-      )
       // Ohne Bewertung — über die aktive Menge, identisch zum Zähler auf /jobs (Korpus-Wahrheit)
       const unscoredAll = active.filter((j) => j.score == null)
       // Handlungsfähiger Teil: unbewertet UND nicht schon in der Pipeline
@@ -158,8 +153,8 @@ export default function Dashboard() {
         scored: scored.length,
         applied: active.filter((j) => PIPELINE_AHEAD.includes(j.status)).length,
       })
-      setWaitingCount(waiting.length)
       setUnscoredCount(unscored.length)
+
       setUnscoredAllCount(unscoredAll.length)
       setNewThisWeek(fresh.length)
 
@@ -249,14 +244,13 @@ export default function Dashboard() {
         href: '/jobs?filter=unscored&sort=oldest',
       })
     }
-    if (waitingCount > 0) {
+    // Die eigene Bewerbungstätigkeit statt Treffer-Versprechen: was du in
+    // Bewegung gesetzt hast, mit Terminen, Notizen und Wiedervorlage
+    if (stats.applied > 0) {
       options.push({
-        label: 'High Matches ansehen',
-        description:
-          waitingCount === 1
-            ? '1 starker Treffer ist noch nicht in deiner Pipeline.'
-            : `${waitingCount} starke Treffer sind noch nicht in deiner Pipeline.`,
-        href: '/jobs?filter=high_match',
+        label: 'Bewerbungen im Blick',
+        description: `${stats.applied} laufende ${stats.applied === 1 ? 'Bewerbung' : 'Bewerbungen'} — Termine, Notizen, Wiedervorlage.`,
+        href: '/applications',
       })
     }
     if (savedSearches.length > 0) {

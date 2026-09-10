@@ -8,6 +8,7 @@ import { signOut } from 'next-auth/react'
 const links = [
   { href: '/search', label: 'Suchen' },
   { href: '/jobs', label: 'Jobs' },
+  { href: '/applications', label: 'Bewerbungen' },
   { href: '/interview', label: 'Interview' },
   { href: '/resume', label: 'Lebenslauf' },
   { href: '/settings', label: 'Einstellungen' },

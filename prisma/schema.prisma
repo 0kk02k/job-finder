@@ -131,6 +131,9 @@ model Job {
   matchDetails String? // JSON: { strengths?, gaps?, transferableSkills? }
 
   appliedAt   DateTime?
+  rejectedAt  DateTime? // erste Absage — nie überschrieben (rejectedAtFor), für Wochen-Kennzahlen
+  followUpAt  DateTime? // Wiedervorlage: vom Nutzer gesetzter Termin (nachfassen / Gespräch)
+  notes       String?   // Klartext-Notiz des Nutzers zur Bewerbung
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

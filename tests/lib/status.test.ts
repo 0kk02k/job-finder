@@ -3,7 +3,7 @@
 // überschrieben oder zurückgenommen.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { appliedAtFor, STATUS_LABELS } from '../../lib/status'
+import { appliedAtFor, rejectedAtFor, STATUS_LABELS } from '../../lib/status'
 
 const NOW = new Date('2026-09-08T12:00:00Z')
 const EARLIER = new Date('2026-08-01T09:00:00Z')
@@ -25,6 +25,23 @@ test('non-application statuses do not set appliedAt', () => {
   assert.equal(appliedAtFor('REJECTED', null, NOW), null)
   assert.equal(appliedAtFor('ARCHIVED', null, NOW), null)
   assert.equal(appliedAtFor('DISCOVERED', null, NOW), null)
+})
+
+// rejectedAt markiert die erste Absage — dieselbe Unumkehrlichkeits-Regel wie
+// appliedAt: gesetzt beim REJECTED-Übergang, nie überschrieben, nie zurückgenommen.
+test('rejectedAt is set when the job moves to REJECTED', () => {
+  assert.equal(rejectedAtFor('REJECTED', null, NOW), NOW)
+})
+
+test('an existing rejectedAt is never overwritten', () => {
+  assert.equal(rejectedAtFor('REJECTED', EARLIER, NOW), EARLIER)
+})
+
+test('other statuses keep rejectedAt unchanged (set or null)', () => {
+  assert.equal(rejectedAtFor('APPLIED', null, NOW), null)
+  assert.equal(rejectedAtFor('INTERVIEW', null, NOW), null)
+  assert.equal(rejectedAtFor('ARCHIVED', EARLIER, NOW), EARLIER)
+  assert.equal(rejectedAtFor('DISCOVERED', EARLIER, NOW), EARLIER)
 })
 
 test('every JobStatus has a German label', () => {

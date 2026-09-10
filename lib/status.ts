@@ -20,3 +20,11 @@ export function appliedAtFor(nextStatus: string, current: Date | null, now: Date
   if (nextStatus !== 'APPLIED' && nextStatus !== 'INTERVIEW') return current ?? null
   return current ?? now
 }
+
+// rejectedAt markiert die erste Absage nach derselben Unumkehrlichkeits-Regel:
+// gesetzt beim REJECTED-Übergang, danach nie überschrieben und durch keinen
+// anderen Wechsel gelöscht — Grundlage für die ehrliche „Absagen diese Woche“-Zahl.
+export function rejectedAtFor(nextStatus: string, current: Date | null, now: Date): Date | null {
+  if (nextStatus !== 'REJECTED') return current ?? null
+  return current ?? now
+}
