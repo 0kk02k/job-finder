@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef } from 'react'
 import { useToast } from '../components/Toast'
 import { MarkdownContent } from '../components/Markdown'
+import { Button } from '../components/ui'
+import { parseSkills } from '@/lib/anecdotes'
 
 interface Resume {
   id: string
@@ -10,6 +12,28 @@ interface Resume {
   content: string
   createdAt: string
   updatedAt: string
+}
+
+// Anekdoten: wahre Geschichten als Material fürs Anschreiben. `skills` kommt
+// als JSON-String aus der DB und wird an der Grenze geparst.
+interface Anecdote {
+  id: string
+  title: string
+  situation: string
+  action: string
+  result: string
+  skills: string
+  source: string
+  createdAt: string
+}
+
+// Vorschlag aus der Extraktion — lebt nur im Client-State, bis er bestätigt wird
+interface Proposal {
+  title: string
+  situation: string
+  action: string
+  result: string
+  skills: string[]
 }
 
 export default function ResumePage() {
@@ -24,8 +48,19 @@ export default function ResumePage() {
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Anekdoten: eigene Sektion mit eigenem Ladezyklus — sie hängt nicht am Modus
+  // des Lebenslaufs (view/upload/edit), sondern steht immer unten.
+  const [anecdotes, setAnecdotes] = useState<Anecdote[]>([])
+  const [anecdotePanel, setAnecdotePanel] = useState<'none' | 'extract' | 'manual'>('none')
+  const [editingAnecdote, setEditingAnecdote] = useState<Anecdote | null>(null)
+  const [proposals, setProposals] = useState<Proposal[] | null>(null)
+
   useEffect(() => {
     fetchResume()
+  }, [])
+
+  useEffect(() => {
+    void fetchAnecdotes()
   }, [])
 
   async function fetchResume() {
@@ -42,6 +77,32 @@ export default function ResumePage() {
       console.error('Failed to fetch resume:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchAnecdotes() {
+    try {
+      const response = await fetch('/api/anecdotes')
+      if (response.ok) {
+        const data = await response.json()
+        setAnecdotes(Array.isArray(data) ? data : [])
+      }
+    } catch {
+      // Stille Liste: ohne Anekdoten bleibt die Sektion einfach leer
+    }
+  }
+
+  async function deleteAnecdote(id: string) {
+    try {
+      const response = await fetch(`/api/anecdotes/${id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        toast.error('Löschen fehlgeschlagen — die Geschichte bleibt erhalten.')
+        return
+      }
+      setAnecdotes((prev) => prev.filter((a) => a.id !== id))
+      toast.success('Anekdote gelöscht.')
+    } catch {
+      toast.error('Netzwerkfehler — die Geschichte bleibt erhalten.')
     }
   }
 
@@ -326,6 +387,81 @@ export default function ResumePage() {
           </>
         )}
 
+        {/* Anekdoten — wahre Geschichten als Material fürs Anschreiben */}
+        <section id="anekdoten" className="mb-6">
+          <div className="flex flex-wrap items-start justify-between gap-4 mb-4">
+            <div>
+              <h2 className="text-xl font-medium text-foreground">Anekdoten</h2>
+              <p className="text-sm text-primary-soft">
+                Wahre Geschichten, die dein Anschreiben von KI-Standardsatz trennen.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => setAnecdotePanel(anecdotePanel === 'extract' ? 'none' : 'extract')}
+              >
+                Geschichten erzählen
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() => {
+                  setEditingAnecdote(null)
+                  setAnecdotePanel(anecdotePanel === 'manual' ? 'none' : 'manual')
+                }}
+              >
+                Selbst schreiben
+              </Button>
+            </div>
+          </div>
+
+          {anecdotePanel === 'manual' && (
+            <div className="mb-4">
+              <AnecdoteForm
+                key={editingAnecdote ? editingAnecdote.id : 'neu'}
+                anecdote={editingAnecdote}
+                onSaved={(saved) => {
+                  setAnecdotes((prev) => {
+                    const exists = prev.some((a) => a.id === saved.id)
+                    return exists ? prev.map((a) => (a.id === saved.id ? saved : a)) : [saved, ...prev]
+                  })
+                  setAnecdotePanel('none')
+                  setEditingAnecdote(null)
+                  toast.success('Anekdote gespeichert.')
+                }}
+                onCancel={() => {
+                  setAnecdotePanel('none')
+                  setEditingAnecdote(null)
+                }}
+              />
+            </div>
+          )}
+
+          {anecdotes.length > 0 ? (
+            <div className="space-y-4">
+              {anecdotes.map((a) => (
+                <AnecdoteCard
+                  key={a.id}
+                  anecdote={a}
+                  onEdit={() => {
+                    setEditingAnecdote(a)
+                    setAnecdotePanel('manual')
+                  }}
+                  onDelete={() => void deleteAnecdote(a.id)}
+                />
+              ))}
+            </div>
+          ) : (
+            anecdotePanel === 'none' && (
+              <p className="text-sm text-primary-soft bg-surface rounded-2xl p-6 border border-border">
+                Noch keine Anekdoten. Erzähl drei kurze Geschichten — die App formt daraus Karten.
+              </p>
+            )
+          )}
+        </section>
+
         {/* Tip */}
         {resume && mode === 'view' && (
           <section className="bg-success/10 rounded-2xl p-6 border border-success/20">
@@ -337,6 +473,193 @@ export default function ResumePage() {
           </section>
         )}
       </main>
+    </div>
+  )
+}
+
+// Formular für „Selbst schreiben" und Bearbeiten — dieselben vier Felder wie
+// die Extraktions-Karten. Skills werden kommagetrennt eingegeben.
+function AnecdoteForm({
+  anecdote,
+  onSaved,
+  onCancel,
+}: {
+  anecdote: Anecdote | null
+  onSaved: (saved: Anecdote) => void
+  onCancel: () => void
+}) {
+  const toast = useToast()
+  const [title, setTitle] = useState(anecdote?.title ?? '')
+  const [situation, setSituation] = useState(anecdote?.situation ?? '')
+  const [action, setAction] = useState(anecdote?.action ?? '')
+  const [result, setResult] = useState(anecdote?.result ?? '')
+  const [skills, setSkills] = useState(
+    anecdote ? parseSkills(anecdote.skills).join(', ') : ''
+  )
+  const [saving, setSaving] = useState(false)
+
+  async function save() {
+    if (!title.trim() || !situation.trim() || !action.trim() || !result.trim()) {
+      toast.error('Alle vier Felder gehören zur Geschichte.')
+      return
+    }
+    setSaving(true)
+    try {
+      const response = await fetch(anecdote ? `/api/anecdotes/${anecdote.id}` : '/api/anecdotes', {
+        method: anecdote ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          situation,
+          action,
+          result,
+          skills: skills.split(',').map((s) => s.trim()).filter(Boolean),
+        }),
+      })
+      if (!response.ok) {
+        const data = (await response.json().catch(() => undefined)) as { error?: string } | undefined
+        toast.error(data?.error ?? 'Speichern fehlgeschlagen — die Geschichte bleibt unverändert.')
+        return
+      }
+      onSaved(await response.json())
+    } catch {
+      toast.error('Netzwerkfehler — die Geschichte bleibt unverändert.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const inputClass =
+    'w-full px-4 py-3 rounded-xl bg-background border border-border text-foreground text-sm leading-relaxed resize-y'
+
+  return (
+    <div className="bg-surface rounded-2xl p-6 border border-border space-y-4">
+      <div>
+        <label htmlFor="anecdote-title" className="block text-sm font-medium text-foreground mb-2">
+          Titel
+        </label>
+        <input
+          id="anecdote-title"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm"
+          placeholder="z. B. Der Deploy-Freitag"
+        />
+      </div>
+      <div>
+        <label htmlFor="anecdote-situation" className="block text-sm font-medium text-foreground mb-2">
+          Situation
+        </label>
+        <textarea id="anecdote-situation" value={situation} onChange={(e) => setSituation(e.target.value)} rows={2} className={inputClass} />
+      </div>
+      <div>
+        <label htmlFor="anecdote-action" className="block text-sm font-medium text-foreground mb-2">
+          Was ich getan habe
+        </label>
+        <textarea id="anecdote-action" value={action} onChange={(e) => setAction(e.target.value)} rows={3} className={inputClass} />
+      </div>
+      <div>
+        <label htmlFor="anecdote-result" className="block text-sm font-medium text-foreground mb-2">
+          Ergebnis
+        </label>
+        <textarea id="anecdote-result" value={result} onChange={(e) => setResult(e.target.value)} rows={2} className={inputClass} />
+      </div>
+      <div>
+        <label htmlFor="anecdote-skills" className="block text-sm font-medium text-foreground mb-2">
+          Qualitäten (Komma-getrennt)
+        </label>
+        <input
+          id="anecdote-skills"
+          value={skills}
+          onChange={(e) => setSkills(e.target.value)}
+          className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm"
+          placeholder="Druck, Entscheidung, Kommunikation"
+        />
+      </div>
+      <div className="flex gap-3">
+        <Button size="sm" onClick={() => void save()} disabled={saving}>
+          {saving ? 'Speichert …' : anecdote ? 'Änderungen speichern' : 'Speichern'}
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Eine Karte, eine Geschichte: geraffte Ansicht, Bearbeiten springt ins
+// Formular, Löschen ist zweistufig (zweiter Klick bestätigt, Timeout nimmt
+// die Schärfe nach fünf Sekunden wieder raus).
+function AnecdoteCard({
+  anecdote,
+  onEdit,
+  onDelete,
+}: {
+  anecdote: Anecdote
+  onEdit: () => void
+  onDelete: () => void
+}) {
+  const [confirming, setConfirming] = useState(false)
+  const skills = parseSkills(anecdote.skills)
+
+  return (
+    <div className="bg-surface rounded-2xl p-6 border border-border">
+      <div className="flex items-start justify-between gap-4 mb-3">
+        <h3 className="text-lg font-medium text-foreground">{anecdote.title}</h3>
+        <div className="flex gap-2 flex-shrink-0">
+          <Button size="sm" variant="secondary" onClick={onEdit}>
+            Bearbeiten
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            className={confirming ? 'bg-error/10 text-error border border-error/20 hover:bg-error/20' : undefined}
+            onClick={() => {
+              if (!confirming) {
+                setConfirming(true)
+                setTimeout(() => setConfirming(false), 5000)
+                return
+              }
+              onDelete()
+            }}
+          >
+            {confirming ? 'Wirklich löschen' : 'Löschen'}
+          </Button>
+        </div>
+      </div>
+      <dl className="text-sm text-primary leading-relaxed space-y-1.5 mb-3">
+        <div>
+          <dt className="sr-only">Situation</dt>
+          <dd>
+            <span className="text-primary-soft">Situation: </span>
+            {anecdote.situation}
+          </dd>
+        </div>
+        <div>
+          <dt className="sr-only">Was ich getan habe</dt>
+          <dd>
+            <span className="text-primary-soft">Getan: </span>
+            {anecdote.action}
+          </dd>
+        </div>
+        <div>
+          <dt className="sr-only">Ergebnis</dt>
+          <dd>
+            <span className="text-primary-soft">Ergebnis: </span>
+            {anecdote.result}
+          </dd>
+        </div>
+      </dl>
+      {skills.length > 0 && (
+        <ul className="flex flex-wrap gap-2" aria-label="Belegte Qualitäten">
+          {skills.map((skill) => (
+            <li key={skill} className="px-2.5 py-1 rounded-full text-xs border border-border text-primary-soft">
+              {skill}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }
