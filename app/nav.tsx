@@ -11,8 +11,30 @@ const links = [
   { href: '/applications', label: 'Bewerbungen' },
   { href: '/interview', label: 'Interview' },
   { href: '/resume', label: 'Lebenslauf' },
-  { href: '/settings', label: 'Einstellungen' },
 ]
+
+// Die Abmelde-Geste: ein gezogener Strich mit Pfeil nach draußen —
+// gezeichnet wie das Menü-Icon (1.5 Stroke), kein Emoji, keine Bibliothek.
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M7 2.5H4.5A1.5 1.5 0 0 0 3 4v10a1.5 1.5 0 0 0 1.5 1.5H7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M11.5 5.5 15 9l-3.5 3.5M15 9H6.5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
 
 function linkClasses(active: boolean) {
   return `text-sm font-medium transition-colors ${
@@ -40,11 +62,11 @@ export function Nav() {
       </a>
       <div className="max-w-5xl mx-auto px-6 py-5">
         <div className="flex items-center justify-between">
-          <Link href="/" className="text-xl font-medium text-foreground">
+          <Link href="/" className="text-xl font-semibold text-foreground">
             Job-Finder
           </Link>
 
-          {/* Desktop links */}
+          {/* Desktop links — Einstellungen leben im Footer, Abmelden ist eine Geste */}
           <div className="hidden sm:flex items-center gap-8">
             {links.map((link) => (
               <Link
@@ -58,9 +80,11 @@ export function Nav() {
             ))}
             <button
               onClick={() => signOut({ callbackUrl: '/login' })}
-              className="text-primary-soft hover:text-foreground text-sm font-medium transition-colors"
+              aria-label="Abmelden"
+              title="Abmelden"
+              className="flex items-center justify-center w-10 h-10 -mr-2 rounded-xl text-primary-soft hover:text-foreground hover:bg-border-soft transition-colors"
             >
-              Abmelden
+              <LogoutIcon />
             </button>
           </div>
 
@@ -98,8 +122,9 @@ export function Nav() {
           ))}
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            className="text-left py-2.5 text-primary-soft hover:text-foreground text-sm font-medium transition-colors"
+            className="flex items-center gap-3 text-left py-2.5 text-primary-soft hover:text-foreground text-sm font-medium transition-colors"
           >
+            <LogoutIcon />
             Abmelden
           </button>
         </div>

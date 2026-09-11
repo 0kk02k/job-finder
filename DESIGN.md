@@ -226,7 +226,10 @@ Der beschreibende Kern der App: acht deutsche Status-Pills, die Bedeutung über 
 - **Focus:** Ocker-Ring; kein Glow, kein Farbwechsel des Feldes.
 
 ### Navigation
-Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtbar. Links sind Label (0.875rem, 500): inaktiv Weicher Stein mit Hover zu Tusche, aktiv Tusche mit 2px-Tinten-Blau-Unterlinie (offset 8px) und `aria-current="page"` — „wo bin ich" ist Zustand, also der blauen Tinte. Abmelden ist ein Textlink, kein Button. Mobil: 40px-Icon-Button (12px Radius), Panel mit vollem Link-Set.
+Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtbar. Die Wortmarke „Job-Finder" trägt Gewicht 600 — die eine bewusste Ausnahme zur Light-at-Scale-Regel, weil eine Marke kein Überschriftentext ist. Links sind Label (0.875rem, 500): inaktiv Weicher Stein mit Hover zu Tusche, aktiv Tusche mit 2px-Tinten-Blau-Unterlinie (offset 8px) und `aria-current="page"` — „wo bin ich" ist Zustand, also der blauen Tinte. Abmelden ist ein Icon-Button (40×40, gezeichnetes Exit-SVG, `aria-label` Pflicht) — eine Geste, kein Text im Arbeitsweg. Mobil: 40px-Icon-Button (12px Radius), Panel mit vollem Link-Set.
+
+### Footer
+Die ruhige Schmalseite: Blatt Weiß mit Haarkante oben, Wortmarke klein (600) mit dem einen Positionierungssatz, rechts die Verweis-Links in Weichem Stein — Einstellungen, Impressum, Datenschutz. Auch auf Login/Register sichtbar: Rechtsseiten kennen keine Anmeldung. Der Footer ist fürs Nachschlagen, die Nav-Leiste fürs Arbeiten.
 
 ## Do's and Don'ts
 

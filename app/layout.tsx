@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Nav } from "./nav";
+import { Footer } from "./footer";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -33,7 +34,11 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <Providers>
           <Nav />
-          <div id="inhalt">{children}</div>
+          {/* flex-1 drückt den Footer auch auf kurzen Seiten an die Unterkante */}
+          <div id="inhalt" className="flex-1">
+            {children}
+          </div>
+          <Footer />
         </Providers>
       </body>
     </html>
