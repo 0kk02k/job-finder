@@ -55,3 +55,76 @@ export function sanitizeSkillsInput(raw: unknown): string[] {
     .filter(Boolean)
     .slice(0, MAX_SKILLS)
 }
+
+export interface AnecdoteInput {
+  title: string
+  situation: string
+  action: string
+  result: string
+  skills: string[]
+}
+
+// Die drei Leitfragen des Mini-Interviews (A1) — bewusst so gefasst, dass sie
+// nicht-technische Qualitäten belegen: Druck, Konflikt, Verantwortung, Lernen.
+// Die Fläche rendert dieselben Strings wie der Prompt.
+export const EXTRACT_QUESTIONS: readonly string[] = [
+  'Ein Erfolg, auf den du stolz bist — und worauf er wirklich zurückgeht.',
+  'Etwas, das schiefging und das du rettest — oder ein Konflikt, den du gelöst hast.',
+  'Eine Aufgabe, die dir niemand zugeteilt hat — wo du ohne Anleitung Verantwortung übernommen hast.',
+]
+
+const MAX_PROPOSALS = 5
+const MAX_TITLE = 120
+const MAX_STORY = 1200
+
+function cappedString(value: unknown, max: number): string {
+  return typeof value === 'string' ? value.trim().slice(0, max) : ''
+}
+
+// Was die KI vorschlägt, bleibt Vorschlag: unvollständige Geschichten fallen
+// weg, nichts wird länger als vereinbart. Speichern tut erst der Nutzer.
+export function sanitizeExtractedProposals(raw: unknown): AnecdoteInput[] {
+  if (!Array.isArray(raw)) return []
+  const proposals: AnecdoteInput[] = []
+  for (const item of raw.slice(0, MAX_PROPOSALS)) {
+    if (typeof item !== 'object' || item === null) continue
+    const record = item as Record<string, unknown>
+    const proposal: AnecdoteInput = {
+      title: cappedString(record.title, MAX_TITLE),
+      situation: cappedString(record.situation, MAX_STORY),
+      action: cappedString(record.action, MAX_STORY),
+      result: cappedString(record.result, MAX_STORY),
+      skills: sanitizeSkillsInput(record.skills),
+    }
+    // Titel allein ist keine Geschichte — wenigstens ein Stern-Feld muss stehen.
+    if (!proposal.situation && !proposal.action && !proposal.result) continue
+    proposals.push(proposal)
+  }
+  return proposals
+}
+
+export function buildExtractPrompt(answers: string[]): string {
+  const told = answers
+    .map((answer, i) => `${i + 1}. ${EXTRACT_QUESTIONS[i] ?? 'Weitere Geschichte:'}\n${answer}`)
+    .join('\n\n')
+  return `Der Nutzer hat über seine beruflichen Erfahrungen erzählt. Forme daraus
+bis zu 5 wahre Anekdoten als JSON-Array. Jede Anekdote:
+
+{
+  "title": "kurzer prägnanter Titel",
+  "situation": "Anlass und Umfeld",
+  "action": "was der Nutzer konkret getan hat",
+  "result": "was herauskam",
+  "skills": ["2-4 nicht-technische Qualitäten, die die Geschichte belegt"]
+}
+
+Wahrheitsregeln: Forme nur, was der Nutzer erzählt hat — erfinde nichts dazu,
+ergänze keine Zahlen, keine Firmen, keine Details. Kürze auf das Wesentliche,
+sprich die Geschichte so, wie der Nutzer sie erzählt hat (Sprache der Antworten).
+
+Erzählte Geschichten:
+
+${told}
+
+Gib AUSSCHLIESSLICH das JSON-Array aus — kein Vorwort, keine Anmerkungen.`
+}
