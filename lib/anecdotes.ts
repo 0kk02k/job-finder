@@ -176,11 +176,13 @@ export function sanitizeMatches(
   if (!Array.isArray(raw)) return []
   const known = new Set(anecdoteIds)
   const matches: AnecdoteMatch[] = []
+  const seen = new Set<string>()
   for (const item of raw.slice(0, MAX_MATCHES * 2)) {
     if (typeof item !== 'object' || item === null) continue
     const record = item as Record<string, unknown>
     const anecdoteId = typeof record.anecdoteId === 'string' ? record.anecdoteId : ''
-    if (!known.has(anecdoteId)) continue
+    if (!known.has(anecdoteId) || seen.has(anecdoteId)) continue
+    seen.add(anecdoteId)
     const addresses = Array.isArray(record.addresses)
       ? [...new Set(record.addresses)]
           .filter((i): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < needCount)

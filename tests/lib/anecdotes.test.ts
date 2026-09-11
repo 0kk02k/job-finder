@@ -127,6 +127,16 @@ test('sanitizeMatches drops unknown anecdote ids and out-of-range addresses', ()
   assert.ok(matches[1].reason.length <= 300)
 })
 
+test('sanitizeMatches collapses duplicate anecdote ids — first reason wins', () => {
+  const raw = [
+    { anecdoteId: 'a1', reason: 'erste', addresses: [0] },
+    { anecdoteId: 'a1', reason: 'zweite', addresses: [] },
+  ]
+  const matches = sanitizeMatches(raw, ['a1'], 1)
+  assert.equal(matches.length, 1)
+  assert.equal(matches[0].reason, 'erste')
+})
+
 test('sanitizeNeedPayload returns the guess only when the quote is verbatim', () => {
   const good = { quote: 'Teamplayer gesucht', need: 'Teamfähigkeit', why: 'ausdrücklich gefordert' }
   assert.deepEqual(sanitizeNeedPayload(good, AD), good)
