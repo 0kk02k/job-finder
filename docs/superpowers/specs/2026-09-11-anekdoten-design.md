@@ -128,7 +128,7 @@ Zweck, an den selbst gewählten Provider.
 ## Testing (TDD)
 
 - `tests/lib/anecdotes.test.ts` (neu): `verifyQuotes` (exakt, whitespace-, case- und
-  typografie-tolerant; erfundene Zitate fallen durch), `sanitizeNeedsPayload`
+  typografie-tolerant; erfundene Zitate fallen durch), `sanitizeNeedPayload`
   (unbelegte weg, Anzahl/Längen deckeln), `sanitizeExtractedProposals` (leere Felder
   weg, Längen deckeln), `anecdoteToPromptBlock`, `buildExtractPrompt` (enthält alle
   drei Leitfragen + Wahrheitsregeln).
