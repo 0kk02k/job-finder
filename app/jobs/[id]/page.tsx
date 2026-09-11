@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '../../components/Toast'
 import { MarkdownContent, structureJobDescription } from '../../components/Markdown'
@@ -41,6 +42,29 @@ function parseMatchDetails(raw: string | null): MatchDetails {
   }
 }
 
+// Chooser-Typen — spiegelbildlich zu den Responses der Anecdotes-API
+interface NeedGuessClient {
+  quote: string
+  need: string
+  why: string
+}
+
+interface AnecdoteMatchClient {
+  anecdoteId: string
+  reason: string
+  addresses: number[]
+}
+
+interface AnecdoteClient {
+  id: string
+  title: string
+  situation: string
+  action: string
+  result: string
+  skills: string
+  source: string
+}
+
 export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -55,6 +79,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   // bearbeitet ihn und lädt das PDF selbst. Nichts wird persistiert.
   const [letter, setLetter] = useState<{ text: string; source: 'ki' | 'vorlage' } | null>(null)
   const [letterError, setLetterError] = useState<string | null>(null)
+  // Anekdoten-Chooser: die Wahl VOR der Generierung (Spec: „Nutzer wählt vorab").
+  // `ranked: false` heißt, der Match-Aufruf ist fehlgeschlagen — die Sammlung
+  // erscheint unrangiert zum Selbstwählen, beschriftet als Ausnahme.
+  const [chooser, setChooser] = useState<{
+    needs: NeedGuessClient[]
+    matches: AnecdoteMatchClient[]
+    anecdotes: AnecdoteClient[]
+    ranked: boolean
+  } | null>(null)
+  const [chosenAnecdote, setChosenAnecdote] = useState<string>('none')
+  const [matching, setMatching] = useState(false)
+  const [anecdoteHint, setAnecdoteHint] = useState(false)
   // Notiz & Wiedervorlage — dieselben Felder wie im Cockpit, derselbe Schreibweg (PATCH).
   // Sync beim Job-Wechsel als Render-Zeit-Muster: Status-Buttons (eigene setJob-Aufrufe)
   // dürfen laufende Eingaben nicht wegwalzen, nur echter Job-Wechsel setzt zurück.
@@ -66,6 +102,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     setNotes(job.notes ?? '')
     setFollowUp(job.followUpAt ? job.followUpAt.slice(0, 10) : '')
   }
+
+  // Rangierte zuerst (in Reihenfolge der Rangliste, mit Begründung), dann der
+  // Rest der Sammlung — die Wahl bleibt immer vollständig wählbar.
+  const orderedChoices = chooser
+    ? [
+        ...chooser.matches
+          .map((m) => ({
+            anecdote: chooser.anecdotes.find((a) => a.id === m.anecdoteId),
+            reason: m.reason as string | undefined,
+          }))
+          .filter((entry): entry is { anecdote: AnecdoteClient; reason: string } => entry.anecdote !== undefined),
+        ...chooser.anecdotes
+          .filter((a) => !chooser.matches.some((m) => m.anecdoteId === a.id))
+          .map((a) => ({ anecdote: a, reason: undefined as string | undefined })),
+      ]
+    : []
 
   async function updateStatus(status: string) {
     if (!job) return
@@ -178,7 +230,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   // Anschreiben erzeugen: Primärweg KI (echter Lebenslauf + echte Anzeige). Ein
   // Ausfall wird benannt — der Stufen-2-Fallback (Vorlage) läuft nur auf Ausdruck.
-  async function handleGenerateLetter(useTemplate = false) {
+  async function handleGenerateLetter(
+    useTemplate = false,
+    anecdote?: { anecdoteId: string; need?: NeedGuessClient }
+  ) {
     if (!job) return
     setBusy('generate')
     setLetterError(null)
@@ -201,7 +256,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       const response = await fetch('/api/coverletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jobId: job.id }),
+        body: JSON.stringify({
+          jobId: job.id,
+          ...(anecdote ? { anecdoteId: anecdote.anecdoteId, need: anecdote.need } : {}),
+        }),
       })
       const data = await response.json().catch(() => undefined)
       if (!response.ok) {
@@ -217,6 +275,61 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     } finally {
       setBusy(null)
     }
+  }
+
+  // Der Weg zum Anschreiben läuft über die Wahl: erst prüfen, ob es Anekdoten
+  // gibt (leerer Bestand → Generierung wie bisher plus ein Angebot, kein
+  // Vorwurf), dann das zweistufige Lesen der Anzeige. KI-Ausfall beim Matchen
+  // ist keine Sperre — die Sammlung erscheint unrangiert zum Selbstwählen.
+  async function startLetterGeneration() {
+    if (!job || busy || matching) return
+    setAnecdoteHint(false)
+    setMatching(true)
+    try {
+      const listResponse = await fetch('/api/anecdotes')
+      if (!listResponse.ok) {
+        await handleGenerateLetter(false)
+        return
+      }
+      const anecdotes: AnecdoteClient[] = await listResponse.json()
+      if (!Array.isArray(anecdotes) || anecdotes.length === 0) {
+        setAnecdoteHint(true)
+        await handleGenerateLetter(false)
+        return
+      }
+      const response = await fetch('/api/anecdotes/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id }),
+      })
+      if (response.ok) {
+        const data = await response.json()
+        const needs: NeedGuessClient[] = Array.isArray(data.needs) ? data.needs : []
+        const matches: AnecdoteMatchClient[] = Array.isArray(data.matches) ? data.matches : []
+        setChooser({ needs, matches, anecdotes, ranked: true })
+        // Beste Vorgabe (Spec): der erste Rang ist vorab gewählt
+        setChosenAnecdote(matches[0]?.anecdoteId ?? 'none')
+      } else {
+        setChooser({ needs: [], matches: [], anecdotes, ranked: false })
+        setChosenAnecdote('none')
+      }
+    } catch {
+      // Netzwerk: ohne Chooser direkt generieren, wie bisher
+      await handleGenerateLetter(false)
+    } finally {
+      setMatching(false)
+    }
+  }
+
+  async function generateFromChooser() {
+    if (!job || !chooser) return
+    const match = chooser.matches.find((m) => m.anecdoteId === chosenAnecdote)
+    const need = match ? chooser.needs[match.addresses[0]] : undefined
+    setChooser(null)
+    await handleGenerateLetter(
+      false,
+      chosenAnecdote !== 'none' ? { anecdoteId: chosenAnecdote, need } : undefined
+    )
   }
 
   async function handleDownloadPDF(type: 'resume' | 'letter', format: 'pdf' | 'docx' = 'pdf') {
@@ -441,16 +554,119 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
           <h2 className="text-sm font-medium text-primary-soft mb-4">Anschreiben</h2>
 
-          {!letter && !letterError && (
+          {!letter && !letterError && !chooser && (
             <div className="flex flex-wrap items-center justify-between gap-4">
               <p className="text-sm text-primary leading-relaxed max-w-prose">
                 Aus deinem Lebenslauf und dieser Stellenanzeige — zum Bearbeiten, bevor du sie
                 verschickst.
               </p>
-              <Button onClick={() => void handleGenerateLetter(false)} disabled={busy !== null}>
-                {busy === 'generate' ? 'Wird erzeugt …' : 'Anschreiben erzeugen'}
+              <Button onClick={() => void startLetterGeneration()} disabled={busy !== null || matching}>
+                {matching ? 'Wird geprüft …' : busy === 'generate' ? 'Wird erzeugt …' : 'Anschreiben erzeugen'}
               </Button>
             </div>
+          )}
+
+          {/* Der Chooser: erst die Mutmaßungen (mit geprüften Zitatstellen), dann die Wahl */}
+          {!letter && !letterError && chooser && (
+            <div>
+              <h3 className="text-sm font-medium text-foreground mb-1">
+                Was die Anzeige zwischen den Zeilen sucht
+              </h3>
+              <p className="text-xs text-primary-soft mb-3">
+                Mutmaßung, nicht Gewissheit — jede Belegstelle wurde wörtlich gegen den
+                Anzeigentext geprüft.
+              </p>
+              <ul className="space-y-2 mb-5">
+                {chooser.needs.map((guess) => (
+                  <li key={guess.need} className="text-sm bg-background rounded-xl border border-border-soft p-3">
+                    <p className="text-foreground">{guess.need}</p>
+                    <p className="text-primary-soft mt-1">Zitat: „{guess.quote}“</p>
+                    {guess.why && <p className="text-primary-soft mt-1">{guess.why}</p>}
+                  </li>
+                ))}
+                {chooser.needs.length === 0 && (
+                  <li className="text-sm text-primary-soft">
+                    Keine belegten Mutmaßungen — die Anzeige sagt wenig zwischen den Zeilen.
+                  </li>
+                )}
+              </ul>
+              <fieldset>
+                <legend className="text-sm font-medium text-foreground mb-2">
+                  Welche Anekdote öffnet das Anschreiben?
+                </legend>
+                {!chooser.ranked && (
+                  <p className="text-xs text-warning mb-2">
+                    Rangliste gerade nicht verfügbar — wähle selbst.
+                  </p>
+                )}
+                <div className="space-y-2">
+                  {orderedChoices.map(({ anecdote, reason }) => (
+                    <label
+                      key={anecdote.id}
+                      className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                        chosenAnecdote === anecdote.id ? 'border-selection' : 'border-border'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="anekdote-wahl"
+                        value={anecdote.id}
+                        checked={chosenAnecdote === anecdote.id}
+                        onChange={() => setChosenAnecdote(anecdote.id)}
+                        className="mt-1 accent-selection"
+                      />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium text-foreground">{anecdote.title}</span>
+                        {reason ? (
+                          <span className="block text-xs text-primary-soft mt-0.5">{reason}</span>
+                        ) : (
+                          <span className="block text-xs text-primary-soft mt-0.5">
+                            {anecdote.situation.slice(0, 90)}
+                            {anecdote.situation.length > 90 ? '…' : ''}
+                          </span>
+                        )}
+                      </span>
+                    </label>
+                  ))}
+                  <label
+                    className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                      chosenAnecdote === 'none' ? 'border-selection' : 'border-border'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="anekdote-wahl"
+                      value="none"
+                      checked={chosenAnecdote === 'none'}
+                      onChange={() => setChosenAnecdote('none')}
+                      className="mt-1 accent-selection"
+                    />
+                    <span className="text-sm text-foreground">Ohne Anekdote — klassisches Anschreiben</span>
+                  </label>
+                </div>
+              </fieldset>
+              <div className="flex flex-wrap gap-3 mt-4">
+                <Button onClick={() => void generateFromChooser()} disabled={busy !== null || matching}>
+                  {busy === 'generate' ? 'Wird erzeugt …' : 'Anschreiben erzeugen'}
+                </Button>
+                <Button variant="secondary" onClick={() => setChooser(null)}>
+                  Abbrechen
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Leerer Bestand: kein Vorwurf, ein Angebot */}
+          {!letter && !letterError && !chooser && anecdoteHint && (
+            <p className="text-xs text-primary-soft mt-3">
+              Tipp: Eine wahre Anekdote hebt dein Anschreiben von KI-Standardsatz ab.{' '}
+              <Link
+                href="/resume#anekdoten"
+                className="underline decoration-selection/60 underline-offset-4 hover:text-foreground hover:decoration-selection"
+              >
+                Anekdoten anlegen
+              </Link>
+            </p>
           )}
 
           {letterError && (
@@ -496,10 +712,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <Button
                   size="sm"
                   variant="secondary"
-                  onClick={() => void handleGenerateLetter(letter.source === 'vorlage')}
-                  disabled={busy !== null}
+                  onClick={() => void startLetterGeneration()}
+                  disabled={busy !== null || matching}
                 >
-                  Neu erzeugen
+                  {matching ? 'Wird geprüft …' : 'Neu erzeugen'}
                 </Button>
                 <button
                   onClick={() => setLetter(null)}
