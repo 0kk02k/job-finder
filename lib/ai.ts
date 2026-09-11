@@ -3,6 +3,7 @@
 
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
+import { buildExtractPrompt, parseJsonLoose } from './anecdotes'
 
 // Ein Ort, eine Wahrheit: die Standard-Modell-ID für Nebius Token Factory.
 // (Im Studio verifizierbar über „Copy model ID".)
@@ -532,4 +533,25 @@ export function aiConfigFromSettings(settings: AIConfigSource | null | undefined
               : undefined,
     baseUrl: provider === 'ollama' ? settings?.ollamaUrl || undefined : undefined,
   }
+}
+
+// Vorschläge aus freitextlichen Geschichten (Mini-Interview A1). Wirft bei
+// KI-Ausfall oder unlesbarem JSON — die Route antwortet ehrlich, die Antworten
+// des Nutzers bleiben unverändert im Formular.
+export async function generateAnecdoteProposals(
+  answers: string[],
+  provider: string = 'nebius',
+  model?: string,
+  apiKey?: string,
+  baseUrl?: string
+): Promise<unknown> {
+  const ai = getAIClient(provider, apiKey, baseUrl)
+  const { text } = await generateText({
+    model: ai.chat(model || defaultModel(provider)),
+    messages: [{ role: 'user', content: buildExtractPrompt(answers) }],
+  })
+  if (!text || text.trim().length === 0) {
+    throw new Error('Die KI hat keine Vorschläge geliefert')
+  }
+  return parseJsonLoose(text)
 }
