@@ -232,6 +232,47 @@ Gib zurück als JSON:
   }
 }
 
+// Der Scoring-Prompt stellt den wiederholten Teil nach vorn: Anweisungen und
+// Lebenslauf sind über alle Aufrufe identisch und bilden so einen Cache-Präfix
+// (der Provider kann den billigen Satz nutzen), die wechselnde Anzeige steht
+// hinten. Die Reihenfolge ist Kostenvertrag — nicht drehen, ohne den Test zu lesen.
+export function buildScorePrompt(
+  jobDescription: string,
+  resume: string,
+  minSalary?: number | null
+): string {
+  const salaryLine =
+    typeof minSalary === 'number' && minSalary > 0
+      ? `5. Gehaltsvorstellung: Der Nutzer sucht ab ${minSalary} — liegt das angegebene Gehalt darunter, wirkt das den Score senkend, ist aber nur ein Faktor neben den Skills.\n`
+      : ''
+
+  return `Du bist ein Karriere-Experte. Du bewertest gleich EINEN Job auf einer Skala von 1-10 basierend auf dem unten mitgelieferten Resume.
+
+Resume:
+${resume}
+
+Berücksichtige dabei:
+1. Direkte Skill-Matches
+2. Transferable Skills (Skills die übertragbar sind)
+3. Potenzial zur Einarbeitung (job ist vielleicht etwas höher, aber lernbar)
+4. Kultur-Fit basierend auf Firmenbeschreibung (falls vorhanden)
+${salaryLine}
+Gib für den unten stehenden Job zurück als JSON:
+{
+  "score": number (1-10),
+  "reason": "Detaillierte Begründung in Deutsch. Warum passt der Job? Was fehlt? Was sind Transferable Skills?",
+  "gaps": ["Fehlende Skill 1", "Fehlende Skill 2"],
+  "strengths": ["Stärke 1", "Stärke 2", "Transferable Skill 1"]
+}
+
+Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lücken. 5 oder weniger bedeutet großer Gap.
+
+Der zu bewertende Job:
+${jobDescription}
+
+Bewerte jetzt diesen Job wie oben beschrieben.`
+}
+
 // Score job against resume (enhanced with transferable skills)
 // minSalary: Wunscheinstellung aus den Settings — als Kontext in die Bewertung,
 // damit die gespeicherte Einstellung eine Wirkung hat statt nur zu existieren.
@@ -246,35 +287,7 @@ export async function scoreJob(
 ): Promise<ScoreResult> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
-  const salaryLine =
-    typeof minSalary === 'number' && minSalary > 0
-      ? `5. Gehaltsvorstellung: Der Nutzer sucht ab ${minSalary} — liegt das angegebene Gehalt darunter, wirkt das den Score senkend, ist aber nur ein Faktor neben den Skills.\n`
-      : ''
-
-  const prompt = `Du bist ein Karriere-Experte. Bewerte diesen Job auf einer Skala von 1-10 basierend auf dem Resume.
-
-Job-Beschreibung:
-${jobDescription}
-
-Resume:
-${resume}
-
-Berücksichtige dabei:
-1. Direkte Skill-Matches
-2. Transferable Skills (Skills die übertragbar sind)
-3. Potenzial zur Einarbeitung (job ist vielleicht etwas höher, aber lernbar)
-4. Kultur-Fit basierend auf Firmenbeschreibung (falls vorhanden)
-${salaryLine}
-
-Gib zurück als JSON:
-{
-  "score": number (1-10),
-  "reason": "Detaillierte Begründung in Deutsch. Warum passt der Job? Was fehlt? Was sind Transferable Skills?",
-  "gaps": ["Fehlende Skill 1", "Fehlende Skill 2"],
-  "strengths": ["Stärke 1", "Stärke 2", "Transferable Skill 1"]
-}
-
-Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lücken. 5 oder weniger bedeutet großer Gap.`
+  const prompt = buildScorePrompt(jobDescription, resume, minSalary)
 
   try {
     const { text } = await generateText({

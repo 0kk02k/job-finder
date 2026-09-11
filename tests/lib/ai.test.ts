@@ -3,7 +3,7 @@
 // Getestet wird der Prompt-Vertrag — die KI selbst ist außen vor (lokal kein Key).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCoverLetterPrompt, buildTranslateResumePrompt } from '../../lib/ai'
+import { buildCoverLetterPrompt, buildScorePrompt, buildTranslateResumePrompt } from '../../lib/ai'
 
 const AD_DU_FORM = 'Dein Profil: Du liebst Kaffee und bringst Deine Ideen ein. Wir bieten dir ein starkes Team.'
 
@@ -49,6 +49,31 @@ test('prompt stays free of a block when none is given (backward compatible)', ()
   const prompt = buildCoverLetterPrompt('LEBENSLAUF', AD_DU_FORM, 'Firma', 'Barista', 'de')
   assert.ok(!prompt.includes('X-ANEKDOTEN-BLOCK'))
   assert.match(prompt, /Struktur:/)
+})
+
+test('score prompt puts the resume before the job description — cacheable prefix', () => {
+  const prompt = buildScorePrompt('JOB-BESCHREIBUNG', 'LEBENSLAUF-TEXT', null)
+  assert.match(prompt, /LEBENSLAUF-TEXT/)
+  assert.match(prompt, /JOB-BESCHREIBUNG/)
+  assert.ok(
+    prompt.indexOf('LEBENSLAUF-TEXT') < prompt.indexOf('JOB-BESCHREIBUNG'),
+    'Der Lebenslauf muss VOR der Anzeige stehen — er ist der identische Teil jedes Aufrufs und damit der Cache-Präfix'
+  )
+})
+
+test('score prompt carries the salary wish only when set', () => {
+  const withSalary = buildScorePrompt('JOB', 'LEBENSLAUF', 45000)
+  const withoutSalary = buildScorePrompt('JOB', 'LEBENSLAUF', null)
+  assert.match(withSalary, /45 ?000/)
+  assert.ok(!withoutSalary.includes('Gehaltsvorstellung'))
+})
+
+test('score prompt demands the JSON verdict shape and the 1-10 scale', () => {
+  const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', null)
+  assert.match(prompt, /JSON/)
+  assert.match(prompt, /1-10/)
+  assert.match(prompt, /"score"/)
+  assert.match(prompt, /"reason"/)
 })
 
 test('resume translation prompt forbids inventing facts and keeps structure', () => {
