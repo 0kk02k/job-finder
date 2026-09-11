@@ -32,8 +32,11 @@ export default function DatenschutzPage() {
             Für die KI-Bewertung überträgt die Instanz pro Suchlauf oder Einzelbewertung
             den Text der Stellenanzeige und deinen Lebenslauf-Text an den KI-Provider,
             den du selbst in den Einstellungen hinterlegt hast — zu keinem anderen
-            Zweck und an niemand sonst. Stellensuche fragt öffentliche Quellen ab
-            (Jooble, Remotive, Arbeitnow, optional LinkedIn via Apify).
+            Zweck und an niemand sonst. Für das Anekdoten-Mini-Interview und die
+            Anschreiben-Erzeugung kommen zusätzlich deine Anekdoten-Texte an
+            denselben Provider — ebenfalls nur zu diesem Zweck. Stellensuche fragt
+            öffentliche Quellen ab (Jooble, Remotive, Arbeitnow, optional LinkedIn
+            via Apify).
           </p>
         </section>
         <section>
