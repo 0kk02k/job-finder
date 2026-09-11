@@ -246,3 +246,24 @@ Regeln: 2-4 Mutmaßungen, jede mit wörtlichem Zitat aus der Anzeige — erfinde
 keine Zitate. Rangiere höchstens 3 Anekdote-IDs, die besten zuerst. Gib
 AUSSCHLIESSLICH das JSON aus.`
 }
+
+// Der Block im Anschreiben-Prompt: die Anekdote ist Wahrheitsmaterial — die KI
+// darf kürzen und auf die Stelle zuspitzen, aber nichts erfinden. Und sie ist
+// der Aufhänger: Einleitung heißt Anekdote, nicht Motivationsformel.
+export function anecdoteToPromptBlock(anecdote: AnecdoteInput, need: NeedGuess | null): string {
+  const needBlock = need
+    ? `
+Mutmaßung, die die Anekdote belegen soll: ${need.need}
+Belegstelle aus der Anzeige: „${need.quote}"${need.why ? `\nWarum: ${need.why}` : ''}`
+    : ''
+  return `WAHRE ANEKDOTE DES NUTZERS — Wahrheitsmaterial: kürzen, fokussieren, auf
+die Stelle zuspitzen. Erfinde nichts dazu und ergänze keine Zahlen.
+
+Titel: ${anecdote.title}
+Situation: ${anecdote.situation}
+Was ich getan habe: ${anecdote.action}
+Ergebnis: ${anecdote.result}${needBlock}
+
+Das Anschreiben ÖFFNET mit dieser Anekdote: Sie ist die Einleitung (Strukturpunkt 1)
+— kein generischer Motivationssatz. Der Rest der Struktur bleibt.`
+}

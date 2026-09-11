@@ -7,6 +7,7 @@ import {
   EXTRACT_QUESTIONS,
   buildExtractPrompt,
   buildMatchPrompt,
+  anecdoteToPromptBlock,
   parseJsonLoose,
   parseSkills,
   sanitizeExtractedProposals,
@@ -153,4 +154,36 @@ test('buildMatchPrompt demands verbatim quotes and ranks the given anecdotes', (
   assert.match(prompt, /Mutmaßung/i)
   assert.match(prompt, /a1/)
   assert.match(prompt, /JSON/)
+})
+
+const ANECDOTE = {
+  title: 'Deploy-Freitag',
+  situation: 'Ausfall um 17 Uhr',
+  action: 'Rollback entschieden und kommuniziert',
+  result: 'Keine Ausfälle im Weihnachtsgeschäft',
+  skills: ['Druck'],
+}
+
+test('prompt block carries the anecdote verbatim, the no-invention rule and the need', () => {
+  const block = anecdoteToPromptBlock(ANECDOTE, {
+    quote: 'Teamplayer gesucht',
+    need: 'Teamfähigkeit',
+    why: 'klar gefordert',
+  })
+  assert.match(block, /Deploy-Freitag/)
+  assert.match(block, /Rollback/)
+  assert.match(block, /erfinde|nichts dazu/i)
+  assert.match(block, /Teamfähigkeit/)
+  assert.match(block, /Teamplayer gesucht/)
+})
+
+test('prompt block works without a need guess', () => {
+  const block = anecdoteToPromptBlock(ANECDOTE, null)
+  assert.match(block, /Deploy-Freitag/)
+  assert.ok(!block.includes('Mutmaßung'))
+})
+
+test('prompt block orders the anecdote as the letter’s opening', () => {
+  const block = anecdoteToPromptBlock(ANECDOTE, null)
+  assert.match(block, /Einleitung|öffnet|Aufhänger/i)
 })
