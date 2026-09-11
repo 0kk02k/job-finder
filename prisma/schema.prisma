@@ -26,6 +26,7 @@ model User {
   profiles    PlatformProfile[]
   savedSearches SavedSearch[]
   interviews  InterviewSession[]
+  anecdotes   Anecdote[]
 }
 
 model PlatformCredential {
@@ -188,6 +189,24 @@ model SavedSearch {
   createdAt DateTime @default(now())
 
   @@unique([userId, query, location])
+}
+
+model Anecdote {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title     String
+  situation String
+  action    String
+  result    String
+  skills    String   @default("[]") // JSON-Array aus Tags, wie matchDetails beim Job
+  source    String   @default("interview") // 'interview' | 'manuell'
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model InterviewSession {
