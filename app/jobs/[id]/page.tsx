@@ -284,6 +284,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   async function startLetterGeneration() {
     if (!job || busy || matching) return
     setAnecdoteHint(false)
+    // Fehlerblock weichen — sonst könnte der Chooser dahinter unsichtbar bleiben
+    setLetterError(null)
     setMatching(true)
     try {
       const listResponse = await fetch('/api/anecdotes')
@@ -306,10 +308,13 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         const data = await response.json()
         const needs: NeedGuessClient[] = Array.isArray(data.needs) ? data.needs : []
         const matches: AnecdoteMatchClient[] = Array.isArray(data.matches) ? data.matches : []
+        // Altes Anschreiben weicht — sonst bliebe der Chooser hinter dem Brief unsichtbar
+        setLetter(null)
         setChooser({ needs, matches, anecdotes, ranked: true })
         // Beste Vorgabe (Spec): der erste Rang ist vorab gewählt
         setChosenAnecdote(matches[0]?.anecdoteId ?? 'none')
       } else {
+        setLetter(null)
         setChooser({ needs: [], matches: [], anecdotes, ranked: false })
         setChosenAnecdote('none')
       }
@@ -675,7 +680,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 <p className="text-sm text-primary">{letterError}</p>
               </div>
               <div className="flex flex-wrap gap-3">
-                <Button size="sm" variant="secondary" onClick={() => void handleGenerateLetter(false)}>
+                <Button size="sm" variant="secondary" onClick={() => void startLetterGeneration()}>
                   Erneut versuchen
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => void handleGenerateLetter(true)}>
