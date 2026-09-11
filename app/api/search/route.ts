@@ -241,8 +241,10 @@ export async function POST(request: NextRequest) {
       })
 
       // Score jobs with AI (requires resume). Capped to bound LLM costs/latency —
-      // roughly one LLM call per scored job.
-      const SCORE_LIMIT = 15
+      // roughly one LLM call per scored job. 50 statt 15: eine Bewertung kostet
+      // ~0,7 ct (Kimi K3) — die Suche soll ihre Treffer liefern, nicht den
+      // Rückstand füttern; Reste drainiert der nächtliche Cron (/api/cron/score).
+      const SCORE_LIMIT = 50
       const resumeContent = useAI !== false ? resume?.content : undefined
       if (resumeContent && rawJobs.length > 0) {
         emit({ type: 'progress', stage: 'ai-matching', total: Math.min(SCORE_LIMIT, rawJobs.length) })
