@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, useId } from 'react'
 import { useToast } from '../components/Toast'
 import { MarkdownContent } from '../components/Markdown'
 import { Button } from '../components/ui'
-import { parseSkills } from '@/lib/anecdotes'
+import { EXTRACT_QUESTIONS, parseSkills } from '@/lib/anecdotes'
 
 interface Resume {
   id: string
@@ -103,6 +103,31 @@ export default function ResumePage() {
       toast.success('Anekdote gelöscht.')
     } catch {
       toast.error('Netzwerkfehler — die Geschichte bleibt erhalten.')
+    }
+  }
+
+  // Übernahme eines Vorschlags: erst jetzt wird er wahr — und nur einzeln.
+  async function saveProposal(edited: Proposal, original: Proposal) {
+    try {
+      const response = await fetch('/api/anecdotes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...edited, source: 'interview' }),
+      })
+      if (!response.ok) {
+        const data = (await response.json().catch(() => undefined)) as { error?: string } | undefined
+        toast.error(data?.error ?? 'Speichern fehlgeschlagen — der Vorschlag bleibt stehen.')
+        return
+      }
+      const saved: Anecdote = await response.json()
+      setAnecdotes((prev) => [saved, ...prev])
+      setProposals((prev) => {
+        const rest = prev?.filter((p) => p !== original) ?? []
+        return rest.length > 0 ? rest : null
+      })
+      toast.success('Anekdote übernommen.')
+    } catch {
+      toast.error('Netzwerkfehler — der Vorschlag bleibt stehen.')
     }
   }
 
@@ -417,6 +442,37 @@ export default function ResumePage() {
             </div>
           </div>
 
+          {anecdotePanel === 'extract' && (
+            <ExtractPanel
+              onProposals={(list) => {
+                setProposals(list)
+                setAnecdotePanel('none')
+              }}
+              onCancel={() => setAnecdotePanel('none')}
+            />
+          )}
+
+          {proposals && proposals.length > 0 && (
+            <div className="mb-4 space-y-4">
+              <p className="text-sm text-primary-soft">
+                Vorschläge aus deinen Geschichten — prüfe jede, bevor du sie übernimmst.
+              </p>
+              {proposals.map((proposal) => (
+                <ProposalCard
+                  key={proposal.title + proposal.situation}
+                  proposal={proposal}
+                  onSave={(edited) => void saveProposal(edited, proposal)}
+                  onDiscard={() =>
+                    setProposals((prev) => {
+                      const rest = prev?.filter((p) => p !== proposal) ?? []
+                      return rest.length > 0 ? rest : null
+                    })
+                  }
+                />
+              ))}
+            </div>
+          )}
+
           {anecdotePanel === 'manual' && (
             <div className="mb-4">
               <AnecdoteForm
@@ -660,6 +716,173 @@ function AnecdoteCard({
           ))}
         </ul>
       )}
+    </div>
+  )
+}
+
+// Das Mini-Interview (A1): drei Leitfragen, ein KI-Aufruf. Ein Ausfall ist
+// ehrlich — die Antworten bleiben im Formular, nichts ist verloren.
+function ExtractPanel({
+  onProposals,
+  onCancel,
+}: {
+  onProposals: (proposals: Proposal[]) => void
+  onCancel: () => void
+}) {
+  const [answers, setAnswers] = useState<string[]>(['', '', ''])
+  const [extracting, setExtracting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function extract() {
+    setExtracting(true)
+    setError(null)
+    try {
+      const response = await fetch('/api/anecdotes/extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers }),
+      })
+      const data = (await response.json().catch(() => undefined)) as
+        | { proposals?: Proposal[]; error?: string }
+        | undefined
+      if (!response.ok) {
+        setError(data?.error ?? 'Die KI ist nicht erreichbar — deine Antworten bleiben im Formular, nichts ist verloren.')
+        return
+      }
+      onProposals(Array.isArray(data?.proposals) ? data.proposals : [])
+    } catch {
+      setError('Netzwerkfehler — deine Antworten bleiben im Formular, nichts ist verloren.')
+    } finally {
+      setExtracting(false)
+    }
+  }
+
+  return (
+    <div className="bg-surface rounded-2xl p-6 border border-border mb-4 space-y-4">
+      {EXTRACT_QUESTIONS.map((question, i) => (
+        <div key={question}>
+          <label htmlFor={`story-${i}`} className="block text-sm font-medium text-foreground mb-2">
+            {i + 1}. {question}
+          </label>
+          <textarea
+            id={`story-${i}`}
+            value={answers[i]}
+            onChange={(e) =>
+              setAnswers((prev) => prev.map((a, j) => (j === i ? e.target.value : a)))
+            }
+            rows={3}
+            placeholder="Erzähl frei — Fakten, Zahlen, Namen bleiben bei dir, solange du nichts speicherst."
+            className="w-full px-4 py-3 rounded-xl bg-background border border-border text-foreground text-sm leading-relaxed resize-y"
+          />
+        </div>
+      ))}
+      {error && (
+        <p role="alert" className="text-sm text-error">
+          {error}
+        </p>
+      )}
+      <div className="flex gap-3">
+        <Button
+          size="sm"
+          onClick={() => void extract()}
+          disabled={extracting || answers.every((a) => !a.trim())}
+        >
+          {extracting ? 'Wird geformt …' : 'Geschichten formen lassen'}
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onCancel}>
+          Abbrechen
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Eine Karte, ein Vorschlag: alles editierbar, bevor etwas gespeichert wird.
+function ProposalCard({
+  proposal,
+  onSave,
+  onDiscard,
+}: {
+  proposal: Proposal
+  onSave: (edited: Proposal) => void
+  onDiscard: () => void
+}) {
+  const [title, setTitle] = useState(proposal.title)
+  const [situation, setSituation] = useState(proposal.situation)
+  const [action, setAction] = useState(proposal.action)
+  const [result, setResult] = useState(proposal.result)
+  const [skills, setSkills] = useState(proposal.skills.join(', '))
+  const [saving, setSaving] = useState(false)
+  // useId: mehrere Karten dürfen sich nie dieselben Label-IDs teilen
+  const id = useId()
+
+  const inputClass =
+    'w-full px-4 py-3 rounded-xl bg-background border border-border text-foreground text-sm leading-relaxed resize-y'
+
+  return (
+    <div className="bg-surface rounded-2xl p-6 border border-border space-y-3">
+      <div>
+        <label htmlFor={`${id}-titel`} className="block text-sm font-medium text-foreground mb-2">
+          Titel
+        </label>
+        <input
+          id={`${id}-titel`}
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm"
+        />
+      </div>
+      <div>
+        <label htmlFor={`${id}-situation`} className="block text-sm font-medium text-foreground mb-2">
+          Situation
+        </label>
+        <textarea id={`${id}-situation`} value={situation} onChange={(e) => setSituation(e.target.value)} rows={2} className={inputClass} />
+      </div>
+      <div>
+        <label htmlFor={`${id}-aktion`} className="block text-sm font-medium text-foreground mb-2">
+          Was ich getan habe
+        </label>
+        <textarea id={`${id}-aktion`} value={action} onChange={(e) => setAction(e.target.value)} rows={3} className={inputClass} />
+      </div>
+      <div>
+        <label htmlFor={`${id}-ergebnis`} className="block text-sm font-medium text-foreground mb-2">
+          Ergebnis
+        </label>
+        <textarea id={`${id}-ergebnis`} value={result} onChange={(e) => setResult(e.target.value)} rows={2} className={inputClass} />
+      </div>
+      <div>
+        <label htmlFor={`${id}-qualitaeten`} className="block text-sm font-medium text-foreground mb-2">
+          Qualitäten (Komma-getrennt)
+        </label>
+        <input
+          id={`${id}-qualitaeten`}
+          value={skills}
+          onChange={(e) => setSkills(e.target.value)}
+          className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-foreground text-sm"
+        />
+      </div>
+      <div className="flex gap-3">
+        <Button
+          size="sm"
+          disabled={saving || !title.trim() || !situation.trim() || !action.trim() || !result.trim()}
+          onClick={() => {
+            setSaving(true)
+            onSave({
+              title,
+              situation,
+              action,
+              result,
+              skills: skills.split(',').map((s) => s.trim()).filter(Boolean),
+            })
+            setSaving(false)
+          }}
+        >
+          Übernehmen
+        </Button>
+        <Button size="sm" variant="secondary" onClick={onDiscard}>
+          Verwerfen
+        </Button>
+      </div>
     </div>
   )
 }
