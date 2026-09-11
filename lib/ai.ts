@@ -377,7 +377,8 @@ export function buildCoverLetterPrompt(
   jobDescription: string,
   company: string,
   jobTitle?: string,
-  language: 'de' | 'en' = 'de'
+  language: 'de' | 'en' = 'de',
+  anecdoteBlock?: string
 ): string {
   const languageRules =
     language === 'en'
@@ -406,7 +407,7 @@ Basierend auf diesem Lebenslauf:
 ${resume}
 
 ${languageRules}
-
+${anecdoteBlock ? `\n${anecdoteBlock}\n\nBeachte: Strukturpunkt 1 (Einleitung) ist damit die Anekdote selbst — kein generischer Motivationssatz.\n` : ''}
 Halte es kurz (3-4 Absätze), professionell und überzeugend. Beziehe dich konkret
 auf Anforderungen aus der Stellenbeschreibung und Stärken aus dem Lebenslauf —
 keine Floskeln ohne Bezug.
@@ -472,11 +473,19 @@ export async function generateCoverLetter(
   apiKey?: string,
   baseUrl?: string,
   jobTitle?: string,
-  language: 'de' | 'en' = 'de'
+  language: 'de' | 'en' = 'de',
+  anecdoteBlock?: string
 ): Promise<string> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
-  const prompt = buildCoverLetterPrompt(resume, jobDescription, company, jobTitle, language)
+  const prompt = buildCoverLetterPrompt(
+    resume,
+    jobDescription,
+    company,
+    jobTitle,
+    language,
+    anecdoteBlock
+  )
 
   const { text } = await generateText({
     model: ai.chat(model || defaultModel(provider)),

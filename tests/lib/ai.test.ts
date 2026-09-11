@@ -39,6 +39,18 @@ test('German ad keeps the German letter rules', () => {
   assert.match(prompt, /Du-Form/)
 })
 
+test('prompt embeds the anecdote block before the structure, verbatim', () => {
+  const prompt = buildCoverLetterPrompt('LEBENSLAUF', AD_DU_FORM, 'Firma', 'Barista', 'de', 'X-ANEKDOTEN-BLOCK')
+  assert.match(prompt, /X-ANEKDOTEN-BLOCK/)
+  assert.ok(prompt.indexOf('X-ANEKDOTEN-BLOCK') < prompt.indexOf('Struktur:'), 'Block muss vor der Struktur stehen')
+})
+
+test('prompt stays free of a block when none is given (backward compatible)', () => {
+  const prompt = buildCoverLetterPrompt('LEBENSLAUF', AD_DU_FORM, 'Firma', 'Barista', 'de')
+  assert.ok(!prompt.includes('X-ANEKDOTEN-BLOCK'))
+  assert.match(prompt, /Struktur:/)
+})
+
 test('resume translation prompt forbids inventing facts and keeps structure', () => {
   const prompt = buildTranslateResumePrompt('Berufserfahrung\n- 3 Jahre Erfahrung', 'en')
   assert.match(prompt, /[Ee]nglisch|[Ee]nglish/)
