@@ -461,7 +461,7 @@ export default function ResumePage() {
                 <ProposalCard
                   key={proposal.title + proposal.situation}
                   proposal={proposal}
-                  onSave={(edited) => void saveProposal(edited, proposal)}
+                  onSave={(edited) => saveProposal(edited, proposal)}
                   onDiscard={() =>
                     setProposals((prev) => {
                       const rest = prev?.filter((p) => p !== proposal) ?? []
@@ -749,7 +749,12 @@ function ExtractPanel({
         setError(data?.error ?? 'Die KI ist nicht erreichbar — deine Antworten bleiben im Formular, nichts ist verloren.')
         return
       }
-      onProposals(Array.isArray(data?.proposals) ? data.proposals : [])
+      const list = Array.isArray(data?.proposals) ? data.proposals : []
+      if (list.length === 0) {
+        setError('Aus diesen Geschichten ließ sich nichts formen — erzähl mehr Details oder schreib eine Anekdote selbst.')
+        return
+      }
+      onProposals(list)
     } catch {
       setError('Netzwerkfehler — deine Antworten bleiben im Formular, nichts ist verloren.')
     } finally {
@@ -804,7 +809,7 @@ function ProposalCard({
   onDiscard,
 }: {
   proposal: Proposal
-  onSave: (edited: Proposal) => void
+  onSave: (edited: Proposal) => Promise<void>
   onDiscard: () => void
 }) {
   const [title, setTitle] = useState(proposal.title)
@@ -873,8 +878,7 @@ function ProposalCard({
               action,
               result,
               skills: skills.split(',').map((s) => s.trim()).filter(Boolean),
-            })
-            setSaving(false)
+            }).finally(() => setSaving(false))
           }}
         >
           Übernehmen
