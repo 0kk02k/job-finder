@@ -63,6 +63,14 @@ export default function ResumePage() {
     void fetchAnecdotes()
   }, [])
 
+  // Next 16 läuft den Hash-Scroll einmalig beim Navigieren — zu dem Zeitpunkt
+  // existiert die Sektion noch nicht (Lade-Gate). Einmal nachziehen, wenn klar ist.
+  useEffect(() => {
+    if (!loading && window.location.hash === '#anekdoten') {
+      document.getElementById('anekdoten')?.scrollIntoView()
+    }
+  }, [loading])
+
   async function fetchResume() {
     try {
       const response = await fetch('/api/resume')

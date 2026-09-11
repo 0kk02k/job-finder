@@ -566,7 +566,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 verschickst.
               </p>
               <Button onClick={() => void startLetterGeneration()} disabled={busy !== null || matching}>
-                {matching ? 'Wird geprüft …' : busy === 'generate' ? 'Wird erzeugt …' : 'Anschreiben erzeugen'}
+                {busy === 'generate' ? 'Wird erzeugt …' : matching ? 'Wird geprüft …' : 'Anschreiben erzeugen'}
               </Button>
             </div>
           )}
@@ -582,8 +582,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                 Anzeigentext geprüft.
               </p>
               <ul className="space-y-2 mb-5">
-                {chooser.needs.map((guess) => (
-                  <li key={guess.need} className="text-sm bg-background rounded-xl border border-border-soft p-3">
+                {chooser.needs.map((guess, i) => (
+                  <li key={`${guess.need}-${i}`} className="text-sm bg-background rounded-xl border border-border-soft p-3">
                     <p className="text-foreground">{guess.need}</p>
                     <p className="text-primary-soft mt-1">Zitat: „{guess.quote}“</p>
                     {guess.why && <p className="text-primary-soft mt-1">{guess.why}</p>}
@@ -661,8 +661,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
           )}
 
-          {/* Leerer Bestand: kein Vorwurf, ein Angebot */}
-          {!letter && !letterError && !chooser && anecdoteHint && (
+          {/* Leerer Bestand: kein Vorwurf, ein Angebot. Ohne die `letter`/`letterError`
+              -Gates bleibt der Tipp sichtbar — er begleitet das Ergebnis, statt nur in
+              dem einen Moment zu stehen, in dem noch keins existiert. */}
+          {!chooser && anecdoteHint && (
             <p className="text-xs text-primary-soft mt-3">
               Tipp: Eine wahre Anekdote hebt dein Anschreiben von KI-Standardsatz ab.{' '}
               <Link
