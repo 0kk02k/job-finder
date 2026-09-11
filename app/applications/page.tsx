@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
 import { Button, StatusBadge, scoreTone } from '../components/ui'
-import { isDue } from '@/lib/applications'
+import { collectFollowUps, isDue } from '@/lib/applications'
 
 interface Application {
   id: string
@@ -179,6 +179,11 @@ export default function ApplicationsPage() {
     }
   }
 
+  // Der Termin-Überblick leitet sich aus demselben State ab wie die Karten —
+  // eine geänderte Wiedervorlage aktualisiert ihn sofort mit.
+  const now = new Date()
+  const followUps = collectFollowUps(applications)
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -231,6 +236,41 @@ export default function ApplicationsPage() {
             <Button size="sm" variant="secondary" onClick={() => void loadApplications()}>
               Erneut versuchen
             </Button>
+          </section>
+        )}
+
+        {/* Termin-Überblick: alle gesetzten Wiedervorlagen auf einem Blick,
+            aufsteigend — Überfälliges steht automatisch oben */}
+        {!error && followUps.length > 0 && (
+          <section
+            aria-label="Wiedervorlagen"
+            className="mb-8 bg-surface rounded-2xl px-6 py-5 border border-border"
+          >
+            <h2 className="text-sm font-medium text-primary-soft mb-2">Wiedervorlagen</h2>
+            <ul className="divide-y divide-border-soft">
+              {followUps.map((f) => (
+                <li
+                  key={f.id}
+                  className="py-3 first:pt-0 last:pb-0 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm"
+                >
+                  <span className="tabular-nums text-foreground font-medium w-14 flex-shrink-0">
+                    {shortDate(f.followUpAt)}
+                  </span>
+                  <Link
+                    href={`/jobs/${f.id}`}
+                    className="flex-1 min-w-0 truncate text-primary hover:text-selection transition-colors"
+                  >
+                    {[f.company, f.title].filter(Boolean).join(' · ')}
+                  </Link>
+                  <StatusBadge status={f.status} />
+                  {isDue(f.followUpAt, now) && (
+                    <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
+                      Fällig
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 

@@ -50,6 +50,16 @@ export function sortApplications<T extends ApplicationRow>(apps: T[], now: Date)
   })
 }
 
+// Die Termin-Übersicht im Cockpit: alle gesetzten Wiedervorlagen, aufsteigend —
+// Überfälliges steht damit automatisch oben, ein eigener „fällig“-Zweig ist unnötig.
+export function collectFollowUps<T extends { followUpAt: string | null }>(
+  apps: T[]
+): (T & { followUpAt: string })[] {
+  return apps
+    .filter((a): a is T & { followUpAt: string } => a.followUpAt != null)
+    .sort((a, b) => new Date(a.followUpAt).getTime() - new Date(b.followUpAt).getTime())
+}
+
 export interface WeekStats {
   appliedThisWeek: number
   rejectedThisWeek: number

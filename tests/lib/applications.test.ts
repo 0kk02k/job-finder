@@ -3,7 +3,7 @@
 // Wochen-Kennzahlen aus den ehrlichen Zeitstempeln (appliedAt, rejectedAt).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { PIPELINE_STATUSES, sortApplications, weekStats } from '../../lib/applications'
+import { PIPELINE_STATUSES, collectFollowUps, sortApplications, weekStats } from '../../lib/applications'
 
 interface App {
   id: string
@@ -95,6 +95,14 @@ test('weekStats counts applications and rejections from their own timestamps', (
     interviews: 0,
     offers: 0,
   })
+})
+
+test('collectFollowUps lists only set dates, oldest first — overdue on top', () => {
+  const withoutDate = app('no-date')
+  const upcoming = app('upcoming', { followUpAt: new Date(TODAY.getTime() + 5 * DAY).toISOString() })
+  const overdue = app('overdue', { followUpAt: new Date(TODAY.getTime() - 1 * DAY).toISOString() })
+  const collected = collectFollowUps([withoutDate, upcoming, overdue])
+  assert.deepEqual(collected.map((a) => a.id), ['overdue', 'upcoming'])
 })
 
 test('weekStats counts standing interviews and offers regardless of week', () => {
