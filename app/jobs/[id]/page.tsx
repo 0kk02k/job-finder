@@ -444,9 +444,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <span className="text-sm text-primary-soft">KI-Score</span>
             </div>
             {job.scoreReason && (
-              <p className="text-primary leading-relaxed max-w-prose">
-                {job.scoreReason}
-              </p>
+              <p className="text-primary leading-relaxed">{job.scoreReason}</p>
             )}
             {(() => {
               const { strengths, gaps, transferableSkills } = parseMatchDetails(job.matchDetails)
