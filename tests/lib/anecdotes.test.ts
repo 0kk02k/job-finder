@@ -6,9 +6,13 @@ import assert from 'node:assert/strict'
 import {
   EXTRACT_QUESTIONS,
   buildExtractPrompt,
+  buildMatchPrompt,
   parseJsonLoose,
   parseSkills,
   sanitizeExtractedProposals,
+  sanitizeMatches,
+  sanitizeNeedPayload,
+  sanitizeNeeds,
   sanitizeSkillsInput,
   verifyQuotes,
 } from '../../lib/anecdotes'
@@ -25,6 +29,10 @@ test('verifyQuotes rejects invented quotes and empty input', () => {
   assert.equal(verifyQuotes('Wir zahlen Bestgehälter', ad), false)
   assert.equal(verifyQuotes('', ad), false)
   assert.equal(verifyQuotes('Lagerlogistik', ''), false)
+  // Nach Normalisierung leer (nur Whitespace bzw. nur Anführungszeichen) ist
+  // kein Beleg — `'x'.includes('')` darf hier nicht zum Durchkommen führen.
+  assert.equal(verifyQuotes('„“', ad), false)
+  assert.equal(verifyQuotes('   ', ad), false)
 })
 
 test('parseJsonLoose unwraps fenced and accompanied JSON', () => {
@@ -82,5 +90,57 @@ test('buildExtractPrompt carries all three questions, the answers and the truth 
   EXTRACT_QUESTIONS.forEach((q) => assert.ok(prompt.includes(q), `Frage fehlt: ${q}`))
   assert.match(prompt, /2019/)
   assert.match(prompt, /erfinde|nichts dazu/i)
+  assert.match(prompt, /JSON/)
+})
+
+const AD =
+  'Wir suchen jemanden, der Prioritäten in einem schnell wachsenden Umfeld setzt. Teamplayer gesucht.'
+
+test('sanitizeNeeds keeps only quotes the ad actually contains', () => {
+  const raw = [
+    { quote: 'Prioritäten in einem schnell wachsenden Umfeld setzt', need: 'Selbstständigkeit', why: 'Wachstum genannt' },
+    { quote: 'Wir bezahlen Bestgehälter', need: 'erfunden', why: 'steht nicht drin' },
+  ]
+  const needs = sanitizeNeeds(raw, AD)
+  assert.equal(needs.length, 1)
+  assert.equal(needs[0].need, 'Selbstständigkeit')
+})
+
+test('sanitizeNeeds caps at four guesses', () => {
+  const raw = Array.from({ length: 6 }, (_, i) => ({
+    quote: 'Teamplayer gesucht',
+    need: `Bedürfnis ${i}`,
+    why: 'weil',
+  }))
+  assert.equal(sanitizeNeeds(raw, AD).length, 4)
+})
+
+test('sanitizeMatches drops unknown anecdote ids and out-of-range addresses', () => {
+  const raw = [
+    { anecdoteId: 'a1', reason: 'passt zur Wachstums-Mutmaßung', addresses: [0, 9, 0] },
+    { anecdoteId: 'fremd', reason: 'x', addresses: [0] },
+    { anecdoteId: 'a2', reason: 'y'.repeat(400), addresses: [] },
+  ]
+  const matches = sanitizeMatches(raw, ['a1', 'a2'], 1)
+  assert.deepEqual(matches.map((m) => m.anecdoteId), ['a1', 'a2'])
+  assert.deepEqual(matches[0].addresses, [0])
+  assert.ok(matches[1].reason.length <= 300)
+})
+
+test('sanitizeNeedPayload returns the guess only when the quote is verbatim', () => {
+  const good = { quote: 'Teamplayer gesucht', need: 'Teamfähigkeit', why: 'ausdrücklich gefordert' }
+  assert.deepEqual(sanitizeNeedPayload(good, AD), good)
+  assert.equal(sanitizeNeedPayload({ quote: 'erfunden', need: 'x', why: 'y' }, AD), null)
+  assert.equal(sanitizeNeedPayload(null, AD), null)
+  assert.equal(sanitizeNeedPayload('kein objekt', AD), null)
+})
+
+test('buildMatchPrompt demands verbatim quotes and ranks the given anecdotes', () => {
+  const prompt = buildMatchPrompt(AD, [
+    { id: 'a1', title: 'Deploy-Freitag', situation: 's', action: 'a', result: 'r', skills: ['Druck'] },
+  ])
+  assert.match(prompt, /wörtlich/i)
+  assert.match(prompt, /Mutmaßung/i)
+  assert.match(prompt, /a1/)
   assert.match(prompt, /JSON/)
 })

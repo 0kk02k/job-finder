@@ -17,8 +17,9 @@ function normalizeText(s: string): string {
 // Ein Zitat ohne wörtlichen Beleg im Anzeigentext ist eine unbelegte
 // Spekulation — und die wird nicht gezeigt (Spec: Ehrlichkeitsregel).
 export function verifyQuotes(quote: string, adText: string): boolean {
-  if (!quote || !adText) return false
-  return normalizeText(adText).includes(normalizeText(quote))
+  const normalizedQuote = normalizeText(quote)
+  if (!normalizedQuote) return false
+  return normalizeText(adText).includes(normalizedQuote)
 }
 
 // KI-Antworten kommen gepolstert („Hier ist dein JSON:", Code-Fences, Nachsatz).
@@ -127,4 +128,119 @@ Erzählte Geschichten:
 ${told}
 
 Gib AUSSCHLIESSLICH das JSON-Array aus — kein Vorwort, keine Anmerkungen.`
+}
+
+export interface NeedGuess {
+  quote: string
+  need: string
+  why: string
+}
+
+export interface AnecdoteMatch {
+  anecdoteId: string
+  reason: string
+  addresses: number[]
+}
+
+const MAX_NEEDS = 4
+const MAX_QUOTE = 300
+const MAX_NEED = 200
+const MAX_WHY = 400
+const MAX_MATCHES = 3
+const MAX_REASON = 300
+
+// Nur belegte Mutmaßungen überleben: ein Bedürfnis ohne wörtliche Zitatstelle
+// in der Anzeige wird nicht gezeigt (Spec: „beleglose Spekulation wird nicht
+// gezeigt").
+export function sanitizeNeeds(raw: unknown, adText: string): NeedGuess[] {
+  if (!Array.isArray(raw)) return []
+  const needs: NeedGuess[] = []
+  for (const item of raw.slice(0, MAX_NEEDS * 2)) {
+    if (typeof item !== 'object' || item === null) continue
+    const record = item as Record<string, unknown>
+    const quote = cappedString(record.quote, MAX_QUOTE)
+    const need = cappedString(record.need, MAX_NEED)
+    const why = cappedString(record.why, MAX_WHY)
+    if (!need || !verifyQuotes(quote, adText)) continue
+    needs.push({ quote, need, why })
+    if (needs.length >= MAX_NEEDS) break
+  }
+  return needs
+}
+
+export function sanitizeMatches(
+  raw: unknown,
+  anecdoteIds: readonly string[],
+  needCount: number
+): AnecdoteMatch[] {
+  if (!Array.isArray(raw)) return []
+  const known = new Set(anecdoteIds)
+  const matches: AnecdoteMatch[] = []
+  for (const item of raw.slice(0, MAX_MATCHES * 2)) {
+    if (typeof item !== 'object' || item === null) continue
+    const record = item as Record<string, unknown>
+    const anecdoteId = typeof record.anecdoteId === 'string' ? record.anecdoteId : ''
+    if (!known.has(anecdoteId)) continue
+    const addresses = Array.isArray(record.addresses)
+      ? [...new Set(record.addresses)]
+          .filter((i): i is number => typeof i === 'number' && Number.isInteger(i) && i >= 0 && i < needCount)
+          .slice(0, 3)
+      : []
+    matches.push({ anecdoteId, reason: cappedString(record.reason, MAX_REASON), addresses })
+    if (matches.length >= MAX_MATCHES) break
+  }
+  return matches
+}
+
+// Der Need kommt vom Client zurück (aus der Chooser-Auswahl) — dem wird nicht
+// vertraut: Form geprüft, Zitat erneut gegen die Anzeige verifiziert, Längen
+// gedeckelt. `null` heißt: Anekdote ja, Mutmaßung unbelegbar → weglassen.
+export function sanitizeNeedPayload(raw: unknown, adText: string): NeedGuess | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const record = raw as Record<string, unknown>
+  const quote = cappedString(record.quote, MAX_QUOTE)
+  const need = cappedString(record.need, MAX_NEED)
+  if (!need || !verifyQuotes(quote, adText)) return null
+  return { quote, need, why: cappedString(record.why, MAX_WHY) }
+}
+
+export function buildMatchPrompt(
+  adDescription: string,
+  anecdotes: Array<{ id: string } & AnecdoteInput>
+): string {
+  const list = anecdotes
+    .map(
+      (a) =>
+        `id: ${a.id}\nTitel: ${a.title}\nSituation: ${a.situation}\nGetan: ${a.action}\nErgebnis: ${a.result}\nQualitäten: ${a.skills.join(', ')}`
+    )
+    .join('\n\n')
+  return `Lies diese Stellenanzeige und stelle Mutmaßungen an: Welche NICHT-technischen
+Bedürfnisse hat der Arbeitgeber zwischen den Zeilen? (z. B. Selbstständigkeit,
+Druckresistenz, Konfliktfähigkeit, Lernbereitschaft, Loyalität)
+
+Stellenanzeige:
+${adDescription}
+
+Anekdoten des Nutzers (wahre Geschichten):
+
+${list}
+
+Liefere JSON:
+
+{
+  "needs": [
+    { "quote": "WÖRTLICHES Zitat aus der Anzeige als Beleg — kopiere den Text Zeichen für Zeichen",
+      "need": "das vermutete nicht-technische Bedürfnis",
+      "why": "ein Satz: woran du es erkennst" }
+  ],
+  "matches": [
+    { "anecdoteId": "id der passendsten Anekdote",
+      "reason": "ein Satz: warum diese Geschichte dieses Bedürfnis belegt",
+      "addresses": [Indizes der needs, die die Anekdote beantwortet] }
+  ]
+}
+
+Regeln: 2-4 Mutmaßungen, jede mit wörtlichem Zitat aus der Anzeige — erfinde
+keine Zitate. Rangiere höchstens 3 Anekdote-IDs, die besten zuerst. Gib
+AUSSCHLIESSLICH das JSON aus.`
 }
