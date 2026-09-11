@@ -3,7 +3,12 @@
 
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
-import { buildExtractPrompt, parseJsonLoose } from './anecdotes'
+import {
+  AnecdoteInput,
+  buildExtractPrompt,
+  buildMatchPrompt,
+  parseJsonLoose,
+} from './anecdotes'
 
 // Ein Ort, eine Wahrheit: die Standard-Modell-ID für Nebius Token Factory.
 // (Im Studio verifizierbar über „Copy model ID".)
@@ -552,6 +557,28 @@ export async function generateAnecdoteProposals(
   })
   if (!text || text.trim().length === 0) {
     throw new Error('Die KI hat keine Vorschläge geliefert')
+  }
+  return parseJsonLoose(text)
+}
+
+// Das zweistufige Lesen: aus der Anzeige nicht-technische Bedürfnisse mutmaßen
+// (mit wörtlichen Zitatstellen — die Verifikation passiert danach in
+// lib/anecdotes.ts) und die Anekdoten dazu rangieren. Wirft bei KI-Ausfall.
+export async function matchAnecdotesForAd(
+  adDescription: string,
+  anecdotes: Array<{ id: string } & AnecdoteInput>,
+  provider: string = 'nebius',
+  model?: string,
+  apiKey?: string,
+  baseUrl?: string
+): Promise<unknown> {
+  const ai = getAIClient(provider, apiKey, baseUrl)
+  const { text } = await generateText({
+    model: ai.chat(model || defaultModel(provider)),
+    messages: [{ role: 'user', content: buildMatchPrompt(adDescription, anecdotes) }],
+  })
+  if (!text || text.trim().length === 0) {
+    throw new Error('Die KI hat keine Rangliste geliefert')
   }
   return parseJsonLoose(text)
 }
