@@ -34,9 +34,12 @@ export default function DatenschutzPage() {
             den du selbst in den Einstellungen hinterlegt hast — zu keinem anderen
             Zweck und an niemand sonst. Für das Anekdoten-Mini-Interview und die
             Anschreiben-Erzeugung kommen zusätzlich deine Anekdoten-Texte an
-            denselben Provider — ebenfalls nur zu diesem Zweck. Stellensuche fragt
-            öffentliche Quellen ab (Jooble, Remotive, Arbeitnow, optional LinkedIn
-            via Apify).
+            denselben Provider — ebenfalls nur zu diesem Zweck. Der Provider
+            verarbeitet diese Anfragen global und ohne feste Region — gespeichert
+            werden sie nicht: Zero Data Retention ist aktiviert, es gibt keine
+            zurückbehaltene Kopie und keine Trainingsnutzung der Inhalte.
+            Stellensuche fragt öffentliche Quellen ab (Jooble, Remotive, Arbeitnow,
+            optional LinkedIn via Apify).
           </p>
         </section>
         <section>
