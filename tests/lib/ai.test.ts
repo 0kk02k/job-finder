@@ -3,7 +3,7 @@
 // Getestet wird der Prompt-Vertrag — die KI selbst ist außen vor (lokal kein Key).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCoverLetterPrompt, buildScorePrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
+import { buildCoverLetterPrompt, buildScorePrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
 
 const AD_DU_FORM = 'Dein Profil: Du liebst Kaffee und bringst Deine Ideen ein. Wir bieten dir ein starkes Team.'
 
@@ -84,6 +84,17 @@ test('scoringModel sends Nebius scoring to GLM 5.3 Flash — the user model is d
 test('scoringModel leaves other providers with their own model choice', () => {
   assert.equal(scoringModel('gemini', undefined), defaultModel('gemini'))
   assert.equal(scoringModel('openai', 'gpt-x'), 'gpt-x')
+})
+
+test('semantic ranking prompt carries deep descriptions — 800 chars, not 200', () => {
+  const deep = 'A'.repeat(700) + 'BESONDERES-MERKMAL' + 'C'.repeat(200)
+  const prompt = buildSemanticRankingPrompt('LEBENSLAUF', 'QUERY', [
+    { title: 'T', company: 'F', location: 'L', description: deep, url: 'u', platform: 'p', relevanceScore: 0, matchReason: '', transferableSkills: [] },
+  ])
+  assert.match(prompt, /BESONDERES-MERKMAL/, 'Zeichen jenseits von 200 müssen im Prompt stehen — Fähigkeiten stehen oft tief in der Anzeige')
+  assert.match(prompt, /LEBENSLAUF/)
+  assert.match(prompt, /QUERY/)
+  assert.match(prompt, /0\.6/)
 })
 
 test('resume translation prompt forbids inventing facts and keeps structure', () => {

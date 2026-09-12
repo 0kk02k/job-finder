@@ -153,25 +153,21 @@ Wenn kein Job gefunden wird, gib null zurück.`
   }
 }
 
-// Semantic job search - finds jobs that match even with different titles
-export async function semanticJobSearch(
+// Der Ranking-Prompt bewertet Fähigkeiten, nicht Titel — dafür braucht er die
+// Anzeige in der Tiefe: 800 Zeichen statt 200, die passenden Skills stehen oft
+// tief in der Beschreibung. Kostet bei GLM Flash Cent-Bruchteile.
+export function buildSemanticRankingPrompt(
   resume: string,
   searchQuery: string,
-  availableJobs: SemanticJob[],
-  provider: string = 'nebius',
-  model?: string,
-  apiKey?: string,
-  baseUrl?: string
-): Promise<SemanticSearchResult> {
-  const ai = getAIClient(provider, apiKey, baseUrl)
-
+  availableJobs: SemanticJob[]
+): string {
   // Numbered summary — the model only returns indices, never URLs or platforms.
   // (Asking it for those fields would make it hallucinate them.)
   const jobsSummary = availableJobs.map((j, i) =>
-    `[${i}] TITLE: ${j.title}\nCOMPANY: ${j.company}\nLOCATION: ${j.location}\nDESC: ${j.description.substring(0, 200)}`
+    `[${i}] TITLE: ${j.title}\nCOMPANY: ${j.company}\nLOCATION: ${j.location}\nDESC: ${j.description.substring(0, 800)}`
   ).join('\n\n---\n\n')
 
-  const prompt = `Du bist ein Karriere-Matching-Experte. Finde Jobs, die semantisch passen, auch wenn die Titel nicht genau übereinstimmen.
+  return `Du bist ein Karriere-Matching-Experte. Finde Jobs, die semantisch passen, auch wenn die Titel nicht genau übereinstimmen.
 
 RESUME:
 ${resume.substring(0, 1000)}
@@ -195,6 +191,21 @@ Gib zurück als JSON:
 }
 
 "index" ist die Nummer des Jobs aus der Liste oben. Nur Jobs mit relevanceScore >= 0.6 aufnehmen.`
+}
+
+// Semantic job search - finds jobs that match even with different titles
+export async function semanticJobSearch(
+  resume: string,
+  searchQuery: string,
+  availableJobs: SemanticJob[],
+  provider: string = 'nebius',
+  model?: string,
+  apiKey?: string,
+  baseUrl?: string
+): Promise<SemanticSearchResult> {
+  const ai = getAIClient(provider, apiKey, baseUrl)
+
+  const prompt = buildSemanticRankingPrompt(resume, searchQuery, availableJobs)
 
   try {
     const { text } = await generateText({
