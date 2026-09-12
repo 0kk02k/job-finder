@@ -273,6 +273,16 @@ ${jobDescription}
 Bewerte jetzt diesen Job wie oben beschrieben.`
 }
 
+// Scoring läuft auf eigenem, schnellem Modell: kleine strukturierte Aufgabe,
+// aber häufig — Kims Denken kostet hier Zeit und Geld ohne Gewinn (~0,05 ct
+// statt ~0,7 ct pro Bewertung, Sekunden statt Minuten). Nur Nebius hat diese
+// ID; andere Provider behalten ihr Modell.
+const NEBIUS_SCORING_MODEL = 'deepseek-ai/DeepSeek-V3.2'
+
+export function scoringModel(provider: string, userModel?: string): string {
+  return provider === 'nebius' ? NEBIUS_SCORING_MODEL : userModel || defaultModel(provider)
+}
+
 // Score job against resume (enhanced with transferable skills)
 // minSalary: Wunscheinstellung aus den Settings — als Kontext in die Bewertung,
 // damit die gespeicherte Einstellung eine Wirkung hat statt nur zu existieren.
@@ -291,7 +301,7 @@ export async function scoreJob(
 
   try {
     const { text } = await generateText({
-      model: ai.chat(model || (defaultModel(provider))),
+      model: ai.chat(scoringModel(provider, model)),
       messages: [{ role: 'user', content: prompt }],
     })
 

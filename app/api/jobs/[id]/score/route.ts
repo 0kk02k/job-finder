@@ -5,6 +5,8 @@ import { scoreJob, aiConfigFromSettings } from '@/lib/ai'
 import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 import { scoreUpdatePayload } from '@/lib/scoring'
 
+export const maxDuration = 60
+
 // POST /api/jobs/[id]/score - einen einzelnen Job jetzt gegen den Lebenslauf bewerten
 // lassen. Bisher entstand ein Score ausschließlich bei der Suche (die ersten 15 Treffer
 // pro Lauf) — manuell hinzugefügte oder darüber hinaus gefundene Jobs blieben dauerhaft

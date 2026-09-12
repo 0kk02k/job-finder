@@ -3,7 +3,7 @@
 // Getestet wird der Prompt-Vertrag — die KI selbst ist außen vor (lokal kein Key).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCoverLetterPrompt, buildScorePrompt, buildTranslateResumePrompt } from '../../lib/ai'
+import { buildCoverLetterPrompt, buildScorePrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
 
 const AD_DU_FORM = 'Dein Profil: Du liebst Kaffee und bringst Deine Ideen ein. Wir bieten dir ein starkes Team.'
 
@@ -74,6 +74,16 @@ test('score prompt demands the JSON verdict shape and the 1-10 scale', () => {
   assert.match(prompt, /1-10/)
   assert.match(prompt, /"score"/)
   assert.match(prompt, /"reason"/)
+})
+
+test('scoringModel sends Nebius scoring to DeepSeek V3.2 — the user model is deliberately ignored', () => {
+  assert.equal(scoringModel('nebius', 'moonshotai/Kimi-K3'), 'deepseek-ai/DeepSeek-V3.2')
+  assert.equal(scoringModel('nebius', undefined), 'deepseek-ai/DeepSeek-V3.2')
+})
+
+test('scoringModel leaves other providers with their own model choice', () => {
+  assert.equal(scoringModel('gemini', undefined), defaultModel('gemini'))
+  assert.equal(scoringModel('openai', 'gpt-x'), 'gpt-x')
 })
 
 test('resume translation prompt forbids inventing facts and keeps structure', () => {
