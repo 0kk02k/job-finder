@@ -9,6 +9,10 @@ import {
   type InterviewMessage,
 } from '@/lib/interview'
 
+// Der Abschluss-Turn enthält die Insights auf dem Standard-Modell — der braucht
+// bewusst Kopfraum; ohne Limit lief die Function bis zum Runtime-Timeout.
+export const maxDuration = 300
+
 async function getAIConfig(userId: string) {
   const settings = await prisma.userSettings.findUnique({ where: { userId } })
   const provider = settings?.aiProvider || 'nebius'

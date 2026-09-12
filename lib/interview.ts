@@ -5,7 +5,7 @@
 // die Struktur steckt deshalb in der Checkliste, nicht im Gesprächsfluss).
 
 import { generateText } from 'ai'
-import { getAIClient, defaultModel, parseJsonFromText } from './ai'
+import { getAIClient, scoringModel, defaultModel, parseJsonFromText } from './ai'
 // Evidenz-Zitate verifizieren — dieselbe Normalisierung wie im Präferenz-Gespräch
 import { normalizeForMatch } from './preference-profile'
 
@@ -131,7 +131,10 @@ export async function interviewerReply(
   config: AIConfig
 ): Promise<{ reply: string; completed: string[] }> {
   const ai = getAIClient(config.provider || 'nebius', config.apiKey, config.baseUrl)
-  const model = ai.chat(config.model || defaultModel(config.provider || 'nebius'))
+  // Schnelles Scoring-Modell statt Kimi-K3: K3 denkt auf offenen Gesprächs-
+  // Prompts minutenlang (im Präferenz-Gespräch hat das den Runtime-Timeout
+  // ausgelöst) — Klassifikation und kurze Prosa-Antwort sind kleine Aufgaben.
+  const model = ai.chat(scoringModel(config.provider || 'nebius', config.model))
 
   const history = messages
     .map((m) => `${m.role === 'assistant' ? 'INTERVIEWER' : 'KANDIDAT'}: ${m.content}`)
@@ -281,6 +284,9 @@ Nur aus dem Transkript belegte Aussagen verwenden, nichts erfinden. Wurde keine 
 
   try {
     const { text } = await generateText({
+      // Insights bleiben auf dem Standard-Modell: echte Analyse-Arbeit (STAR-
+      // Bewertung, Mini-Task), nur einmal pro Interview — bei Fehlschlag bleibt
+      // die Akte ehrlich leer (null), die Route läuft weiter.
       model: ai.chat(config.model || defaultModel(config.provider || 'nebius')),
       messages: [{ role: 'user', content: prompt }],
     })

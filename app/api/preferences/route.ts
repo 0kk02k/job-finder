@@ -11,6 +11,11 @@ import {
   type InterviewMessage,
 } from '@/lib/preferences'
 
+// Jeder Chat-Turn läuft auf dem schnellen Scoring-Modell (Sekunden) — aber der
+// Abschluss-Turn zieht die Synthese mit, und ohne Limit hat hier ein hängender
+// KI-Call die Function 300s laufen lassen, bis Vercel sie killte.
+export const maxDuration = 60
+
 function serialize(session: {
   id: string
   status: string

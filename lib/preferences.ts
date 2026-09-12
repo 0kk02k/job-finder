@@ -8,7 +8,7 @@
 // lib/preference-profile.ts — diese Datei hält nur die KI-Calls.
 
 import { generateText } from 'ai'
-import { getAIClient, defaultModel, parseJsonFromText } from './ai'
+import { getAIClient, scoringModel, parseJsonFromText } from './ai'
 import {
   filterVerifiedEvidence,
   PREFERENCE_GUIDE,
@@ -49,7 +49,12 @@ export async function preferenceInterviewerReply(
   config: AIConfig
 ): Promise<{ reply: string; completed: string[] }> {
   const ai = getAIClient(config.provider || 'nebius', config.apiKey, config.baseUrl)
-  const model = ai.chat(config.model || defaultModel(config.provider || 'nebius'))
+  // Bewusst das schnelle Scoring-Modell, NICHT Kimi-K3: K3 denkt auf offenen
+  // Gesprächs-Prompts minutenlang — in Production ist der Turn deshalb nach
+  // 300s vom Runtime-Timeout gekillt worden („Die Beraterin schreibt …" ohne
+  // Ende). Klassifikation und kurze Prosa-Antwort sind kleine Aufgaben —
+  // Flash antwortet in Sekunden (dieselbe Erfahrung wie beim Scoring).
+  const model = ai.chat(scoringModel(config.provider || 'nebius', config.model))
 
   const history = messages
     .map((m) => `${m.role === 'assistant' ? 'BERATERIN' : 'NUTZER'}: ${m.content}`)
@@ -190,8 +195,12 @@ Regeln:
 Gib AUSSCHLIESSLICH das JSON aus — kein Vorwort, keine Anmerkungen.`
 
   try {
+    // Auch die Synthese auf dem schnellen Modell: Sie extrahiert nur belegte
+    // Nutzer-Aussagen in ein JSON-Schema (keine Kreation) — und sie läuft im
+    // selben Request wie der letzte Chat-Turn, der sich sonst denselben
+    // K3-Denk-Marathon mit dem Prosa-Zug teilt.
     const { text } = await generateText({
-      model: ai.chat(config.model || defaultModel(config.provider || 'nebius')),
+      model: ai.chat(scoringModel(config.provider || 'nebius', config.model)),
       messages: [{ role: 'user', content: prompt }],
     })
     return sanitizePreferenceProfile(parseJsonFromText(text || '{}'))
