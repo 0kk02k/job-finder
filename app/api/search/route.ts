@@ -242,9 +242,9 @@ export async function POST(request: NextRequest) {
 
       // Score jobs with AI (requires resume). Capped to bound LLM costs/latency —
       // roughly one LLM call per scored job. 50 statt 15: eine Bewertung kostet
-      // ~0,05 ct (DeepSeek V3.2, siehe scoringModel) — die Suche soll ihre
-      // Treffer liefern, nicht den Rückstand füttern; Reste drainiert der
-      // nächtliche Cron (/api/cron/score).
+      // nur Bruchteile eines Cents (GLM-5.3-Flash, siehe scoringModel) — die
+      // Suche soll ihre Treffer liefern, nicht den Rückstand füttern; Reste
+      // drainiert der nächtliche Cron (/api/cron/score).
       const SCORE_LIMIT = 50
       const resumeContent = useAI !== false ? resume?.content : undefined
       if (resumeContent && rawJobs.length > 0) {

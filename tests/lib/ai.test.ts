@@ -76,9 +76,9 @@ test('score prompt demands the JSON verdict shape and the 1-10 scale', () => {
   assert.match(prompt, /"reason"/)
 })
 
-test('scoringModel sends Nebius scoring to DeepSeek V3.2 — the user model is deliberately ignored', () => {
-  assert.equal(scoringModel('nebius', 'moonshotai/Kimi-K3'), 'deepseek-ai/DeepSeek-V3.2')
-  assert.equal(scoringModel('nebius', undefined), 'deepseek-ai/DeepSeek-V3.2')
+test('scoringModel sends Nebius scoring to GLM 5.3 Flash — the user model is deliberately ignored', () => {
+  assert.equal(scoringModel('nebius', 'moonshotai/Kimi-K3'), 'zai-org/GLM-5.3-Flash')
+  assert.equal(scoringModel('nebius', undefined), 'zai-org/GLM-5.3-Flash')
 })
 
 test('scoringModel leaves other providers with their own model choice', () => {

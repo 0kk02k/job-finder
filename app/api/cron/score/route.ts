@@ -8,7 +8,8 @@ import { pickUnscoredBatch, scoreUpdatePayload } from '@/lib/scoring'
 export const maxDuration = 60
 
 // Ein Cron-Lauf begrenzt sich selbst pro Nutzer — jeder Score ist ein
-// KI-Aufruf (~0,05 ct, DeepSeek V3.2), der Rückstand heilt sich Nacht für Nacht.
+// KI-Aufruf (GLM-5.3-Flash, Bruchteile eines Cents), der Rückstand heilt sich
+// Nacht für Nacht.
 const BATCH_LIMIT = 20
 // Parallele KI-Aufrufe pro Chunk — genug Tempo, keine Provider-Überforderung
 const CHUNK_SIZE = 5
