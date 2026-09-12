@@ -1,5 +1,6 @@
 import NextAuth from "next-auth"
 import Credentials from "next-auth/providers/credentials"
+import Google from "next-auth/providers/google"
 import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 
@@ -10,6 +11,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     signIn: "/login",
   },
   providers: [
+    Google,
     Credentials({
       credentials: {
         email: { type: "email" },
@@ -35,9 +37,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt: ({ token, user }) => {
-      if (user?.id) {
-        token.id = user.id
+    jwt: async ({ token, user }) => {
+      // First sign-in: resolve the local user by email, creating one for
+      // Google logins that have no account yet (password stays null).
+      if (user?.email) {
+        const email = user.email.trim().toLowerCase()
+        let dbUser = await prisma.user.findUnique({ where: { email } })
+        if (!dbUser) {
+          dbUser = await prisma.user.create({
+            data: { email, name: user.name ?? null },
+          })
+        }
+        token.id = dbUser.id
       }
       return token
     },
