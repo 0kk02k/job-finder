@@ -2,6 +2,7 @@
 
 import { extractJobFromHTML, semanticJobSearch } from './ai'
 import { mergeJobsByUrl, pickFuzzyTerms } from './search'
+import type { PreferenceProfile } from './preferences'
 
 export interface ScrapedJob {
   title: string
@@ -411,6 +412,7 @@ export async function semanticSearch(params: {
   adzunaAppId?: string | null
   adzunaAppKey?: string | null
   extraQueries?: string[]
+  preferences?: PreferenceProfile | null
   onProgress?: SearchProgressCallback
 }): Promise<SemanticJob[]> {
   // Original-Query mit Fortschritt, Fächer still — die Fläche zeigt eine
@@ -467,7 +469,8 @@ export async function semanticSearch(params: {
           params.provider || 'nebius',
           params.model,
           params.apiKey,
-          params.baseUrl
+          params.baseUrl,
+          params.preferences
         )
       )
     )

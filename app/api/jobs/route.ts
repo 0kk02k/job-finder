@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { scrapeJobUrl } from '@/lib/scrapers'
-import { scoreJob } from '@/lib/ai'
+import { scoreJob, aiConfigFromSettings } from '@/lib/ai'
+import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 
 // Only allow public http(s) URLs — block SSRF against localhost/private/metadata hosts.
@@ -122,14 +123,19 @@ export async function POST(request: NextRequest) {
 
   if (resume && job.description) {
     try {
+      // Wie jede andere Scoring-Stelle: Konfiguration aus den Nutzer-Settings
+      // (bisher fiel das manuelle Hinzufügen still auf den Env-Key zurück)
+      const { provider, model, apiKey, baseUrl } = aiConfigFromSettings(settings)
       const scoreResult = await scoreJob(
         job.description,
         resume.content,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        settings?.minSalary ?? null
+        provider,
+        model,
+        apiKey,
+        baseUrl,
+        settings?.minSalary ?? null,
+        // Nur zukünftige Bewertungen sehen das Profil — bestehende Scores bleiben
+        parseStoredProfile(settings?.preferenceProfile)
       )
       // score is null when the AI was unreachable — keep the job unscored then
       if (scoreResult.score !== null) {

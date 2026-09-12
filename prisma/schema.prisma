@@ -27,6 +27,7 @@ model User {
   savedSearches SavedSearch[]
   interviews  InterviewSession[]
   anecdotes   Anecdote[]
+  preferenceSessions PreferenceSession[]
 }
 
 model PlatformCredential {
@@ -96,6 +97,11 @@ model UserSettings {
   targetLocations String?  // JSON array of locations
   minSalary       Int?
   remote          Boolean  @default(false)
+  // Ergebnis des Präferenz-Gesprächs (lib/preferences.ts) — die eine Stelle,
+  // die Scoring und Suche lesen. Einziger Schreibzugriff: die Synthese in
+  // /api/preferences; bewusst NICHT im Settings-Zod, damit das Formular sie
+  // nie überschreibt.
+  preferenceProfile String?  // JSON: PreferenceProfile
 
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -222,4 +228,22 @@ model InterviewSession {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// Geführtes Präferenz-Gespräch (Spiegel von InterviewSession): halbfertige
+// Chats sind fortsetzbar, das fertige Profil landet zusätzlich auf UserSettings.
+model PreferenceSession {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  status    String   @default("ACTIVE") // ACTIVE, COMPLETED
+  completedItems String @default("[]") // JSON: abgehakte Guide-IDs (z.B. ["enjoy"])
+  messages  String   @default("[]")  // JSON: [{ role, content, ts }]
+  profile   String?  // JSON: PreferenceProfile, gefüllt bei Abschluss
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

@@ -6,6 +6,8 @@
 
 import { generateText } from 'ai'
 import { getAIClient, defaultModel, parseJsonFromText } from './ai'
+// Evidenz-Zitate verifizieren — dieselbe Normalisierung wie im Präferenz-Gespräch
+import { normalizeForMatch } from './preference-profile'
 
 export interface InterviewMessage {
   role: 'assistant' | 'user'
@@ -243,10 +245,6 @@ Nur IDs aus der Liste oben. "evidence" muss wörtlich aus dem Transkript stammen
     console.error('Checklist classification error:', error)
     return []
   }
-}
-
-function normalizeForMatch(text: string): string {
-  return text.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
 // Abschluss: strukturierte Insights aus dem kompletten Transkript erzeugen

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { scoreJob, aiConfigFromSettings } from '@/lib/ai'
+import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 import { scoreUpdatePayload } from '@/lib/scoring'
 
@@ -50,7 +51,9 @@ export async function POST(
       model,
       apiKey,
       baseUrl,
-      settings?.minSalary ?? null
+      settings?.minSalary ?? null,
+      // Nur zukünftige Bewertungen sehen das Profil — bestehende Scores bleiben
+      parseStoredProfile(settings?.preferenceProfile)
     )
     // Ehrlich statt erfunden: ohne erreichbare KI gibt es keinen Score (Produktprinzip)
     if (result.score === null) {

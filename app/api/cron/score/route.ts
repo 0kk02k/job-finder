@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { JobStatus } from '@prisma/client'
 import { scoreJob, aiConfigFromSettings } from '@/lib/ai'
+import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 import { pickUnscoredBatch, scoreUpdatePayload } from '@/lib/scoring'
 
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
           openrouterApiKey: true,
           ollamaUrl: true,
           minSalary: true,
+          preferenceProfile: true,
         },
       },
       jobs: {
@@ -84,7 +86,8 @@ export async function GET(request: NextRequest) {
               model,
               apiKey,
               baseUrl,
-              settings?.minSalary ?? null
+              settings?.minSalary ?? null,
+              parseStoredProfile(settings?.preferenceProfile)
             )
             return { job, result }
           } catch {

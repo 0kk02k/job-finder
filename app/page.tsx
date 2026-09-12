@@ -96,6 +96,8 @@ export default function Dashboard() {
   // null = unbekannt (lädt oder Resume-API fehlgeschlagen) — niemals „kein Resume" behaupten, wenn wir es nicht wissen
   const [hasResume, setHasResume] = useState<boolean | null>(null)
   const [resumeError, setResumeError] = useState(false)
+  // Präferenz-Profil: dieselbe Disziplin — null heißt unbekannt, nie „nicht erledigt"
+  const [hasPreferenceProfile, setHasPreferenceProfile] = useState<boolean | null>(null)
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
   const [searchesError, setSearchesError] = useState(false)
   const [refreshError, setRefreshError] = useState(false)
@@ -109,13 +111,14 @@ export default function Dashboard() {
     setResumeError(false)
     setSearchesError(false)
     try {
-      const [jobsRes, resumeRes, searchesRes] = await Promise.all([
+      const [jobsRes, resumeRes, searchesRes, prefRes] = await Promise.all([
         fetch('/api/jobs'),
         fetch('/api/resume'),
         fetch('/api/searches'),
+        fetch('/api/preferences?light=1'),
       ])
 
-      if (jobsRes.status === 401 || resumeRes.status === 401 || searchesRes.status === 401) {
+      if (jobsRes.status === 401 || resumeRes.status === 401 || searchesRes.status === 401 || prefRes.status === 401) {
         setJobsState('auth')
         return
       }
@@ -188,6 +191,15 @@ export default function Dashboard() {
         }
       } else {
         setSearchesError(true)
+      }
+
+      // Präferenz-Profil-Flag — bei Fehler bleibt es null („unbekannt“) und wird
+      // nie zu einem falschen „erledigt“ umgedeutet.
+      if (prefRes.ok) {
+        const data = await prefRes.json().catch(() => undefined)
+        if (data && typeof data.hasProfile === 'boolean') {
+          setHasPreferenceProfile(data.hasProfile)
+        }
       }
     } catch {
       // fetch wirft bei echten Netzwerkproblemen — nur hier ist „Verbindung prüfen" die wahre Diagnose
@@ -285,12 +297,21 @@ export default function Dashboard() {
     },
     {
       step: 2,
+      title: 'Präferenz-Gespräch führen',
+      description:
+        'Vier Fragen zu Freude, Gewichtung, No-Gos und Entwicklung — das Ergebnis fließt in Bewertung und Suche ein.',
+      done: hasPreferenceProfile === true,
+      href: '/preferences',
+      cta: 'Gespräch starten',
+    },
+    {
+      step: 3,
       title: 'Jobs suchen',
       description: 'Suche nach einem Beruf oder Ort — oder füge einen Job per Link ein.',
       done: (stats?.total ?? 0) > 0,
     },
     {
-      step: 3,
+      step: 4,
       title: 'KI-Matching',
       description: 'Die KI bewertet Treffer gegen deinen Lebenslauf — nichts verlässt diese App.',
       done: (stats?.scored ?? 0) > 0,
@@ -415,8 +436,8 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* Erste Schritte — direkt nach dem Launcher. Ohne eigenen Button: der Hero
-            trägt die eine Aktion, die Karte ist die Landkarte, nicht das zweite Steuer. */}
+        {/* Erste Schritte — direkt nach dem Launcher. Nur der aktuelle Schritt
+            trägt einen Button (der Weg dorthin), die Karte bleibt die Landkarte. */}
         {showOnboarding && (
           <section className="bg-surface rounded-2xl p-10 border border-border mb-6">
             <h2 className="text-2xl font-medium text-foreground mb-8">Erste Schritte</h2>
@@ -429,6 +450,8 @@ export default function Dashboard() {
                   step={step.step}
                   title={step.title}
                   description={step.description}
+                  href={step.href}
+                  cta={step.cta}
                   state={step.done ? 'done' : i === firstOpenStep ? 'current' : 'upcoming'}
                 />
               ))}
@@ -690,11 +713,15 @@ function OnboardingStep({
   state,
   title,
   description,
+  href,
+  cta,
 }: {
   step: number
   state: StepState
   title: string
   description: string
+  href?: string
+  cta?: string
 }) {
   const marker =
     state === 'done'
@@ -724,6 +751,16 @@ function OnboardingStep({
           {state === 'done' && <span className="sr-only"> (erledigt)</span>}
         </h3>
         <p className="text-sm leading-relaxed text-primary-soft">{description}</p>
+        {/* Nur der aktuelle Schritt ist ein Weg — erledigte und kommende bleiben
+            Kartenpunkte, damit die Liste nicht zu einem zweiten Launcher wird. */}
+        {state === 'current' && href && cta && (
+          <Link
+            href={href}
+            className="inline-flex items-center justify-center mt-3 px-5 py-2.5 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium text-sm transition-colors"
+          >
+            {cta}
+          </Link>
+        )}
       </div>
     </li>
   )

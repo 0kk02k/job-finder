@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useId } from 'react'
+import Link from 'next/link'
 import { useToast } from '../components/Toast'
 import { MarkdownContent } from '../components/Markdown'
 import { Button } from '../components/ui'
@@ -47,6 +48,11 @@ export default function ResumePage() {
   const [downloading, setDownloading] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Nach frischem Upload/Save: Hinweis aufs Präferenz-Gespräch. Kein Auto-
+  // Redirect — die PDF-Extraktion ist verlustbehaftet, der Nutzer soll den
+  // geparsten Text zuerst prüfen können.
+  const [showPrefCta, setShowPrefCta] = useState(false)
 
   // Anekdoten: eigene Sektion mit eigenem Ladezyklus — sie hängt nicht am Modus
   // des Lebenslaufs (view/upload/edit), sondern steht immer unten.
@@ -155,6 +161,7 @@ export default function ResumePage() {
 
       if (response.ok) {
         setMode('view')
+        setShowPrefCta(true)
         fetchResume()
       } else {
         const data = await response.json().catch(() => ({}))
@@ -185,6 +192,7 @@ export default function ResumePage() {
       if (response.ok) {
         setMode('view')
         setPastedText('')
+        setShowPrefCta(true)
         fetchResume()
       }
     } catch {
@@ -406,6 +414,33 @@ export default function ResumePage() {
         {/* View Mode */}
         {mode === 'view' && resume && (
           <>
+          {showPrefCta && (
+            <section className="bg-accent-soft/30 rounded-2xl p-6 border border-accent/20 mb-6 flex flex-col sm:flex-row sm:items-center gap-4">
+              <div className="flex-1">
+                <p className="text-foreground font-medium mb-1">
+                  Dein Lebenslauf steht — jetzt klären, was du wirklich willst
+                </p>
+                <p className="text-sm text-primary-soft">
+                  Im kurzen KI-Gespräch (ca. 10 Minuten) erfasst du, was dir Freude macht und
+                  wichtig ist. Das Präferenzen-Profil fließt in jede Job-Bewertung und Suche ein.
+                </p>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <Link
+                  href="/preferences"
+                  className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium text-sm transition-colors"
+                >
+                  Präferenz-Gespräch starten
+                </Link>
+                <button
+                  onClick={() => setShowPrefCta(false)}
+                  className="text-sm text-primary-soft hover:text-foreground transition-colors"
+                >
+                  Später
+                </button>
+              </div>
+            </section>
+          )}
           {resume.updatedAt && (
             <p className="text-sm text-primary-soft mb-4 tabular-nums">
               Zuletzt aktualisiert: {new Date(resume.updatedAt).toLocaleDateString('de-DE', { day: 'numeric', month: 'long', year: 'numeric' })}

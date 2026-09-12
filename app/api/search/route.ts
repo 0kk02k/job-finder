@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { searchJobs, semanticSearch, type ScrapedJob, type SearchProgressEvent } from '@/lib/scrapers'
 import { scoreJob, generateSearchQueries, aiConfigFromSettings } from '@/lib/ai'
+import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD, relevanceToScore } from '@/lib/matching'
 import { pickQueryFan } from '@/lib/search'
 
@@ -64,6 +65,9 @@ export async function POST(request: NextRequest) {
   // AI config from user settings (falls back to Nebius via env key)
   const { provider: aiProvider, model: aiModel, apiKey: aiApiKey, baseUrl: aiBaseUrl } =
     aiConfigFromSettings(settings)
+  // Profil aus dem Präferenz-Gespräch — nur zukünftige Bewertungen und Suchen
+  // sehen es, bestehende Scores bleiben
+  const preferences = parseStoredProfile(settings?.preferenceProfile)
 
   // Existing statuses by URL — re-searches may refresh scores but must not
   // clobber statuses the user already set (APPLIED, INTERVIEW, ...)
@@ -142,7 +146,7 @@ export async function POST(request: NextRequest) {
           // Liste → nur die Original-Query, wie bisher.
           let fan: string[] = []
           try {
-            fan = pickQueryFan(await generateSearchQueries(resume.content, query), query, 3)
+            fan = pickQueryFan(await generateSearchQueries(resume.content, query, aiProvider, preferences), query, 3)
           } catch {
             fan = []
           }
@@ -162,6 +166,7 @@ export async function POST(request: NextRequest) {
             adzunaAppId,
             adzunaAppKey,
             extraQueries: fan,
+            preferences,
             onProgress,
           })
 
@@ -271,7 +276,7 @@ export async function POST(request: NextRequest) {
           if (!resumeContent || index >= SCORE_LIMIT) return job
           try {
             if (job.description) {
-              const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null)
+              const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null, preferences)
               if (scoreResult.score === null) return job // AI unreachable — leave unscored
               return {
                 ...job,

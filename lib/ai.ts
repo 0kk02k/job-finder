@@ -9,6 +9,11 @@ import {
   buildMatchPrompt,
   parseJsonLoose,
 } from './anecdotes'
+import {
+  PreferenceProfile,
+  condensePreferenceProfile,
+  renderPreferenceBlock,
+} from './preferences'
 
 // Ein Ort, eine Wahrheit: die Standard-Modell-ID für Nebius Token Factory.
 // (Im Studio verifizierbar über „Copy model ID".)
@@ -159,13 +164,21 @@ Wenn kein Job gefunden wird, gib null zurück.`
 export function buildSemanticRankingPrompt(
   resume: string,
   searchQuery: string,
-  availableJobs: SemanticJob[]
+  availableJobs: SemanticJob[],
+  preferences?: PreferenceProfile | null
 ): string {
   // Numbered summary — the model only returns indices, never URLs or platforms.
   // (Asking it for those fields would make it hallucinate them.)
   const jobsSummary = availableJobs.map((j, i) =>
     `[${i}] TITLE: ${j.title}\nCOMPANY: ${j.company}\nLOCATION: ${j.location}\nDESC: ${j.description.substring(0, 800)}`
   ).join('\n\n---\n\n')
+
+  // Der Resume ist hier schon auf 1000 Zeichen gekappt — das Profil bekommt
+  // eine harte Kompaktkappe, damit der Rangierer keinen zweiten Lebenslauf
+  // vorgesetzt bekommt.
+  const prefsBlock = preferences
+    ? `PREFERENZEN DES NUTZERS (kurz):\n${condensePreferenceProfile(preferences, 500)}\nBeziehe sie in relevanceScore und matchReason ein.\n\n`
+    : ''
 
   return `Du bist ein Karriere-Matching-Experte. Finde Jobs, die semantisch passen, auch wenn die Titel nicht genau übereinstimmen.
 
@@ -174,7 +187,7 @@ ${resume.substring(0, 1000)}
 
 SUCH-QUERY: ${searchQuery}
 
-VERFÜGBARE JOBS (nummeriert):
+${prefsBlock}VERFÜGBARE JOBS (nummeriert):
 ${jobsSummary}
 
 Gib zurück als JSON:
@@ -201,11 +214,12 @@ export async function semanticJobSearch(
   provider: string = 'nebius',
   model?: string,
   apiKey?: string,
-  baseUrl?: string
+  baseUrl?: string,
+  preferences?: PreferenceProfile | null
 ): Promise<SemanticSearchResult> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
-  const prompt = buildSemanticRankingPrompt(resume, searchQuery, availableJobs)
+  const prompt = buildSemanticRankingPrompt(resume, searchQuery, availableJobs, preferences)
 
   try {
     const { text } = await generateText({
@@ -243,31 +257,43 @@ export async function semanticJobSearch(
   }
 }
 
-// Der Scoring-Prompt stellt den wiederholten Teil nach vorn: Anweisungen und
-// Lebenslauf sind über alle Aufrufe identisch und bilden so einen Cache-Präfix
-// (der Provider kann den billigen Satz nutzen), die wechselnde Anzeige steht
-// hinten. Die Reihenfolge ist Kostenvertrag — nicht drehen, ohne den Test zu lesen.
+// Der Scoring-Prompt stellt den wiederholten Teil nach vorn: Anweisungen,
+// Lebenslauf und Wertpräferenzen sind über die Jobs eines Nutzers identisch und
+// bilden so einen Cache-Präfix (der Provider kann den billigen Satz nutzen),
+// die wechselnde Anzeige steht hinten. Die Reihenfolge ist Kostenvertrag —
+// nicht drehen, ohne den Test zu lesen.
 export function buildScorePrompt(
   jobDescription: string,
   resume: string,
-  minSalary?: number | null
+  minSalary?: number | null,
+  preferences?: PreferenceProfile | null
 ): string {
   const salaryLine =
     typeof minSalary === 'number' && minSalary > 0
       ? `5. Gehaltsvorstellung: Der Nutzer sucht ab ${minSalary} — liegt das angegebene Gehalt darunter, wirkt das den Score senkend, ist aber nur ein Faktor neben den Skills.\n`
       : ''
 
+  // Die Präferenzen stehen im Präfix (pro Nutzer konstant) und die Regelzeile
+  // bewusst unnummeriert — eine „6." klaffte, sobald minSalary fehlt. Ohne
+  // Profil bleibt der Prompt byte-identisch zur Zeit ohne dieses Feature.
+  const prefsBlock = preferences
+    ? `\nWERTPREFERENZEN AUS DEM PRÄFERENZ-GESPRÄCH (vom Nutzer bestätigt):\n${renderPreferenceBlock(preferences)}\n`
+    : ''
+  const prefsRule = preferences
+    ? 'Die Wertpräferenzen oben gelten: Die Gewichtung des Nutzers („hoch“, „mittel“, „niedrig“) schlägt die Reihenfolge der Liste hier, und Punkte unter „Meidet“ senken den Score wie ein Gehalt unter der Vorstellung.\n'
+    : ''
+
   return `Du bist ein Karriere-Experte. Du bewertest gleich EINEN Job auf einer Skala von 1-10 basierend auf dem unten mitgelieferten Resume.
 
 Resume:
 ${resume}
-
+${prefsBlock}
 Berücksichtige dabei:
 1. Direkte Skill-Matches
 2. Transferable Skills (Skills die übertragbar sind)
 3. Potenzial zur Einarbeitung (job ist vielleicht etwas höher, aber lernbar)
 4. Kultur-Fit basierend auf Firmenbeschreibung (falls vorhanden)
-${salaryLine}
+${salaryLine}${prefsRule}
 Gib für den unten stehenden Job zurück als JSON:
 {
   "score": number (1-10),
@@ -297,6 +323,7 @@ export function scoringModel(provider: string, userModel?: string): string {
 // Score job against resume (enhanced with transferable skills)
 // minSalary: Wunscheinstellung aus den Settings — als Kontext in die Bewertung,
 // damit die gespeicherte Einstellung eine Wirkung hat statt nur zu existieren.
+// preferences: Profil aus dem Präferenz-Gespräch (UserSettings.preferenceProfile).
 export async function scoreJob(
   jobDescription: string,
   resume: string,
@@ -304,11 +331,12 @@ export async function scoreJob(
   model?: string,
   apiKey?: string,
   baseUrl?: string,
-  minSalary?: number | null
+  minSalary?: number | null,
+  preferences?: PreferenceProfile | null
 ): Promise<ScoreResult> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
-  const prompt = buildScorePrompt(jobDescription, resume, minSalary)
+  const prompt = buildScorePrompt(jobDescription, resume, minSalary, preferences)
 
   try {
     const { text } = await generateText({
@@ -333,21 +361,26 @@ export async function scoreJob(
   }
 }
 
-// Generate alternative search queries for edge cases
-export async function generateSearchQueries(
+// Prompt-Bau als eigene Funktion (Muster: buildCoverLetterPrompt) — der
+// Vertrag über die Präferenz-Beimischung ist getestet. Keine Negationen in den
+// Queries: Jobbörsen-APIs können nicht negieren, „kein Bereitschaftsdienst"
+// verbrennt nur einen der 5–10 Slots.
+export function buildSearchQueryPrompt(
   resume: string,
   originalQuery: string,
-  provider: string = 'nebius'
-): Promise<string[]> {
-  const ai = getAIClient(provider)
+  preferences?: PreferenceProfile | null
+): string {
+  const prefsBlock = preferences
+    ? `\nPRÄFERENZEN DES NUTZERS:\n${condensePreferenceProfile(preferences, 300)}\nNeige die Begriffe zu den gewünschten Rollen und Schwerpunkten. Keine Negationen („kein X" ist als Suchbegriff nutzlos).\n`
+    : ''
 
-  const prompt = `Basierend auf diesem Resume und der ursprünglichen Suchanfrage, generiere 5-10 alternative Suchbegriffe, die Jobs finden könnten, die passen aber vielleicht andere Titel haben.
+  return `Basierend auf diesem Resume und der ursprünglichen Suchanfrage, generiere 5-10 alternative Suchbegriffe, die Jobs finden könnten, die passen aber vielleicht andere Titel haben.
 
 RESUME:
 ${resume.substring(0, 800)}
 
 URSPRÜNGLICHE QUERY: ${originalQuery}
-
+${prefsBlock}
 Gib zurück als JSON:
 {
   "queries": ["Alternative Query 1", "Query 2", ...]
@@ -358,6 +391,18 @@ Berücksichtige:
 - Verwandte Rollen
 - Industry-spezifische Titel
 - Seniority-Level Variationen`
+}
+
+// Generate alternative search queries for edge cases
+export async function generateSearchQueries(
+  resume: string,
+  originalQuery: string,
+  provider: string = 'nebius',
+  preferences?: PreferenceProfile | null
+): Promise<string[]> {
+  const ai = getAIClient(provider)
+
+  const prompt = buildSearchQueryPrompt(resume, originalQuery, preferences)
 
   try {
     const { text } = await generateText({

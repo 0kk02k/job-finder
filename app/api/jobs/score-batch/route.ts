@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { JobStatus } from '@prisma/client'
 import { scoreJob, aiConfigFromSettings } from '@/lib/ai'
+import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 import { pickUnscoredBatch, scoreUpdatePayload } from '@/lib/scoring'
 
@@ -60,7 +61,9 @@ export async function POST(request: NextRequest) {
             model,
             apiKey,
             baseUrl,
-            settings?.minSalary ?? null
+            settings?.minSalary ?? null,
+            // Nur zukünftige Bewertungen sehen das Profil — bestehende Scores bleiben
+            parseStoredProfile(settings?.preferenceProfile)
           )
           if (result.score === null) return 'failed' as const
           await prisma.job.update({

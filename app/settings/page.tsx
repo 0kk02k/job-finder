@@ -1,7 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import Link from 'next/link'
 import { useToast } from '../components/Toast'
+// Pure Kern-Modul (ohne AI-SDK) — Client-sicher, wie lib/anecdotes auf der
+// Resume-Seite
+import { parseStoredProfile } from '@/lib/preference-profile'
 
 interface Settings {
   id: string
@@ -13,6 +17,9 @@ interface Settings {
   targetLocations: string | null
   minSalary: number | null
   remote: boolean
+  // JSON: PreferenceProfile aus dem Präferenz-Gespräch — wird nie per PUT
+  // geschickt (nur die Synthese schreibt es), das Formular kann es nicht clobbern
+  preferenceProfile: string | null
   // Keys kommen nie im Klartext zurück — nur Maskiert-Hinweise („••••4f2a“)
   nebiusKeyHint?: string | null
   geminiKeyHint?: string | null
@@ -55,6 +62,10 @@ export default function SettingsPage() {
   const [testing, setTesting] = useState(false)
   const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
 
+  // Präferenzen-Profil: Löschen verdient Reibung (zweistufig), wie das Interview
+  const [confirmDeleteProfile, setConfirmDeleteProfile] = useState(false)
+  const [deletingProfile, setDeletingProfile] = useState(false)
+
   // Profile state
   const [profilePlatform, setProfilePlatform] = useState('linkedin')
   const [profileName, setProfileName] = useState('')
@@ -92,6 +103,24 @@ export default function SettingsPage() {
     void fetchSettings()
     void fetchSyncStatus()
   }, [])
+
+  async function deletePreferenceProfile() {
+    setDeletingProfile(true)
+    setConfirmDeleteProfile(false)
+    try {
+      const response = await fetch('/api/preferences?scope=profile', { method: 'DELETE' })
+      if (!response.ok) {
+        toast.error('Löschen fehlgeschlagen — dein Profil bleibt erhalten.')
+        return
+      }
+      setSettings((prev) => (prev ? { ...prev, preferenceProfile: null } : prev))
+      toast.success('Präferenzen-Profil gelöscht.')
+    } catch {
+      toast.error('Netzwerkfehler — dein Profil bleibt erhalten.')
+    } finally {
+      setDeletingProfile(false)
+    }
+  }
 
   async function fetchSyncStatus() {
     try {
@@ -675,6 +704,100 @@ export default function SettingsPage() {
 
           {/* Job-Präferenzen */}
           <Section title="Job-Präferenzen" description="Deine Suchkriterien — fließen in Bewertung und Suche ein">
+            {/* Profil aus dem Präferenz-Gespräch — gelesen wird es an der Grenze
+                geparst (Müll → null), geschrieben nur von der Synthese */}
+            {(() => {
+              const prefProfile = parseStoredProfile(settings.preferenceProfile)
+              return (
+                <div
+                  id="job-praeferenzen"
+                  className={`rounded-xl p-6 border mb-8 ${prefProfile ? 'bg-accent-soft/20 border-accent/20' : 'bg-surface border-border'}`}
+                >
+                  {prefProfile ? (
+                    <>
+                      <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+                        <p className="text-sm font-medium text-foreground">Dein Präferenzen-Profil</p>
+                        <div className="flex items-center gap-4">
+                          <Link
+                            href="/preferences"
+                            className="text-sm text-primary hover:text-selection transition-colors"
+                          >
+                            Gespräch neu führen
+                          </Link>
+                          {/* Selten + ersatzlos — deshalb zweistufig, wie alle destruktiven Aktionen */}
+                          <button
+                            onClick={() => {
+                              if (confirmDeleteProfile) {
+                                void deletePreferenceProfile()
+                              } else {
+                                setConfirmDeleteProfile(true)
+                                setTimeout(() => setConfirmDeleteProfile(false), 5000)
+                              }
+                            }}
+                            disabled={deletingProfile}
+                            className={`text-sm transition-colors disabled:opacity-50 ${
+                              confirmDeleteProfile
+                                ? 'font-medium text-error'
+                                : 'text-primary-soft hover:text-error'
+                            }`}
+                          >
+                            {deletingProfile
+                              ? 'Wird gelöscht …'
+                              : confirmDeleteProfile
+                                ? 'Wirklich löschen'
+                                : 'Profil löschen'}
+                          </button>
+                        </div>
+                      </div>
+                      {prefProfile.enjoys && (
+                        <p className="text-sm text-foreground leading-relaxed mb-3">{prefProfile.enjoys}</p>
+                      )}
+                      {prefProfile.criteria.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mb-3">
+                          {prefProfile.criteria.map((c, i) => (
+                            <span
+                              key={i}
+                              title={c.note || undefined}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+                                c.weight === 'hoch'
+                                  ? 'border-accent/40 bg-accent-soft/30 text-foreground'
+                                  : c.weight === 'niedrig'
+                                    ? 'border-border bg-transparent text-primary-soft'
+                                    : 'border-border bg-border-soft text-foreground'
+                              }`}
+                            >
+                              {c.topic} · {c.weight}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {prefProfile.avoids.length > 0 && (
+                        <p className="text-sm text-primary-soft mb-2">Meidet: {prefProfile.avoids.join('; ')}</p>
+                      )}
+                      {prefProfile.growth && (
+                        <p className="text-sm text-primary-soft">Entwicklung: {prefProfile.growth}</p>
+                      )}
+                      <p className="text-xs text-primary-soft mt-3">
+                        Fließt in neue Bewertungen und Suchen ein — bestehende Job-Scores bleiben unverändert.
+                      </p>
+                    </>
+                  ) : (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-primary-soft">
+                        Noch kein Profil — führe das Präferenz-Gespräch, damit Bewertung und Suche deine
+                        Gewichtung kennen.
+                      </p>
+                      <Link
+                        href="/preferences"
+                        className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium text-sm transition-colors flex-shrink-0"
+                      >
+                        Präferenz-Gespräch starten
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              )
+            })()}
             <div className="space-y-6">
               <InputField
                 label="Wunschberufe"

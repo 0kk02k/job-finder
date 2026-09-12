@@ -3,7 +3,21 @@
 // Getestet wird der Prompt-Vertrag — die KI selbst ist außen vor (lokal kein Key).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCoverLetterPrompt, buildScorePrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
+import { buildCoverLetterPrompt, buildScorePrompt, buildSearchQueryPrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
+import type { PreferenceProfile } from '../../lib/preferences'
+
+const PROFILE: PreferenceProfile = {
+  version: 1,
+  enjoys: 'Architektur-Entscheidungen',
+  criteria: [
+    { topic: 'Tech-Stack', weight: 'hoch', note: 'moderner JS-Stack' },
+    { topic: 'Remote', weight: 'mittel', note: '' },
+  ],
+  avoids: ['Bereitschaftsdienst'],
+  growth: 'Mehr Backend',
+  summary: 'Frontend mit Backend-Ambitionen',
+  keywords: ['React'],
+}
 
 const AD_DU_FORM = 'Dein Profil: Du liebst Kaffee und bringst Deine Ideen ein. Wir bieten dir ein starkes Team.'
 
@@ -102,4 +116,54 @@ test('resume translation prompt forbids inventing facts and keeps structure', ()
   assert.match(prompt, /[Ee]nglisch|[Ee]nglish/)
   assert.match(prompt, /3 Jahre Erfahrung/)
   assert.match(prompt, /erfinde|keine neuen|do not invent|no new|unverändert|unchanged|exakt|exactly/i)
+})
+
+test('score prompt is byte-identical without preferences — the cache prefix survives', () => {
+  assert.equal(buildScorePrompt('JOB', 'LEBENSLAUF', null), buildScorePrompt('JOB', 'LEBENSLAUF', null, null))
+})
+
+test('score prompt embeds preferences after the resume, before rules and job — still cacheable', () => {
+  const prompt = buildScorePrompt('JOB-BESCHREIBUNG', 'LEBENSLAUF-TEXT', null, PROFILE)
+  const idxResume = prompt.indexOf('LEBENSLAUF-TEXT')
+  const idxPrefs = prompt.indexOf('WERTPREFERENZEN')
+  const idxRules = prompt.indexOf('Berücksichtige dabei:')
+  const idxJob = prompt.indexOf('JOB-BESCHREIBUNG')
+  assert.ok(idxPrefs > idxResume, 'Präferenzen stehen im nutzerkonstanten Präfix — nach dem Lebenslauf')
+  assert.ok(idxPrefs < idxRules, 'und vor den Bewertungsregeln')
+  assert.ok(idxPrefs < idxJob, 'und weit vor der wechselnden Anzeige')
+  assert.match(prompt, /Tech-Stack \(hoch\)/)
+  assert.match(prompt, /moderner JS-Stack/)
+  assert.match(prompt, /Meidet: Bereitschaftsdienst/)
+  assert.match(prompt, /Die Wertpräferenzen oben gelten/)
+})
+
+test('score prompt keeps salary and preferences combinable — salary stays rule 5', () => {
+  const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', 45000, PROFILE)
+  assert.match(prompt, /5\. Gehaltsvorstellung/)
+  assert.ok(!prompt.includes('6. '), 'die Präferenz-Regel ist bewusst unnummeriert')
+})
+
+test('score prompt has no preference residue when none exist', () => {
+  const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', null)
+  assert.ok(!prompt.includes('WERTPREFERENZEN'))
+  assert.ok(!prompt.includes('Die Wertpräferenzen oben gelten'))
+})
+
+test('semantic ranking prompt condenses preferences to a short block', () => {
+  const withPrefs = buildSemanticRankingPrompt('LEBENSLAUF', 'QUERY', [], PROFILE)
+  const without = buildSemanticRankingPrompt('LEBENSLAUF', 'QUERY', [])
+  assert.match(withPrefs, /PREFERENZEN DES NUTZERS/)
+  assert.match(withPrefs, /Frontend mit Backend-Ambitionen/)
+  assert.match(withPrefs, /Tech-Stack/)
+  assert.match(withPrefs, /PREFERENZEN DES NUTZERS[\s\S]*VERFÜGBARE JOBS/, 'Block steht vor der Jobliste')
+  assert.equal(without, buildSemanticRankingPrompt('LEBENSLAUF', 'QUERY', [], null), 'ohne Profil unverändert')
+})
+
+test('search query prompt biases toward preferences and forbids negations', () => {
+  const withPrefs = buildSearchQueryPrompt('LEBENSLAUF', 'Entwickler', PROFILE)
+  const without = buildSearchQueryPrompt('LEBENSLAUF', 'Entwickler')
+  assert.match(withPrefs, /PRÄFERENZEN DES NUTZERS/)
+  assert.match(withPrefs, /keine Negationen|Keine Negationen/)
+  assert.match(withPrefs, /LEBENSLAUF/)
+  assert.ok(!without.includes('PRÄFERENZEN'), 'ohne Profil unverändert')
 })
