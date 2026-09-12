@@ -41,6 +41,8 @@ type StreamEvent =
   | { type: 'progress'; stage: 'ba-details'; done: number; total: number }
   | { type: 'progress'; stage: 'sources-done'; total: number }
   | { type: 'progress'; stage: 'ai-matching'; total: number }
+  | { type: 'progress'; stage: 'query-fan'; queries: string[] }
+  | { type: 'progress'; stage: 'second-round'; terms: string[] }
   | {
       type: 'result'
       total: number
@@ -61,8 +63,18 @@ interface StageState {
   totalFound: number | null
   ba: { done: number; total: number } | null
   ai: boolean
+  fan: string[] | null
+  secondRound: string[] | null
 }
-const EMPTY_STAGES: StageState = { sources: [], sourcesDone: false, totalFound: null, ba: null, ai: false }
+const EMPTY_STAGES: StageState = {
+  sources: [],
+  sourcesDone: false,
+  totalFound: null,
+  ba: null,
+  ai: false,
+  fan: null,
+  secondRound: null,
+}
 
 function SearchPageContent() {
   const searchParams = useSearchParams()
@@ -226,6 +238,10 @@ function SearchPageContent() {
             } else if (event.stage === 'ai-matching') {
               setStages((prev) => ({ ...prev, sourcesDone: true, ai: true }))
               setAnnounce('Quellen durchsucht — die KI bewertet jetzt die Treffer')
+            } else if (event.stage === 'query-fan') {
+              setStages((prev) => ({ ...prev, fan: event.queries }))
+            } else if (event.stage === 'second-round') {
+              setStages((prev) => ({ ...prev, secondRound: event.terms }))
             }
           } else if (event.type === 'result') {
             settled = true
@@ -518,6 +534,16 @@ function SearchPageContent() {
                   text="KI bewertet Treffer …"
                   meta={`${elapsed} s`}
                 />
+              )}
+              {stages.fan && stages.fan.length > 0 && (
+                <p className="pl-6 text-sm text-primary-soft">
+                  Suchfächer: {stages.fan.join(' · ')}
+                </p>
+              )}
+              {stages.secondRound && stages.secondRound.length > 0 && (
+                <p className="pl-6 text-sm text-primary-soft">
+                  Zweitrunde: {stages.secondRound.join(' · ')}
+                </p>
               )}
               <p className="text-xs text-primary-soft pt-1">Dauert meist 30–60 Sekunden.</p>
             </div>

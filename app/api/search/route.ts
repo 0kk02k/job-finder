@@ -4,6 +4,7 @@ import { auth } from '@/auth'
 import { searchJobs, semanticSearch, type ScrapedJob, type SearchProgressEvent } from '@/lib/scrapers'
 import { scoreJob, generateSearchQueries, aiConfigFromSettings } from '@/lib/ai'
 import { HIGH_MATCH_THRESHOLD, relevanceToScore } from '@/lib/matching'
+import { pickQueryFan } from '@/lib/search'
 
 export const maxDuration = 60
 
@@ -14,6 +15,8 @@ type StreamEvent =
   | { type: 'progress'; stage: 'ba-details'; done: number; total: number }
   | { type: 'progress'; stage: 'sources-done'; total: number }
   | { type: 'progress'; stage: 'ai-matching'; total: number }
+  | { type: 'progress'; stage: 'query-fan'; queries: string[] }
+  | { type: 'progress'; stage: 'second-round'; terms: string[] }
   | {
       type: 'result'
       total: number
@@ -133,6 +136,18 @@ export async function POST(request: NextRequest) {
       // Semantic search - AI-powered matching (requires resume)
       if (semantic && resume && useAI !== false) {
         try {
+          // Query-Fächer: die KI erzeugt fachliche Suchvarianten (Skills statt
+          // Titel), damit der Kandidatenpool auch Treffer enthält, die unter
+          // fremden Schlagworten eingestellt wurden. KI-Ausfall oder leere
+          // Liste → nur die Original-Query, wie bisher.
+          let fan: string[] = []
+          try {
+            fan = pickQueryFan(await generateSearchQueries(resume.content, query), query, 3)
+          } catch {
+            fan = []
+          }
+          if (fan.length > 0) emit({ type: 'progress', stage: 'query-fan', queries: fan })
+
           jobs = await semanticSearch({
             resume: resume.content,
             query,
@@ -146,6 +161,7 @@ export async function POST(request: NextRequest) {
             joobleKey,
             adzunaAppId,
             adzunaAppKey,
+            extraQueries: fan,
             onProgress,
           })
 

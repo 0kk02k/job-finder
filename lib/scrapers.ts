@@ -1,6 +1,7 @@
 // Job search via multiple APIs + AI-powered single-URL extraction
 
 import { extractJobFromHTML, semanticJobSearch } from './ai'
+import { mergeJobsByUrl, pickFuzzyTerms } from './search'
 
 export interface ScrapedJob {
   title: string
@@ -27,6 +28,8 @@ export type SearchProgressEvent =
   | { stage: 'ba-details'; done: number; total: number }
   | { stage: 'sources-done'; total: number }
   | { stage: 'ai-matching'; total: number }
+  | { stage: 'query-fan'; queries: string[] } // Query-Fächer: fachliche Varianten neben der Original-Query
+  | { stage: 'second-round'; terms: string[] } // Zweitrunde: fuzzyMatches lösen einen zweiten Fetch aus
 
 export type SearchProgressCallback = (event: SearchProgressEvent) => void
 
@@ -389,7 +392,11 @@ export async function searchJobs(params: {
   return deduped
 }
 
-// Semantic search - finds jobs that match even with different titles
+// Semantic search - finds jobs that match even with different titles.
+// Der Pool entsteht aus mehreren Queries: die Original-Query plus die fachlichen
+// Varianten aus dem Query-Fächer (lib/search.ts) — so geraten Treffer in den
+// Kandidatenkreis, die unter fremden Schlagworten eingestellt wurden. Der Ranker
+// kann nur auswählen, was gefetcht wurde; erfindet aber nie Jobs (nur Indizes).
 export async function semanticSearch(params: {
   resume: string
   query: string
@@ -403,53 +410,91 @@ export async function semanticSearch(params: {
   joobleKey?: string | null
   adzunaAppId?: string | null
   adzunaAppKey?: string | null
+  extraQueries?: string[]
   onProgress?: SearchProgressCallback
 }): Promise<SemanticJob[]> {
-  const rawJobs = await searchJobs({
-    query: params.query,
-    location: params.location,
-    remote: params.remote,
-    useAI: true,
-    apifyToken: params.apifyToken,
-    joobleKey: params.joobleKey,
-    adzunaAppId: params.adzunaAppId,
-    adzunaAppKey: params.adzunaAppKey,
-    onProgress: params.onProgress,
-  })
+  // Original-Query mit Fortschritt, Fächer still — die Fläche zeigt eine
+  // Quelle-Meldung pro Plattform, nicht vier
+  const fetchPool = (query: string, withProgress: boolean) =>
+    searchJobs({
+      query,
+      location: params.location,
+      remote: params.remote,
+      useAI: true,
+      apifyToken: params.apifyToken,
+      joobleKey: params.joobleKey,
+      adzunaAppId: params.adzunaAppId,
+      adzunaAppKey: params.adzunaAppKey,
+      ...(withProgress && { onProgress: params.onProgress }),
+    })
 
-  const semanticJobs: SemanticJob[] = rawJobs.map(job => ({
-    ...job,
-    relevanceScore: 0,
-    matchReason: '',
-    transferableSkills: [],
-  }))
+  const pools = await Promise.all([
+    fetchPool(params.query, true),
+    ...(params.extraQueries ?? []).map(q => fetchPool(q, false)),
+  ])
 
-  params.onProgress?.({ stage: 'ai-matching', total: semanticJobs.length })
+  // Der Ranker-Prompt wächst mit jedem Kandidaten — 120 sind das ehrliche
+  // Maximum für einen Durchlauf; bei Überlauf gewinnt die Reihenfolge
+  // (Original-Query zuerst)
+  const pool = mergeJobsByUrl(pools).slice(0, 120)
 
-  // Ein einziger Prompt über ~175 Treffer würde träge und timeout-anfällig —
-  // darum 60er-Chunks parallel. Der Index-Mapping-Schutz bleibt pro Chunk
-  // intakt; fuzzyMatches bleiben verworfen wie bisher.
-  const CHUNK_SIZE = 60
-  const chunks: SemanticJob[][] = []
-  for (let i = 0; i < semanticJobs.length; i += CHUNK_SIZE) {
-    chunks.push(semanticJobs.slice(i, i + CHUNK_SIZE))
-  }
+  const rankPool = async (
+    jobs: ScrapedJob[]
+  ): Promise<{ jobs: SemanticJob[]; fuzzyMatches: string[] }> => {
+    params.onProgress?.({ stage: 'ai-matching', total: jobs.length })
+    const semanticJobs: SemanticJob[] = jobs.map(job => ({
+      ...job,
+      relevanceScore: 0,
+      matchReason: '',
+      transferableSkills: [],
+    }))
 
-  const results = await Promise.all(
-    chunks.map(chunk =>
-      semanticJobSearch(
-        params.resume,
-        params.query,
-        chunk,
-        params.provider || 'nebius',
-        params.model,
-        params.apiKey,
-        params.baseUrl
+    // Ein einziger Prompt über ~175 Treffer würde träge und timeout-anfällig —
+    // darum 60er-Chunks parallel. Der Index-Mapping-Schutz bleibt pro Chunk
+    // intakt.
+    const CHUNK_SIZE = 60
+    const chunks: SemanticJob[][] = []
+    for (let i = 0; i < semanticJobs.length; i += CHUNK_SIZE) {
+      chunks.push(semanticJobs.slice(i, i + CHUNK_SIZE))
+    }
+
+    const results = await Promise.all(
+      chunks.map(chunk =>
+        semanticJobSearch(
+          params.resume,
+          params.query,
+          chunk,
+          params.provider || 'nebius',
+          params.model,
+          params.apiKey,
+          params.baseUrl
+        )
       )
     )
-  )
 
-  return results
-    .flatMap(result => result.jobs)
-    .filter(job => job.relevanceScore >= 0.6)
+    return {
+      jobs: results.flatMap(result => result.jobs).filter(job => job.relevanceScore >= 0.6),
+      fuzzyMatches: results.flatMap(result => result.fuzzyMatches).filter((t): t is string => typeof t === 'string'),
+    }
+  }
+
+  const first = await rankPool(pool)
+
+  // Zweitrunde: die fuzzyMatches des Rankings benennen Begriffe, unter denen
+  // ähnliche Jobs stehen könnten — einmal nachgefetcht, nur neue URLs, dieselben
+  // Regeln. Verlängert die Suche um einen Fetch+Rank, nicht um eine Phase.
+  const terms = pickFuzzyTerms(first.fuzzyMatches, [params.query, ...(params.extraQueries ?? [])], 2)
+  let jobs = first.jobs
+  if (terms.length > 0) {
+    params.onProgress?.({ stage: 'second-round', terms })
+    const pools2 = await Promise.all(terms.map(q => fetchPool(q, false)))
+    const seen = new Set(pool.map(j => j.url))
+    const pool2 = mergeJobsByUrl(pools2).filter(j => !seen.has(j.url)).slice(0, 60)
+    if (pool2.length > 0) {
+      const second = await rankPool(pool2)
+      jobs = [...jobs, ...second.jobs.filter(e => !jobs.some(f => f.url === e.url))]
+    }
+  }
+
+  return jobs
 }
