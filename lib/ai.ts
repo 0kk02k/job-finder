@@ -103,6 +103,28 @@ export function defaultModel(provider: string): string {
   return 'gpt-4o-mini'
 }
 
+// KI-Calls können am Provider stillstehen: keine Antwort, kein Fehler — der Call
+// hängt, bis die Runtime den ganzen Request killt (in Produktion beobachtet:
+// 60-s-Timeout, derselbe Aufruf Sekunden später erfolgreich). abortSignal macht
+// aus dem Stillstand einen echten Fehler; der frische zweite Request geht in
+// der Praxis durch, also wird genau der automatisch gefahren.
+export async function generateTextGuarded(
+  params: Parameters<typeof generateText>[0],
+  timeoutMs = 25000,
+  retries = 1
+): Promise<Awaited<ReturnType<typeof generateText>>> {
+  let lastError: unknown
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await generateText({ ...params, abortSignal: AbortSignal.timeout(timeoutMs) })
+    } catch (error) {
+      lastError = error
+      console.error(`KI-Call nicht durchgelaufen (Versuch ${attempt + 1}/${retries + 1}):`, error)
+    }
+  }
+  throw lastError
+}
+
 // Parse JSON from model output, tolerating markdown code fences and prose around it
 export function parseJsonFromText(text: string) {
   const cleaned = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()

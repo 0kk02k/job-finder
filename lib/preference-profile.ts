@@ -173,7 +173,7 @@ export function condensePreferenceProfile(p: PreferenceProfile, maxChars = 500):
 }
 
 // ---------------------------------------------------------------------------
-// Evidenz-Verifikation — abgehakt wird nur, was wörtlich im Verlauf steht
+// Evidenz-Verifikation — abgehakt wird nur, was im Verlauf belegt ist
 // ---------------------------------------------------------------------------
 
 // Normalisierung für den Beleg-Check. Exportiert: auch das Interview-Transkript
@@ -182,10 +182,38 @@ export function normalizeForMatch(text: string): string {
   return text.toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
+// Signifikante Wort-Token (≥3 Zeichen; \p{L} erfasst Umlaute und ß).
+function significantTokens(text: string): string[] {
+  return text.toLowerCase().match(/[\p{L}\p{N}]{3,}/gu) ?? []
+}
+
+// Ein Beleg gilt als belegt, wenn er wörtlich (whitespace-/case-normalisiert)
+// im Transkript steht — oder als Paraphrase durchgeht: ≥80% seiner Wort-Token
+// kommen im Transkript vor. Kleine Modelle (GLM-Flash) paraphrasieren und
+// kürzen beim Zitieren systematisch; der strenge Substring-Check ließ dadurch
+// echte Abhakungen sterben („1 von 4" trotz fertigem Gespräch). Ein erfundener
+// Beleg scheitert klar an der Quote; Füllwort-Sprüche an der Mindestzahl
+// unterscheidender Token.
+const FUZZY_EVIDENCE_RATIO = 0.8
+const MIN_FUZZY_TOKENS = 3
+
+function evidenceSupported(
+  evidence: string,
+  normalizedHistory: string,
+  historyTokens: Set<string>
+): boolean {
+  if (normalizedHistory.includes(normalizeForMatch(evidence))) return true
+  const tokens = [...new Set(significantTokens(evidence))]
+  if (tokens.length < MIN_FUZZY_TOKENS) return false
+  const hits = tokens.filter((token) => historyTokens.has(token)).length
+  return hits / tokens.length >= FUZZY_EVIDENCE_RATIO
+}
+
 // Die Klassifikator-Antwort ({completed:[{id,evidence}]}) wird hier zu puren
-// IDs verdichtet: nur bekannte IDs, Beleg ≥ 10 Zeichen, Zitat (whitespace- und
-// case-normalisiert) wörtlich im Transkript — halluzinierte Abhakungen fallen
-// weg. Duplikate zählen einmal, Reihenfolge = Reihenfolge der Antwort.
+// IDs verdichtet: nur bekannte IDs, Beleg ≥ 10 Zeichen, wörtlich oder als
+// Paraphrase im Transkript belegt (siehe evidenceSupported) — halluzinierte
+// Abhakungen fallen weg. Duplikate zählen einmal, Reihenfolge = Reihenfolge
+// der Antwort.
 export function filterVerifiedEvidence(
   raw: unknown,
   validIds: readonly string[],
@@ -194,6 +222,7 @@ export function filterVerifiedEvidence(
   const entries: unknown[] = Array.isArray(raw) ? raw : []
   const known = new Set(validIds)
   const normalizedHistory = normalizeForMatch(history)
+  const historyTokens = new Set(significantTokens(history))
 
   const ids: string[] = []
   const seen = new Set<string>()
@@ -204,7 +233,7 @@ export function filterVerifiedEvidence(
     const evidence = typeof record.evidence === 'string' ? record.evidence : ''
     if (!id || !known.has(id) || seen.has(id)) continue
     if (evidence.trim().length < 10) continue
-    if (!normalizedHistory.includes(normalizeForMatch(evidence))) continue
+    if (!evidenceSupported(evidence, normalizedHistory, historyTokens)) continue
     seen.add(id)
     ids.push(id)
   }

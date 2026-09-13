@@ -7,8 +7,7 @@
 // koppeln. Der reine Kern (Guide, Sanitizing, Rendering) lebt import-frei in
 // lib/preference-profile.ts — diese Datei hält nur die KI-Calls.
 
-import { generateText } from 'ai'
-import { getAIClient, scoringModel, parseJsonFromText } from './ai'
+import { getAIClient, scoringModel, parseJsonFromText, generateTextGuarded } from './ai'
 import {
   filterVerifiedEvidence,
   PREFERENCE_GUIDE,
@@ -94,7 +93,7 @@ ${resumeContent ? `- Nutze den Lebenslauf AKTIV als Aufhänger („In deinem Leb
 Offene Themen: ${remaining.map((i) => i.id).join(', ') || 'keine — Gespräch abschließen'}.
 Antworte NUR mit deiner nächsten Nachricht an den Nutzer (Klartext, kein JSON, keine Meta-Kommentare).`
 
-  const { text } = await generateText({
+  const { text } = await generateTextGuarded({
     model,
     messages: [{ role: 'user', content: prompt }],
   })
@@ -139,7 +138,7 @@ Antworte AUSSCHLIESSLICH als JSON:
 Nur IDs aus der Liste oben. "evidence" muss wörtlich aus dem Transkript stammen (kann gekürzt sein). Leere Liste, wenn keins erfüllt ist.`
 
   try {
-    const { text } = await generateText({
+    const { text } = await generateTextGuarded({
       model,
       messages: [{ role: 'user', content: prompt }],
     })
@@ -199,7 +198,7 @@ Gib AUSSCHLIESSLICH das JSON aus — kein Vorwort, keine Anmerkungen.`
     // Nutzer-Aussagen in ein JSON-Schema (keine Kreation) — und sie läuft im
     // selben Request wie der letzte Chat-Turn, der sich sonst denselben
     // K3-Denk-Marathon mit dem Prosa-Zug teilt.
-    const { text } = await generateText({
+    const { text } = await generateTextGuarded({
       model: ai.chat(scoringModel(config.provider || 'nebius', config.model)),
       messages: [{ role: 'user', content: prompt }],
     })

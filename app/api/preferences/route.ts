@@ -71,14 +71,18 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/preferences — Session starten (ohne body), Nachricht senden
-// ({ message }) oder aus dem fertigen Transkript neu synthetisieren
-// ({ resynthesize: true }).
+// ({ message }), aus dem fertigen Transkript neu synthetisieren
+// ({ resynthesize: true }) oder aktiv abschließen ({ finish: true }).
 export async function POST(request: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const userId = session.user.id
 
-  const body = await request.json().catch(() => ({})) as { message?: unknown; resynthesize?: unknown }
+  const body = await request.json().catch(() => ({})) as {
+    message?: unknown
+    resynthesize?: unknown
+    finish?: unknown
+  }
 
   // --- Neu synthetisieren: Transkript der COMPLETED-Session, kein Chat-Zug ---
   if (body.resynthesize === true) {
@@ -113,6 +117,50 @@ export async function POST(request: NextRequest) {
       }),
     ])
     return NextResponse.json({ profile, synthesisError: false })
+  }
+
+  // --- Abschließen: aktives Gespräch beenden, Profil aus dem Bestand ziehen.
+  // Bewusst auch mit offenen Themen möglich: Der Klassifikator hakt nachsichtig
+  // ab, und die Beraterin kann sich vorzeitig verabschiedet haben — der Nutzer
+  // darf nicht in einer ACTIVE-Session gefangen bleiben, deren Ende nur der
+  // Abhak-Stand bestimmen würde. Offene Themen bleiben ehrlich offen; schlägt
+  // die Synthese fehl, meldet die Antwort das („Erneut versuchen" läuft über
+  // {resynthesize: true}).
+  if (body.finish === true) {
+    const active = await prisma.preferenceSession.findFirst({
+      where: { userId, status: 'ACTIVE' },
+      orderBy: { createdAt: 'desc' },
+    })
+    if (!active) {
+      return NextResponse.json({ error: 'Kein aktives Gespräch zum Abschließen.' }, { status: 400 })
+    }
+    if (!JSON.parse(active.messages).some((m: { role: string }) => m.role === 'user')) {
+      return NextResponse.json(
+        { error: 'Das Gespräch hat gerade erst begonnen — es gibt noch nichts zu verwerten.' },
+        { status: 400 }
+      )
+    }
+    const settings = await prisma.userSettings.findUnique({ where: { userId } })
+    const profile = await synthesizePreferenceProfile(
+      JSON.parse(active.messages) as InterviewMessage[],
+      aiConfigFromSettings(settings)
+    )
+    const profileJson = profile ? JSON.stringify(profile) : null
+    const chat = await prisma.preferenceSession.update({
+      where: { id: active.id },
+      data: {
+        status: 'COMPLETED',
+        ...(profileJson && { profile: profileJson }),
+      },
+    })
+    if (profileJson) {
+      await prisma.userSettings.upsert({
+        where: { userId },
+        update: { preferenceProfile: profileJson },
+        create: { userId, preferenceProfile: profileJson },
+      })
+    }
+    return NextResponse.json({ ...serialize(chat), synthesisError: !profile })
   }
 
   const message = typeof body.message === 'string' ? body.message.trim() : ''

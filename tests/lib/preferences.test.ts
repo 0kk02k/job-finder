@@ -176,3 +176,43 @@ test('filterVerifiedEvidence handles a non-array response and empty history', ()
   assert.deepEqual(filterVerifiedEvidence('mist', ['enjoy'], 'x'), [])
   assert.deepEqual(filterVerifiedEvidence([{ id: 'enjoy', evidence: 'irgendein Beleg hier' }], ['enjoy'], ''), [])
 })
+
+// Kleine Modelle paraphrasieren und kürzen beim Zitieren systematisch — ein
+// Beleg geht durch, wenn ≥80% seiner Wort-Token im Transkript stehen.
+test('filterVerifiedEvidence accepts paraphrased evidence with sufficient token overlap', () => {
+  const history = 'NUTZER: Remote-Arbeit ist mir sehr wichtig, weil ich zwei Kinder habe und die Kita-Zeiten eng sind. Bereitschaftsdienst scheidet für mich aus.\n\nBERATERIN: Danke, das ist klar.'
+  const result = filterVerifiedEvidence(
+    [
+      // Paraphrase: ein Wort ersetzt (Kids statt Kinder), Wortstellung leicht anders
+      { id: 'weights', evidence: 'weil ich zwei Kids habe und die Kita-Zeiten eng sind' },
+      // Gekürzt mit Auslassung: "…" bricht den wörtlichen Substring, Token bleiben
+      { id: 'avoid', evidence: 'Bereitschaftsdienst scheidet … aus' },
+    ],
+    ['weights', 'avoid'],
+    history
+  )
+  assert.deepEqual(result, ['weights', 'avoid'])
+})
+
+test('filterVerifiedEvidence rejects invented evidence and token-poor filler fuzzily', () => {
+  const history = 'NUTZER: Remote-Arbeit ist mir sehr wichtig, weil ich zwei Kinder habe und die Kita-Zeiten eng sind.'
+  // Erfunden: fast alle Token kommen im Transkript nicht vor
+  assert.deepEqual(
+    filterVerifiedEvidence(
+      [{ id: 'growth', evidence: 'Ich träume von einer Cloud-Karriere in München mit Führung' }],
+      ['growth'],
+      history
+    ),
+    []
+  )
+  // Füllwörter-Spruch: nur 2 unterscheidende Token — zu dünn für die Fuzzy-Quote
+  // (stünde er wörtlich im Transkript, ginge er über den Substring-Pfad durch)
+  assert.deepEqual(
+    filterVerifiedEvidence(
+      [{ id: 'weights', evidence: 'wichtig, sehr wichtig' }],
+      ['weights'],
+      history
+    ),
+    []
+  )
+})

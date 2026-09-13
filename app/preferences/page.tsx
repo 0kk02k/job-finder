@@ -54,6 +54,7 @@ export default function PreferencesPage() {
 
   const [showGuide, setShowGuide] = useState(false)
   const [confirmingRestart, setConfirmingRestart] = useState(false)
+  const [confirmingFinish, setConfirmingFinish] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -176,6 +177,34 @@ export default function PreferencesPage() {
     }
   }
 
+  // Abschließen ohne komplette Agenda — bewusst möglich: Der Klassifikator hakt
+  // nachsichtig ab, und die Beraterin kann sich vorzeitig verabschiedet haben.
+  // Das Profil entsteht aus dem, was da ist; offene Themen bleiben ehrlich offen.
+  // Schlägt die Synthese fehl, übernimmt der „Erneut versuchen“-Screen.
+  async function finishChat() {
+    setConfirmingFinish(false)
+    setSending(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/preferences', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finish: true }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSession(data)
+        if (data.profile) setProfile(data.profile)
+      } else {
+        setError(data.error || 'Abschließen fehlgeschlagen — dein Gespräch bleibt unverändert.')
+      }
+    } catch {
+      setError('Abschließen fehlgeschlagen — dein Gespräch bleibt unverändert.')
+    } finally {
+      setSending(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -187,6 +216,7 @@ export default function PreferencesPage() {
   const isActive = session?.status === 'ACTIVE'
   const isCompleted = session?.status === 'COMPLETED'
   const currentProfile = profile ?? session?.profile ?? null
+  const openTopics = (session?.guide ?? []).filter((item) => !item.done).map((item) => item.topic)
 
   return (
     <div className="min-h-screen bg-background">
@@ -247,28 +277,57 @@ export default function PreferencesPage() {
                 <span className="text-xs underline">{showGuide ? 'ausblenden' : 'anzeigen'}</span>
               </button>
               <div className="flex items-center gap-3 flex-shrink-0">
-                {confirmingRestart && (
+                {confirmingFinish ? (
+                  <>
+                    <span className="text-xs text-primary-soft max-w-xs text-right" role="status">
+                      {openTopics.length > 0
+                        ? `Noch offen: ${openTopics.join(', ')} — dein Profil entsteht aus deinen bisherigen Antworten.`
+                        : 'Alle Themen abgehakt — dein Profil wird erstellt.'}
+                    </span>
+                    <button
+                      onClick={() => void finishChat()}
+                      disabled={sending}
+                      className="text-sm font-medium text-primary hover:text-selection transition-colors disabled:opacity-50"
+                    >
+                      {sending ? 'Erstelle Profil …' : 'Wirklich abschließen'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setConfirmingFinish(true)
+                      setTimeout(() => setConfirmingFinish(false), 8000)
+                    }}
+                    disabled={sending}
+                    className="text-sm text-primary hover:text-selection transition-colors disabled:opacity-50"
+                  >
+                    Abschließen
+                  </button>
+                )}
+                {!confirmingFinish && confirmingRestart && (
                   <span className="text-xs text-error" role="status">
                     Antworten werden gelöscht.
                   </span>
                 )}
-                <button
-                  onClick={() => {
-                    if (confirmingRestart) {
-                      void restart()
-                    } else {
-                      setConfirmingRestart(true)
-                      setTimeout(() => setConfirmingRestart(false), 5000)
-                    }
-                  }}
-                  className={`text-sm transition-colors ${
-                    confirmingRestart
-                      ? 'font-medium text-error'
-                      : 'text-primary-soft hover:text-error'
-                  }`}
-                >
-                  {confirmingRestart ? 'Wirklich löschen' : 'Neu starten'}
-                </button>
+                {!confirmingFinish && (
+                  <button
+                    onClick={() => {
+                      if (confirmingRestart) {
+                        void restart()
+                      } else {
+                        setConfirmingRestart(true)
+                        setTimeout(() => setConfirmingRestart(false), 5000)
+                      }
+                    }}
+                    className={`text-sm transition-colors ${
+                      confirmingRestart
+                        ? 'font-medium text-error'
+                        : 'text-primary-soft hover:text-error'
+                    }`}
+                  >
+                    {confirmingRestart ? 'Wirklich löschen' : 'Neu starten'}
+                  </button>
+                )}
               </div>
             </div>
             <div className="h-1 bg-border-soft">
