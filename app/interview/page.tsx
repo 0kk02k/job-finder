@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { MarkdownContent } from '../components/Markdown'
 import { COMPETENCIES } from '@/lib/competencies'
 
@@ -439,6 +440,9 @@ export default function InterviewPage() {
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-xl font-medium text-foreground">Deine Akte</h2>
               <div className="flex items-center gap-4">
+                <Link href="/" className="text-sm text-primary hover:text-selection transition-colors">
+                  Zurück zum Start
+                </Link>
                 <button
                   onClick={() => void downloadReport()}
                   disabled={downloadingReport}

@@ -494,13 +494,21 @@ export default function PreferencesPage() {
 
             {!isActive && (
               <div className="pt-2">
-                <button
-                  onClick={startChat}
-                  disabled={sending}
-                  className="text-sm text-primary hover:text-selection transition-colors disabled:opacity-50"
-                >
-                  Gespräch neu führen
-                </button>
+                <div className="flex flex-wrap items-center gap-4">
+                  <Link
+                    href="/"
+                    className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors"
+                  >
+                    Zurück zum Start
+                  </Link>
+                  <button
+                    onClick={startChat}
+                    disabled={sending}
+                    className="text-sm text-primary hover:text-selection transition-colors disabled:opacity-50"
+                  >
+                    Gespräch neu führen
+                  </button>
+                </div>
                 <p className="text-xs text-primary-soft mt-2">
                   Ein neues Gespräch überschreibt das Profil — bestehende Job-Bewertungen bleiben unverändert.
                 </p>

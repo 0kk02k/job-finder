@@ -309,12 +309,16 @@ export default function Dashboard() {
       title: 'Jobs suchen',
       description: 'Suche nach einem Beruf oder Ort — oder füge einen Job per Link ein.',
       done: (stats?.total ?? 0) > 0,
+      href: '/search',
+      cta: 'Jetzt suchen',
     },
     {
       step: 4,
       title: 'KI-Matching',
       description: 'Die KI bewertet Treffer gegen deinen Lebenslauf.',
       done: (stats?.scored ?? 0) > 0,
+      href: '/search',
+      cta: 'Suche starten',
     },
   ]
   const firstOpenStep = onboardingSteps.findIndex((s) => !s.done)
