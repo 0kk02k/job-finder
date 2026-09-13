@@ -29,8 +29,9 @@ export default function DatenschutzPage() {
           <h2 className="text-sm font-medium text-foreground mb-2">Beteiligte Dienste</h2>
           <p>
             Hosting läuft auf Vercel, die Datenbank auf Neon (Postgres, Standort EU).
-            Für die KI-Bewertung überträgt die Instanz pro Suchlauf oder Einzelbewertung
-            den Text der Stellenanzeige und deinen Lebenslauf-Text an den KI-Provider,
+            Für die KI-Bewertung überträgt die Instanz pro Suchlauf, Einzelbewertung
+            oder Gespräch den Text der Stellenanzeige, deinen Lebenslauf-Text und
+            deine Gesprächsverläufe an den KI-Provider,
             den du selbst in den Einstellungen hinterlegt hast — zu keinem anderen
             Zweck und an niemand sonst. Für das Anekdoten-Mini-Interview und die
             Anschreiben-Erzeugung kommen zusätzlich deine Anekdoten-Texte an
@@ -46,9 +47,11 @@ export default function DatenschutzPage() {
           <h2 className="text-sm font-medium text-foreground mb-2">Was nicht passiert</h2>
           <p>
             Kein Tracking, keine Analyse-Tools, keine Werbe-Cookies — der einzige
-            Cookie ist deine eigene Anmeldung. Keine Weitergabe und kein Verkauf von
-            Daten, keine automatischen Bewerbungen: nichts verlässt diese App, was du
-            nicht selbst abschickst.
+            Cookie ist deine eigene Anmeldung. Kein Verkauf von Daten, keine
+            automatischen Bewerbungen: Bewerbungen verschickst immer du selbst. Was
+            dagegen bewusst die App verlässt, steht oben: Lebenslauf-, Anzeigen- und
+            Gesprächstexte gehen zur KI-Verarbeitung an den Provider deiner Wahl —
+            ohne Speicherung dort (Zero Data Retention).
           </p>
         </section>
       </div>

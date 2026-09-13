@@ -231,7 +231,7 @@ export default function Dashboard() {
         {
           label: 'Lebenslauf hochladen',
           description:
-            'Ohne Lebenslauf kann die KI keine Matches berechnen. Deine Daten bleiben bei dir — nichts verlässt diese App.',
+            'Ohne Lebenslauf kann die KI keine Matches berechnen.',
           href: '/resume',
           primary: true,
         },
@@ -313,7 +313,7 @@ export default function Dashboard() {
     {
       step: 4,
       title: 'KI-Matching',
-      description: 'Die KI bewertet Treffer gegen deinen Lebenslauf — nichts verlässt diese App.',
+      description: 'Die KI bewertet Treffer gegen deinen Lebenslauf.',
       done: (stats?.scored ?? 0) > 0,
     },
   ]
@@ -576,8 +576,7 @@ export default function Dashboard() {
               <p className="font-medium text-foreground mb-1">Noch keine bewerteten Jobs</p>
               <p className="text-sm text-primary leading-relaxed max-w-prose mb-5">
                 Bewertungen entstehen bei der Suche — die KI bewertet dort die ersten 15 Treffer
-                gegen deinen Lebenslauf. Starte eine Suche, dann erscheinen hier deine stärksten
-                Treffer.
+                gegen deinen Lebenslauf.
               </p>
               <ButtonLink href="/search" variant="secondary" size="sm">
                 Jetzt suchen
@@ -646,8 +645,7 @@ export default function Dashboard() {
             <div className="bg-surface rounded-2xl p-8 border border-border-soft">
               <p className="font-medium text-foreground mb-1">Noch keine gespeicherte Suche</p>
               <p className="text-sm text-primary leading-relaxed max-w-prose mb-5">
-                Speichere eine Suche, und wir zählen dir künftig die neuen Jobs — beim nächsten
-                Öffnen siehst du sofort, was sich getan hat.
+                Speichere eine Suche — ab dann zählt sie dir bei jedem Öffnen die neuen Jobs.
               </p>
               <ButtonLink href="/search" variant="secondary" size="sm">
                 Erste Suche starten

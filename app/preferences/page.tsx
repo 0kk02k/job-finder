@@ -242,7 +242,7 @@ export default function PreferencesPage() {
         {!isActive && !isCompleted && !currentProfile && (
           <section className="bg-surface rounded-2xl p-16 text-center border border-border">
             <p className="text-primary-soft mb-2">
-              Bereit? Das Gespräch dauert etwa 10 Minuten.
+              Das Gespräch dauert etwa 10 Minuten.
             </p>
             <p className="text-sm text-primary-soft mb-6">
               Vier Themen: Was dir Freude macht, wie du Kriterien gewichtest, was du vermeiden

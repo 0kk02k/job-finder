@@ -494,8 +494,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
             <p className="text-sm text-primary mb-4">
               Noch keine Bewertung. Die KI bewertet bei der Suche automatisch die ersten 15
-              Treffer — dieser Job lag darüber oder wurde manuell hinzugefügt. Er muss nicht
-              auf die nächste Suche warten:
+              Treffer — dieser Job lag darüber oder wurde manuell hinzugefügt.
             </p>
             <Button size="sm" variant="secondary" onClick={() => void scoreNow()} disabled={busy !== null}>
               {busy === 'score' ? 'Bewertung läuft …' : 'Jetzt bewerten'}

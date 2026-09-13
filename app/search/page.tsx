@@ -365,9 +365,6 @@ function SearchPageContent() {
           <h1 className="text-3xl font-light text-foreground mb-3">
             Jobsuche
           </h1>
-          <p className="text-lg text-primary-soft">
-            KI-gestützte semantische Suche findet Jobs, die auch mit anderen Titeln passen.
-          </p>
         </section>
 
         {/* Saved Searches */}

@@ -290,7 +290,7 @@ export default function InterviewPage() {
         {!isActive && !isCompleted && (
           <section className="bg-surface rounded-2xl p-16 text-center border border-border">
             <p className="text-primary-soft mb-2">
-              Bereit? Das Interview dauert etwa 15–20 Minuten.
+              Das Interview dauert etwa 15–20 Minuten.
             </p>
             <p className="text-sm text-primary-soft mb-6">
               Ein freies Gespräch wie ein echtes HR-Interview. Im Hintergrund hakt die

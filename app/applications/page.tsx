@@ -277,7 +277,7 @@ export default function ApplicationsPage() {
         {!error && applications.length === 0 ? (
           <section className="bg-surface rounded-2xl p-16 text-center border border-border">
             <p className="text-primary-soft mb-6">
-              Noch nichts beworben. Deine stärksten Treffer warten schon.
+              Noch nichts beworben.
             </p>
             <Link
               href="/jobs?filter=high_match"

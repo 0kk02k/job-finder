@@ -374,10 +374,10 @@ export default function SettingsPage() {
 
   // Ein Key-Feld pro Provider statt einer Fünf-Felder-Wand
   const keyFieldFor: Record<string, { key: keyof NewKeys; label: string; hint?: string | null; help: string } | null> = {
-    nebius: { key: 'nebius', label: 'Nebius API-Key', hint: settings.nebiusKeyHint, help: 'Wird nur in deiner privaten Instanz gespeichert und nie wieder angezeigt.' },
-    gemini: { key: 'gemini', label: 'Google Gemini API-Key', hint: settings.geminiKeyHint, help: 'Wird nur in deiner privaten Instanz gespeichert und nie wieder angezeigt.' },
-    openai: { key: 'openai', label: 'OpenAI API-Key', hint: settings.openaiKeyHint, help: 'Wird nur in deiner privaten Instanz gespeichert und nie wieder angezeigt.' },
-    openrouter: { key: 'openrouter', label: 'OpenRouter API-Key', hint: settings.openrouterKeyHint, help: 'Wird nur in deiner privaten Instanz gespeichert und nie wieder angezeigt.' },
+    nebius: { key: 'nebius', label: 'Nebius API-Key', hint: settings.nebiusKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    gemini: { key: 'gemini', label: 'Google Gemini API-Key', hint: settings.geminiKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    openai: { key: 'openai', label: 'OpenAI API-Key', hint: settings.openaiKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    openrouter: { key: 'openrouter', label: 'OpenRouter API-Key', hint: settings.openrouterKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
     ollama: null,
   }
   const activeKeyField = keyFieldFor[settings.aiProvider] ?? null
@@ -405,7 +405,6 @@ export default function SettingsPage() {
                   <option value="openai">OpenAI</option>
                   <option value="openrouter">OpenRouter</option>
                 </select>
-                <p className="mt-2 text-xs text-primary-soft">Bestimmt, welcher Dienst für KI-Suche und Job-Bewertung genutzt wird.</p>
               </div>
 
               <InputField
@@ -485,7 +484,7 @@ export default function SettingsPage() {
           </Section>
 
           {/* Profil-Optimierung */}
-          <Section title="Profil-Optimierung" description="Dein LinkedIn/XING/StepStone-Profil für die KI-Analyse">
+          <Section title="Profil-Optimierung">
             <div className="space-y-6">
               <div>
                 <label htmlFor="profile-platform" className="block text-sm font-medium text-foreground mb-2">Plattform</label>
@@ -624,7 +623,7 @@ export default function SettingsPage() {
           </Section>
 
           {/* Portal-Sync */}
-          <Section title="Portal-Sync (experimentell)" description="LinkedIn/XING/StepStone-Profil automatisch importieren">
+          <Section title="Portal-Sync (experimentell)">
             <div className="space-y-6">
               <div className="p-4 bg-warning/10 rounded-xl border border-warning/20">
                 <p className="text-sm text-warning">
@@ -703,7 +702,7 @@ export default function SettingsPage() {
           </Section>
 
           {/* Job-Präferenzen */}
-          <Section title="Job-Präferenzen" description="Deine Suchkriterien — fließen in Bewertung und Suche ein">
+          <Section title="Job-Präferenzen">
             {/* Profil aus dem Präferenz-Gespräch — gelesen wird es an der Grenze
                 geparst (Müll → null), geschrieben nur von der Synthese */}
             {(() => {
@@ -805,7 +804,7 @@ export default function SettingsPage() {
                 value={settings.targetTitles || ''}
                 onChange={(v) => setSettings({ ...settings, targetTitles: v })}
                 placeholder="z. B. Pflegefachkraft, Tischlerin, Lehrer, Data Analyst"
-                help="Kommagetrennt. Für welche Berufe soll die KI dein Profil einschätzen?"
+                help="Kommagetrennt."
               />
               <InputField
                 label="Wunschorte"
@@ -906,12 +905,12 @@ export default function SettingsPage() {
   )
 }
 
-function Section({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function Section({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
   return (
     <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
       <div className="mb-6">
         <h2 className="text-xl font-medium text-foreground mb-1">{title}</h2>
-        <p className="text-sm text-primary-soft">{description}</p>
+        {description && <p className="text-sm text-primary-soft">{description}</p>}
       </div>
       {children}
     </div>

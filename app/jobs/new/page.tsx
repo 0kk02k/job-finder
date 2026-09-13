@@ -52,12 +52,9 @@ export default function NewJobPage() {
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-2xl mx-auto px-6 py-16">
-        <h1 className="text-3xl font-light text-foreground mb-2">
+        <h1 className="text-3xl font-light text-foreground mb-8">
           Job hinzufügen
         </h1>
-        <p className="text-primary-soft mb-8">
-          Per URL automatisch extrahieren oder manuell eingeben.
-        </p>
 
         <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
           <div className="flex gap-3 mb-6" role="group" aria-label="Eingabemodus wählen">

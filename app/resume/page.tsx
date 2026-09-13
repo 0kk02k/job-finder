@@ -561,16 +561,6 @@ export default function ResumePage() {
           )}
         </section>
 
-        {/* Tip */}
-        {resume && mode === 'view' && (
-          <section className="bg-success/10 rounded-2xl p-6 border border-success/20">
-            <h3 className="font-medium text-success mb-2">Tipp</h3>
-            <p className="text-foreground text-sm leading-relaxed">
-              Dein Lebenslauf wird verwendet, um Jobs zu bewerten und Matches zu finden.
-              Je mehr Details (Skills, Erfahrung, Projekte), desto besser die KI-Treffer.
-            </p>
-          </section>
-        )}
       </main>
     </div>
   )

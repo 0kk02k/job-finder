@@ -61,12 +61,9 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <h1 className="text-2xl font-light text-foreground mb-2 text-center">
+        <h1 className="text-2xl font-light text-foreground mb-8 text-center">
           Account erstellen
         </h1>
-        <p className="text-primary-soft text-center mb-8">
-          Starte deine intelligente Jobsuche
-        </p>
 
         <form onSubmit={handleSubmit} className="bg-surface rounded-2xl p-6 shadow-sm border border-border space-y-4">
           {error && (
