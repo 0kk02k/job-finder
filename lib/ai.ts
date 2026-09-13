@@ -244,8 +244,11 @@ export async function semanticJobSearch(
   const prompt = buildSemanticRankingPrompt(resume, searchQuery, availableJobs, preferences)
 
   try {
-    const { text } = await generateText({
-      model: ai.chat(model || defaultModel(provider)),
+    const { text } = await generateTextGuarded({
+      // Ranking ist eine strukturierte Index-Aufgabe — wie das Scoring auf dem
+      // schnellen Modell. K3 hier kostete die erste Jobsuche den Lauf: Es denkt
+      // minutenlang, der Request stirbt am 60s-Limit der Route (504).
+      model: ai.chat(scoringModel(provider, model)),
       messages: [{ role: 'user', content: prompt }],
     })
 
@@ -427,8 +430,13 @@ export async function generateSearchQueries(
   const prompt = buildSearchQueryPrompt(resume, originalQuery, preferences)
 
   try {
-    const { text } = await generateText({
-      model: ai.chat(defaultModel(provider)),
+    // Query-Fächer laufen VOR jedem Fortschritts-Event der Suche — hängt hier
+    // das Standard-Modell (K3 denkt auf offenen Prompts minutenlang), stirbt
+    // der ganze Lauf am 60s-Limit, bevor die Suche überhaupt begonnen hat.
+    // Kleine strukturierte Aufgabe → schnelles Scoring-Modell + Guard; fällt
+    // es trotzdem aus, fängt die Route das ab (nur die Original-Query).
+    const { text } = await generateTextGuarded({
+      model: ai.chat(scoringModel(provider)),
       messages: [{ role: 'user', content: prompt }],
     })
 

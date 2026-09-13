@@ -89,11 +89,17 @@ interface RawAdzunaJob {
   salary_max?: number
 }
 
+// Harte Grenze pro Quell-Request: Eine träge oder hängende Quelle darf den
+// Suchlauf nicht auffressen — der Lauf hat insgesamt 60s (maxDuration der
+// Route). Fail-soft: Der catch macht die Quelle einfach zum leeren Ergebnis.
+const FETCH_TIMEOUT_MS = 15_000
+
 // Scrape a single job posting URL using fetch + AI extraction (no browser needed)
 export async function scrapeJobUrl(url: string): Promise<Partial<ScrapedJob> | null> {
   try {
     const response = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' },
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
     const html = await response.text()
     const extracted = await extractJobFromHTML(html, url, 'nebius')
@@ -114,6 +120,7 @@ async function searchJooble(query: string, location?: string, apiKey?: string | 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ keywords: query, location: location || '', page: '1' }),
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     })
     const data = await response.json()
     const jobs: RawJoobleJob[] = data.jobs || []
@@ -136,7 +143,10 @@ async function searchJooble(query: string, location?: string, apiKey?: string | 
 // --- Source: Remotive (remote jobs, no API key) ---
 async function searchRemotive(query: string): Promise<ScrapedJob[]> {
   try {
-    const response = await fetch(`https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=25`)
+    const response = await fetch(
+      `https://remotive.com/api/remote-jobs?search=${encodeURIComponent(query)}&limit=25`,
+      { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
+    )
     const data = await response.json()
     const jobs: RawRemotiveJob[] = data.jobs || []
 
@@ -158,7 +168,9 @@ async function searchRemotive(query: string): Promise<ScrapedJob[]> {
 // --- Source: Arbeitnow (EU jobs, no API key) ---
 async function searchArbeitnow(query: string): Promise<ScrapedJob[]> {
   try {
-    const response = await fetch('https://www.arbeitnow.com/api/job-board-api')
+    const response = await fetch('https://www.arbeitnow.com/api/job-board-api', {
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+    })
     const data = await response.json()
 
     const keywords = query.toLowerCase().split(/\s+/).filter(Boolean)
@@ -194,7 +206,7 @@ const BA_HEADERS = { 'X-API-Key': process.env.ARBEITSAGENTUR_API_KEY || 'jobboer
 async function baDetail(refnr: string): Promise<string> {
   const response = await fetch(
     `${BA_BASE}/pc/v4/jobdetails/${Buffer.from(refnr).toString('base64')}`,
-    { headers: BA_HEADERS }
+    { headers: BA_HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }
   )
   if (!response.ok) return ''
   const data = await response.json()
@@ -216,7 +228,7 @@ async function searchArbeitsagentur(
         if (location) url.searchParams.set('wo', location)
         url.searchParams.set('size', '50')
         url.searchParams.set('page', String(page))
-        const response = await fetch(url, { headers: BA_HEADERS })
+        const response = await fetch(url, { headers: BA_HEADERS, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
         if (!response.ok) return [] as BaJob[]
         const data = await response.json()
         return (data.ergebnisliste || []) as BaJob[]
@@ -298,7 +310,7 @@ async function searchAdzuna(
     if (location) url.searchParams.set('where', location)
     url.searchParams.set('results_per_page', '25')
 
-    const response = await fetch(url)
+    const response = await fetch(url, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) })
     if (!response.ok) return []
     const data = await response.json()
     const results: RawAdzunaJob[] = data.results || []
