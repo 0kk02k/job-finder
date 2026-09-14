@@ -441,7 +441,7 @@ export default function InterviewPage() {
               <h2 className="text-xl font-medium text-foreground">Deine Akte</h2>
               <div className="flex items-center gap-4">
                 <Link href="/" className="text-sm text-primary hover:text-selection transition-colors">
-                  Zurück zum Start
+                  Weiter im Onboarding
                 </Link>
                 <button
                   onClick={() => void downloadReport()}

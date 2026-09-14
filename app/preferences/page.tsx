@@ -499,7 +499,7 @@ export default function PreferencesPage() {
                     href="/"
                     className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors"
                   >
-                    Zurück zum Start
+                    Weiter im Onboarding
                   </Link>
                   <button
                     onClick={startChat}
