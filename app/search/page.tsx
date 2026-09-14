@@ -108,6 +108,8 @@ function SearchPageContent() {
   const [searched, setSearched] = useState(false)
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
   const [justSaved, setJustSaved] = useState(false)
+  // Läuft gerade eine manuelle Übernahme (url der Karte) — Button gesperrt
+  const [savingJobUrl, setSavingJobUrl] = useState<string | null>(null)
 
   const autoRanRef = useRef(false)
 
@@ -353,6 +355,42 @@ function SearchPageContent() {
       }
     } catch {
       toast.error('Netzwerkfehler — der Treffer bleibt in der Liste.')
+    }
+  }
+
+  // Manuelle Übernahme eines Treffers in die Liste — auch ohne Auto-Save-Haken.
+  // Ein bereits berechneter Score wandert mit; der Endpunkt überspringt dann
+  // sein eigenes Nach-Scoring (kein zweiter KI-Call für dasselbe Ergebnis).
+  async function saveJob(job: SearchResult) {
+    if (savingJobUrl) return
+    setSavingJobUrl(job.url)
+    try {
+      const res = await fetch('/api/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: job.url,
+          title: job.title,
+          company: job.company,
+          location: job.location,
+          description: job.description,
+          aiScore: job.aiScore,
+          aiReason: job.aiReason,
+          strengths: job.strengths,
+          gaps: job.gaps,
+          transferableSkills: job.transferableSkills,
+        }),
+      })
+      const data = await res.json().catch(() => null)
+      if (res.ok && data?.id) {
+        setJobIds((prev) => ({ ...prev, [job.url]: data.id }))
+      } else {
+        toast.error(data?.error || 'Übernehmen fehlgeschlagen — der Treffer bleibt in der Liste.')
+      }
+    } catch {
+      toast.error('Netzwerkfehler — der Treffer bleibt in der Liste.')
+    } finally {
+      setSavingJobUrl(null)
     }
   }
 
@@ -620,6 +658,8 @@ function SearchPageContent() {
                 job={job}
                 jobId={jobIds[job.url]}
                 onIgnore={() => ignoreJob(job)}
+                onSave={() => void saveJob(job)}
+                saving={savingJobUrl === job.url}
               />
             ))}
           </section>
@@ -687,10 +727,14 @@ function JobCard({
   job,
   jobId,
   onIgnore,
+  onSave,
+  saving,
 }: {
   job: SearchResult
   jobId?: string
   onIgnore: () => void
+  onSave?: () => void
+  saving?: boolean
 }) {
   const [confirming, setConfirming] = useState(false)
   // Timer-Räumung beim Unmount — sonst setzt ein toter Timeout State ab
@@ -756,13 +800,23 @@ function JobCard({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
-          {jobId && (
+          {jobId ? (
             <Link
               href={`/jobs/${jobId}`}
               className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl text-sm font-medium transition-colors"
             >
               In deiner Liste
             </Link>
+          ) : (
+            onSave && (
+              <button
+                onClick={onSave}
+                disabled={saving}
+                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Wird übernommen …' : 'Zu meiner Liste'}
+              </button>
+            )
           )}
           <button
             onClick={handleIgnoreClick}

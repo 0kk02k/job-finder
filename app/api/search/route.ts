@@ -5,7 +5,7 @@ import { searchJobs, semanticSearch, type ScrapedJob, type SearchProgressEvent }
 import { scoreJob, generateSearchQueries, aiConfigFromSettings } from '@/lib/ai'
 import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD, relevanceToScore } from '@/lib/matching'
-import { pickQueryFan } from '@/lib/search'
+import { pickQueryFan, mapWithConcurrency } from '@/lib/search'
 
 export const maxDuration = 60
 
@@ -134,6 +134,10 @@ export async function POST(request: NextRequest) {
 
   async function search() {
     const onProgress = (event: SearchProgressEvent) => emit({ type: 'progress', ...event })
+    // Harte Gesamtfrist: Vercel killt den Lauf bei 60s hart (504, kein catch).
+    // 50s Frist + 10s Puffer — Phasen prüfen sie und liefern im Zweifel
+    // ehrliche Teilergebnisse, statt den Request zu verlieren.
+    const deadline = Date.now() + 50_000
     try {
       let jobs: SemanticJobResult[] = []
 
@@ -168,6 +172,7 @@ export async function POST(request: NextRequest) {
             extraQueries: fan,
             preferences,
             onProgress,
+            deadline,
           })
 
           // Ignored (archived) jobs stay out of the result pool; best matches first
@@ -271,9 +276,16 @@ export async function POST(request: NextRequest) {
       if (resumeContent && rawJobs.length > 0) {
         emit({ type: 'progress', stage: 'ai-matching', total: Math.min(SCORE_LIMIT, rawJobs.length) })
       }
-      const scoredJobs: ScoredJob[] = await Promise.all(
-        rawJobs.map(async (job, index): Promise<ScoredJob> => {
-          if (!resumeContent || index >= SCORE_LIMIT) return job
+      // Feste Parallelität (8): 50 unbegrenzt gleichzeitige Calls erzeugen am
+      // Provider einen Stau, der den Lauf an die 60s-Grenze bringt
+      const scoredJobs: ScoredJob[] = await mapWithConcurrency(
+        rawJobs,
+        8,
+        async (job, index): Promise<ScoredJob> => {
+          // Frist überschritten: unverbewertet durchreichen — die Nacht-Cron
+          // bewertet Reste (/api/cron/score), der Lauf wird nicht gerettet,
+          // indem man ihn weiterlaufen lässt
+          if (!resumeContent || index >= SCORE_LIMIT || Date.now() > deadline) return job
           try {
             if (job.description) {
               const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null, preferences)
@@ -290,7 +302,7 @@ export async function POST(request: NextRequest) {
           } catch {
             return job
           }
-        })
+        }
       )
 
       // Ignored (archived) jobs stay out of the result pool; best scores first,

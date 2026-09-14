@@ -247,7 +247,12 @@ async function searchArbeitsagentur(
     // statt die ganze Quelle zu gefährden.
     const descriptions = new Map<string, string>()
     let detailsDone = 0
+    // Phasen-Budget: 10 sequentielle Chunks à 15s-Request wären im Worst Case
+    // 150s — länger als der ganze Suchlauf darf. Nach 20s geht's weiter mit
+    // dem, was da ist (ohne Detailtext bleibt der Treffer unscoriert).
+    const detailsDeadline = Date.now() + 20_000
     for (let i = 0; i < items.length; i += 10) {
+      if (i > 0 && Date.now() > detailsDeadline) break
       await Promise.all(
         items.slice(i, i + 10).map(async (job) => {
           if (!job.referenznummer) return
@@ -426,6 +431,9 @@ export async function semanticSearch(params: {
   extraQueries?: string[]
   preferences?: PreferenceProfile | null
   onProgress?: SearchProgressCallback
+  // Harte Gesamtfrist des Suchlaufs (Epoch-ms) — Phasen, die sie sprengen
+  // würden, werden übersprungen, statt den Lauf an den 60s-Kill zu liefern
+  deadline?: number
 }): Promise<SemanticJob[]> {
   // Original-Query mit Fortschritt, Fächer still — die Fläche zeigt eine
   // Quelle-Meldung pro Plattform, nicht vier
@@ -500,7 +508,9 @@ export async function semanticSearch(params: {
   // Regeln. Verlängert die Suche um einen Fetch+Rank, nicht um eine Phase.
   const terms = pickFuzzyTerms(first.fuzzyMatches, [params.query, ...(params.extraQueries ?? [])], 2)
   let jobs = first.jobs
-  if (terms.length > 0) {
+  // Zweitrunde nur mit Restbudget: Fetch+Rank brauchen zusammen ~35s — knapp
+  // an der Frist angekommen ist sie weggespart, das erste Ranking steht schon
+  if (terms.length > 0 && (!params.deadline || Date.now() < params.deadline - 35_000)) {
     params.onProgress?.({ stage: 'second-round', terms })
     const pools2 = await Promise.all(terms.map(q => fetchPool(q, false)))
     const seen = new Set(pool.map(j => j.url))

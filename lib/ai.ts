@@ -244,13 +244,20 @@ export async function semanticJobSearch(
   const prompt = buildSemanticRankingPrompt(resume, searchQuery, availableJobs, preferences)
 
   try {
-    const { text } = await generateTextGuarded({
-      // Ranking ist eine strukturierte Index-Aufgabe — wie das Scoring auf dem
-      // schnellen Modell. K3 hier kostete die erste Jobsuche den Lauf: Es denkt
-      // minutenlang, der Request stirbt am 60s-Limit der Route (504).
-      model: ai.chat(scoringModel(provider, model)),
-      messages: [{ role: 'user', content: prompt }],
-    })
+    const { text } = await generateTextGuarded(
+      {
+        // Ranking ist eine strukturierte Index-Aufgabe — wie das Scoring auf dem
+        // schnellen Modell. K3 hier kostete die erste Jobsuche den Lauf: Es denkt
+        // minutenlang, der Request stirbt am 60s-Limit der Route (504).
+        model: ai.chat(scoringModel(provider, model)),
+        messages: [{ role: 'user', content: prompt }],
+      },
+      // 30s, kein Retry: Der Lauf hat eine Gesamtfrist (Deadline der Route) —
+      // ein Ranking-Retry würde sie fressen. Fällt der Chunk aus, liefert er
+      // nichts; die anderen Chunks ranken weiter.
+      30_000,
+      0
+    )
 
     const result = parseJsonFromText(text || '{}')
     const matches = (Array.isArray(result.matches) ? result.matches : []) as {
@@ -364,7 +371,10 @@ export async function scoreJob(
   const prompt = buildScorePrompt(jobDescription, resume, minSalary, preferences)
 
   try {
-    const { text } = await generateText({
+    // Auch das Scoring bewaffnet: 50 parallele Calls erhöhen die Treffer-
+    // wahrscheinlichkeit des Provider-Stalls — ein gehängter Call würde die
+    // ganze Scoring-Welle (und damit den Suchlauf) bis zum Kill aufhalten.
+    const { text } = await generateTextGuarded({
       model: ai.chat(scoringModel(provider, model)),
       messages: [{ role: 'user', content: prompt }],
     })
@@ -435,10 +445,18 @@ export async function generateSearchQueries(
     // der ganze Lauf am 60s-Limit, bevor die Suche überhaupt begonnen hat.
     // Kleine strukturierte Aufgabe → schnelles Scoring-Modell + Guard; fällt
     // es trotzdem aus, fängt die Route das ab (nur die Original-Query).
-    const { text } = await generateTextGuarded({
-      model: ai.chat(scoringModel(provider)),
-      messages: [{ role: 'user', content: prompt }],
-    })
+    const { text } = await generateTextGuarded(
+      {
+        model: ai.chat(scoringModel(provider)),
+        messages: [{ role: 'user', content: prompt }],
+      },
+      // Enger bemessen als der Guard-Standard, kein Retry: Der Fächer ist
+      // Bonus — 2×25s Worst Case haben einmal das ganze 60s-Budget der Suche
+      // verbraucht, bevor sie beginnt (Runtime-Log 13.09.). Fällt er aus,
+      // läuft die Suche mit der Original-Query weiter.
+      10_000,
+      0
+    )
 
     const content = text || '{}'
     const result = parseJsonFromText(content)

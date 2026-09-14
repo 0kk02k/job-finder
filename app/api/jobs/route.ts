@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
   const userId = session.user.id
 
   const body = await request.json()
-  const { url, title, company, location, description } = body
+  const { url, title, company, location, description, aiScore, aiReason, strengths, gaps, transferableSkills } = body
 
   if (url && !isPublicHttpUrl(url)) {
     return NextResponse.json({ error: 'Ungültige oder nicht erlaubte URL' }, { status: 400 })
@@ -115,13 +115,35 @@ export async function POST(request: NextRequest) {
     throw error
   }
 
-  // Auto-score if we have resume
+  // Auto-score if we have resume — außer der Treffer kommt bereits bewertet
+  // aus der Suchergebnisliste (manuelle Übernahme): Dann wird der vorliegende
+  // Score übernommen statt einen zweiten KI-Call für dasselbe Ergebnis zu
+  // zahlen. matchDetails in denselben zwei Formen wie der Suchlauf.
   const [resume, settings] = await Promise.all([
     prisma.resume.findFirst({ where: { userId, isActive: true } }),
     prisma.userSettings.findUnique({ where: { userId } }),
   ])
 
-  if (resume && job.description) {
+  const hasScore = typeof aiScore === 'number' && Number.isFinite(aiScore)
+  if (hasScore && job.description) {
+    try {
+      await prisma.job.update({
+        where: { id: job.id },
+        data: {
+          score: aiScore,
+          scoreReason: typeof aiReason === 'string' ? aiReason : '',
+          matchDetails: JSON.stringify(
+            Array.isArray(transferableSkills) && transferableSkills.length > 0
+              ? { transferableSkills: transferableSkills.filter((s) => typeof s === 'string') }
+              : { strengths: Array.isArray(strengths) ? strengths : [], gaps: Array.isArray(gaps) ? gaps : [] }
+          ),
+          status: aiScore >= HIGH_MATCH_THRESHOLD ? 'HIGH_MATCH' : 'SCORED',
+        },
+      })
+    } catch (error) {
+      console.error('Score adoption error:', error)
+    }
+  } else if (resume && job.description) {
     try {
       // Wie jede andere Scoring-Stelle: Konfiguration aus den Nutzer-Settings
       // (bisher fiel das manuelle Hinzufügen still auf den Env-Key zurück)
