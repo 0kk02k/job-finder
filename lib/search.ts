@@ -56,6 +56,14 @@ export function pickFuzzyTerms(fuzzy: string[], usedQueries: string[], max: numb
   return terms
 }
 
+// Reicht die Restfrist für eine Phase mit eigener Fetch-Welle (~35s Worst Case:
+// alle Quellen parallel plus BA-Details)? Zweitrunde und klassischer Fall-through
+// starten nur dann — sonst tragen sie den Lauf ans 60s-Kill-Limit, statt
+// Teilergebnisse zu liefern. Derselbe Richtwert, dem die Zweitrunde folgt.
+export function phaseFitsInBudget(deadline: number | undefined, now: number = Date.now()): boolean {
+  return !deadline || now < deadline - 35_000
+}
+
 // Feste Parallelität statt unbegrenztem Promise.all: 50 gleichzeitige KI-Calls
 // erzeugen am Provider Rate-Limit-Staus, aus denen der Suchlauf nicht
 // rechtzeitig zurückkehrt. Ergebnisse bleiben reihengetreu (Index = Eingabe).

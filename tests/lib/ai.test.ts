@@ -3,7 +3,7 @@
 // Getestet wird der Prompt-Vertrag — die KI selbst ist außen vor (lokal kein Key).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildCoverLetterPrompt, buildScorePrompt, buildSearchQueryPrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
+import { attemptTimeoutMs, buildCoverLetterPrompt, buildScorePrompt, buildSearchQueryPrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
 import type { PreferenceProfile } from '../../lib/preferences'
 
 const PROFILE: PreferenceProfile = {
@@ -109,6 +109,34 @@ test('semantic ranking prompt carries deep descriptions — 800 chars, not 200',
   assert.match(prompt, /LEBENSLAUF/)
   assert.match(prompt, /QUERY/)
   assert.match(prompt, /0\.6/)
+})
+
+test('semantic ranking prompt orders a compact answer — the answer time decides', () => {
+  const prompt = buildSemanticRankingPrompt('LEBENSLAUF', 'QUERY', [
+    { title: 'T', company: 'F', location: 'L', description: 'D', url: 'u', platform: 'p', relevanceScore: 0, matchReason: '', transferableSkills: [] },
+  ])
+  assert.match(prompt, /max\. 1 Satz/, 'Reasons in Romanlänge waren der 30s-Timeout beider Ranking-Chunks')
+  assert.match(prompt, /max\. 3 Skills/)
+})
+
+// Guard gegen Gesamtfrist: ein Call, der kurz vor Fristablauf startet, darf die
+// Frist nicht um seine volle Guard-Zeit überstehen — sonst kehrt die Scoring-
+// Welle nie rechtzeitig zurück und der Lauf stirbt am 60s-Kill.
+test('attemptTimeoutMs keeps the guard timeout when no deadline is set', () => {
+  assert.equal(attemptTimeoutMs(25_000), 25_000)
+})
+
+test('attemptTimeoutMs keeps the guard timeout while the deadline is far away', () => {
+  assert.equal(attemptTimeoutMs(25_000, 100_000, 1_000), 25_000)
+})
+
+test('attemptTimeoutMs clamps to the remaining budget near the deadline', () => {
+  assert.equal(attemptTimeoutMs(25_000, 50_000, 45_000), 5_000)
+})
+
+test('attemptTimeoutMs reports a spent budget as null — no doomed call gets started', () => {
+  assert.equal(attemptTimeoutMs(25_000, 50_000, 50_000), null)
+  assert.equal(attemptTimeoutMs(25_000, 50_000, 60_000), null)
 })
 
 test('resume translation prompt forbids inventing facts and keeps structure', () => {

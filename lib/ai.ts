@@ -103,20 +103,38 @@ export function defaultModel(provider: string): string {
   return 'gpt-4o-mini'
 }
 
+// Effektives Abort-Timeout eines Guard-Versuchs: der engere Wert aus Call-Timeout
+// und Restbudget bis zur Gesamtfrist des Suchlaufs. null heißt: Frist verbraucht —
+// der Versuch entfällt, statt einen sicher toten Call zu starten. (Sonst überstand
+// ein kurz vor der Frist gestarteter Call die Frist um seine volle Guard-Zeit,
+// die Scoring-Welle kehrte nie rechtzeitig zurück, und der Lauf starb am 60s-Kill,
+// bevor das Teilergebnis gesendet war — Runtime-Log 14.09.)
+export function attemptTimeoutMs(timeoutMs: number, deadline?: number, now: number = Date.now()): number | null {
+  if (deadline === undefined) return timeoutMs
+  const remainingMs = deadline - now
+  return remainingMs > 0 ? Math.min(timeoutMs, remainingMs) : null
+}
+
 // KI-Calls können am Provider stillstehen: keine Antwort, kein Fehler — der Call
 // hängt, bis die Runtime den ganzen Request killt (in Produktion beobachtet:
 // 60-s-Timeout, derselbe Aufruf Sekunden später erfolgreich). abortSignal macht
 // aus dem Stillstand einen echten Fehler; der frische zweite Request geht in
-// der Praxis durch, also wird genau der automatisch gefahren.
+// der Praxis durch, also wird genau der automatisch gefahren. deadline (Epoch-ms)
+// kappt jeden Versuch zusätzlich an der Gesamtfrist des Suchlaufs.
 export async function generateTextGuarded(
   params: Parameters<typeof generateText>[0],
   timeoutMs = 25000,
-  retries = 1
+  retries = 1,
+  deadline?: number
 ): Promise<Awaited<ReturnType<typeof generateText>>> {
   let lastError: unknown
   for (let attempt = 0; attempt <= retries; attempt++) {
+    const timeout = attemptTimeoutMs(timeoutMs, deadline)
+    if (timeout === null) {
+      throw lastError ?? new Error('Zeitbudget verbraucht — KI-Call nicht mehr gestartet')
+    }
     try {
-      return await generateText({ ...params, abortSignal: AbortSignal.timeout(timeoutMs) })
+      return await generateText({ ...params, abortSignal: AbortSignal.timeout(timeout) })
     } catch (error) {
       lastError = error
       console.error(`KI-Call nicht durchgelaufen (Versuch ${attempt + 1}/${retries + 1}):`, error)
@@ -218,14 +236,15 @@ Gib zurück als JSON:
     {
       "index": 0,
       "relevanceScore": 0.85,
-      "matchReason": "Warum dieser Job passt (Transferable Skills, Industrie, etc.)",
+      "matchReason": "Warum dieser Job passt — max. 1 Satz",
       "transferableSkills": ["Skill1", "Skill2"]
     }
   ],
   "fuzzyMatches": ["Alternative Suchbegriffe"]
 }
 
-"index" ist die Nummer des Jobs aus der Liste oben. Nur Jobs mit relevanceScore >= 0.6 aufnehmen.`
+"index" ist die Nummer des Jobs aus der Liste oben. Nur Jobs mit relevanceScore >= 0.6 aufnehmen.
+Antworte kompakt: matchReason in max. 1 Satz, transferableSkills mit max. 3 Skills — die Antwortzeit entscheidet, ob das Ranking ins Zeitlimit passt.`
 }
 
 // Semantic job search - finds jobs that match even with different titles
@@ -237,7 +256,8 @@ export async function semanticJobSearch(
   model?: string,
   apiKey?: string,
   baseUrl?: string,
-  preferences?: PreferenceProfile | null
+  preferences?: PreferenceProfile | null,
+  deadline?: number
 ): Promise<SemanticSearchResult> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
@@ -254,9 +274,12 @@ export async function semanticJobSearch(
       },
       // 30s, kein Retry: Der Lauf hat eine Gesamtfrist (Deadline der Route) —
       // ein Ranking-Retry würde sie fressen. Fällt der Chunk aus, liefert er
-      // nichts; die anderen Chunks ranken weiter.
+      // nichts; die anderen Chunks ranken weiter. deadline kappt zusätzlich
+      // an der Gesamtfrist — ein kurz vor Fristablauf gestarteter Chunk stirbt
+      // an der Frist, nicht an der vollen Guard-Zeit danach.
       30_000,
-      0
+      0,
+      deadline
     )
 
     const result = parseJsonFromText(text || '{}')
@@ -364,7 +387,8 @@ export async function scoreJob(
   apiKey?: string,
   baseUrl?: string,
   minSalary?: number | null,
-  preferences?: PreferenceProfile | null
+  preferences?: PreferenceProfile | null,
+  deadline?: number
 ): Promise<ScoreResult> {
   const ai = getAIClient(provider, apiKey, baseUrl)
 
@@ -374,10 +398,17 @@ export async function scoreJob(
     // Auch das Scoring bewaffnet: 50 parallele Calls erhöhen die Treffer-
     // wahrscheinlichkeit des Provider-Stalls — ein gehängter Call würde die
     // ganze Scoring-Welle (und damit den Suchlauf) bis zum Kill aufhalten.
-    const { text } = await generateTextGuarded({
-      model: ai.chat(scoringModel(provider, model)),
-      messages: [{ role: 'user', content: prompt }],
-    })
+    // deadline kappt jeden Versuch an der Gesamtfrist der Suche (25s Guard,
+    // 1 Retry — nur noch, solange Restbudget da ist).
+    const { text } = await generateTextGuarded(
+      {
+        model: ai.chat(scoringModel(provider, model)),
+        messages: [{ role: 'user', content: prompt }],
+      },
+      25_000,
+      1,
+      deadline
+    )
 
     const content = text || '{}'
     const result = parseJsonFromText(content) as ScoreResult

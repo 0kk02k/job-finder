@@ -5,7 +5,7 @@ import { searchJobs, semanticSearch, type ScrapedJob, type SearchProgressEvent }
 import { scoreJob, generateSearchQueries, aiConfigFromSettings } from '@/lib/ai'
 import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD, relevanceToScore } from '@/lib/matching'
-import { pickQueryFan, mapWithConcurrency } from '@/lib/search'
+import { pickQueryFan, mapWithConcurrency, phaseFitsInBudget } from '@/lib/search'
 
 export const maxDuration = 60
 
@@ -196,6 +196,9 @@ export async function POST(request: NextRequest) {
           let newJobsCount = 0
 
           for (const job of toSave) {
+            // Frist erreicht: Rest nicht mehr schreiben — der Emit darf nicht
+            // an DB-Roundtrips sterben; die Treffer stehen schon im Ergebnis
+            if (Date.now() > deadline) break
             const isNew = !existingSemanticUrls.has(job.url)
             if (isNew) newJobsCount++
             const score = semanticScore(job)
@@ -250,6 +253,18 @@ export async function POST(request: NextRequest) {
           console.error('Semantic search error:', error)
           // Fall back to traditional search
         }
+
+        // Totalausfall des Rankings (0 Treffer oder Wurf) kostet den klassischen
+        // Pfad eine zweite Fetch-Welle (~35s Worst Case) plus Scoring — nur mit
+        // Restbudget. Sonst trägt er den Lauf ans 60s-Kill-Limit und die Fläche
+        // bekommt gar nichts; ein ehrlicher Fehler ist mehr wert als eine 504.
+        if (!phaseFitsInBudget(deadline, Date.now())) {
+          emit({
+            type: 'error',
+            message: 'Die KI-Bewertung hat das Zeitlimit überschritten — bitte noch einmal suchen.',
+          })
+          return
+        }
       }
 
       // Traditional search with AI enrichment
@@ -288,7 +303,7 @@ export async function POST(request: NextRequest) {
           if (!resumeContent || index >= SCORE_LIMIT || Date.now() > deadline) return job
           try {
             if (job.description) {
-              const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null, preferences)
+              const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null, preferences, deadline)
               if (scoreResult.score === null) return job // AI unreachable — leave unscored
               return {
                 ...job,
@@ -323,6 +338,9 @@ export async function POST(request: NextRequest) {
       // Auto-save all results to job list — außer die Fläche sagt es ab (autoSave: false)
       if (autoSave) {
         for (const job of visibleJobs) {
+          // Frist erreicht: Rest nur als Ergebnisse ausliefern — ohne ids, der
+          // „Zu meiner Liste"-Button adoptiert sie einzeln (ohne Neu-Scoring)
+          if (Date.now() > deadline) break
           const isNew = !existingTraditionalUrls.has(job.url)
           if (isNew) newJobsCount++
           try {

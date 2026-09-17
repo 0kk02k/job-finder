@@ -1,7 +1,7 @@
 // Job search via multiple APIs + AI-powered single-URL extraction
 
 import { extractJobFromHTML, semanticJobSearch } from './ai'
-import { mergeJobsByUrl, pickFuzzyTerms } from './search'
+import { mergeJobsByUrl, phaseFitsInBudget, pickFuzzyTerms } from './search'
 import type { PreferenceProfile } from './preferences'
 
 export interface ScrapedJob {
@@ -471,10 +471,12 @@ export async function semanticSearch(params: {
       transferableSkills: [],
     }))
 
-    // Ein einziger Prompt über ~175 Treffer würde träge und timeout-anfällig —
-    // darum 60er-Chunks parallel. Der Index-Mapping-Schutz bleibt pro Chunk
-    // intakt.
-    const CHUNK_SIZE = 60
+    // Viele kleine Chunks statt zweier großer: ein Ranking-Chunk gibt pro Job
+    // Reason + Skills zurück — 60er-Chunks kamen über die 30s-Guard nie hinaus
+    // (beide starben gleichzeitig, Runtime-Log 14.09.). 15er-Chunks beantwortet
+    // das schnelle Modell in Sekunden; 8 parallel bleiben unter der bewährten
+    // concurrency von 8, und ein stallender Chunk kostet 15 Kandidaten statt 120.
+    const CHUNK_SIZE = 15
     const chunks: SemanticJob[][] = []
     for (let i = 0; i < semanticJobs.length; i += CHUNK_SIZE) {
       chunks.push(semanticJobs.slice(i, i + CHUNK_SIZE))
@@ -490,7 +492,8 @@ export async function semanticSearch(params: {
           params.model,
           params.apiKey,
           params.baseUrl,
-          params.preferences
+          params.preferences,
+          params.deadline
         )
       )
     )
@@ -510,7 +513,7 @@ export async function semanticSearch(params: {
   let jobs = first.jobs
   // Zweitrunde nur mit Restbudget: Fetch+Rank brauchen zusammen ~35s — knapp
   // an der Frist angekommen ist sie weggespart, das erste Ranking steht schon
-  if (terms.length > 0 && (!params.deadline || Date.now() < params.deadline - 35_000)) {
+  if (terms.length > 0 && phaseFitsInBudget(params.deadline, Date.now())) {
     params.onProgress?.({ stage: 'second-round', terms })
     const pools2 = await Promise.all(terms.map(q => fetchPool(q, false)))
     const seen = new Set(pool.map(j => j.url))

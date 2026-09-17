@@ -3,7 +3,7 @@
 // Ordnungsfunktionen hier sind rein — sie entscheiden, was gefetcht und gerankt wird.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mapWithConcurrency, mergeJobsByUrl, pickFuzzyTerms, pickQueryFan } from '../../lib/search'
+import { mapWithConcurrency, mergeJobsByUrl, phaseFitsInBudget, pickFuzzyTerms, pickQueryFan } from '../../lib/search'
 
 test('pickQueryFan trims, dedupes against the original and itself, caps at max', () => {
   const fan = pickQueryFan(
@@ -67,4 +67,21 @@ test('mapWithConcurrency never exceeds the concurrency limit', async () => {
 test('mapWithConcurrency handles empty input and limit above item count', async () => {
   assert.deepEqual(await mapWithConcurrency([], 4, async (n: number) => n), [])
   assert.deepEqual(await mapWithConcurrency([1, 2], 10, async (n) => n * 2), [2, 4])
+})
+
+// Nachfetch-Phasen (Zweitrunde, klassischer Fall-through) tragen eine eigene
+// Fetch-Welle mit ~35s Worst Case. Sie dürfen nur starten, wenn das in die
+// Gesamtfrist passt — sonst tragen sie den Lauf ans Kill-Limit, statt
+// Teilergebnisse zu liefern.
+test('phaseFitsInBudget allows phases when no deadline is set', () => {
+  assert.equal(phaseFitsInBudget(undefined, 0), true)
+})
+
+test('phaseFitsInBudget allows a phase whose worst case still fits before the deadline', () => {
+  assert.equal(phaseFitsInBudget(50_000, 14_999), true)
+})
+
+test('phaseFitsInBudget blocks a phase once its worst case would cross the deadline', () => {
+  assert.equal(phaseFitsInBudget(50_000, 15_000), false)
+  assert.equal(phaseFitsInBudget(50_000, 49_000), false)
 })
