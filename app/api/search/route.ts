@@ -159,7 +159,7 @@ export async function POST(request: NextRequest) {
           // Liste → nur die Original-Query, wie bisher.
           let fan: string[] = []
           try {
-            fan = pickQueryFan(await generateSearchQueries(resume.content, query, aiProvider, preferences), query, 3)
+            fan = pickQueryFan(await generateSearchQueries(resume.content, query, aiProvider, preferences, aiApiKey, aiBaseUrl), query, 3)
           } catch {
             fan = []
           }
@@ -313,7 +313,7 @@ export async function POST(request: NextRequest) {
 
       // Score jobs with AI (requires resume). Capped to bound LLM costs/latency —
       // roughly one LLM call per scored job. 50 statt 15: eine Bewertung kostet
-      // nur Bruchteile eines Cents (GLM-5.3-Flash, siehe scoringModel) — die
+      // nur Bruchteile eines Cents (schnelles Scoring-Modell, siehe scoringModel) — die
       // Suche soll ihre Treffer liefern, nicht den Rückstand füttern; Reste
       // drainiert der nächtliche Cron (/api/cron/score).
       const SCORE_LIMIT = 50
@@ -452,8 +452,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ queries: [] })
   }
 
-  // Generate alternative queries
-  const queries = await generateSearchQueries(resume.content, query)
+  // Generate alternative queries — mit der Provider-Konfig des Nutzers
+  // (Settings-Key schlägt Env), wie im Such-POST
+  const settings = await prisma.userSettings.findUnique({ where: { userId } })
+  const { provider, apiKey, baseUrl } = aiConfigFromSettings(settings)
+  const queries = await generateSearchQueries(resume.content, query, provider, null, apiKey, baseUrl)
 
   return NextResponse.json({ queries })
 }

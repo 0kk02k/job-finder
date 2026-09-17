@@ -189,7 +189,7 @@ function significantTokens(text: string): string[] {
 
 // Ein Beleg gilt als belegt, wenn er wörtlich (whitespace-/case-normalisiert)
 // im Transkript steht — oder als Paraphrase durchgeht: ≥80% seiner Wort-Token
-// kommen im Transkript vor. Kleine Modelle (GLM-Flash) paraphrasieren und
+// kommen im Transkript vor. Kleine Modelle paraphrasieren und
 // kürzen beim Zitieren systematisch; der strenge Substring-Check ließ dadurch
 // echte Abhakungen sterben („1 von 4" trotz fertigem Gespräch). Ein erfundener
 // Beleg scheitert klar an der Quote; Füllwort-Sprüche an der Mindestzahl

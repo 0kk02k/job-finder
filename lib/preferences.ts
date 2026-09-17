@@ -7,7 +7,7 @@
 // koppeln. Der reine Kern (Guide, Sanitizing, Rendering) lebt import-frei in
 // lib/preference-profile.ts — diese Datei hält nur die KI-Calls.
 
-import { getAIClient, scoringModel, parseJsonFromText, generateTextGuarded } from './ai'
+import { getAIClient, scoringChat, parseJsonFromText, generateTextGuarded } from './ai'
 import {
   filterVerifiedEvidence,
   PREFERENCE_GUIDE,
@@ -47,13 +47,13 @@ export async function preferenceInterviewerReply(
   resumeContent: string | null,
   config: AIConfig
 ): Promise<{ reply: string; completed: string[] }> {
-  const ai = getAIClient(config.provider || 'nebius', config.apiKey, config.baseUrl)
   // Bewusst das schnelle Scoring-Modell, NICHT Kimi-K3: K3 denkt auf offenen
   // Gesprächs-Prompts minutenlang — in Production ist der Turn deshalb nach
   // 300s vom Runtime-Timeout gekillt worden („Die Beraterin schreibt …" ohne
   // Ende). Klassifikation und kurze Prosa-Antwort sind kleine Aufgaben —
-  // Flash antwortet in Sekunden (dieselbe Erfahrung wie beim Scoring).
-  const model = ai.chat(scoringModel(config.provider || 'nebius', config.model))
+  // scoringChat liefert das Modell ohne Denkpause (dieselbe Erfahrung wie
+  // beim Scoring).
+  const model = scoringChat(config.provider || 'nebius', config.apiKey, config.baseUrl, config.model)
 
   const history = messages
     .map((m) => `${m.role === 'assistant' ? 'BERATERIN' : 'NUTZER'}: ${m.content}`)
@@ -160,8 +160,6 @@ export async function synthesizePreferenceProfile(
   messages: InterviewMessage[],
   config: AIConfig
 ): Promise<PreferenceProfile | null> {
-  const ai = getAIClient(config.provider || 'nebius', config.apiKey, config.baseUrl)
-
   const transcript = messages
     .map((m) => `${m.role === 'assistant' ? 'BERATERIN' : 'NUTZER'}: ${m.content}`)
     .join('\n\n')
@@ -199,7 +197,7 @@ Gib AUSSCHLIESSLICH das JSON aus — kein Vorwort, keine Anmerkungen.`
     // selben Request wie der letzte Chat-Turn, der sich sonst denselben
     // K3-Denk-Marathon mit dem Prosa-Zug teilt.
     const { text } = await generateTextGuarded({
-      model: ai.chat(scoringModel(config.provider || 'nebius', config.model)),
+      model: scoringChat(config.provider || 'nebius', config.apiKey, config.baseUrl, config.model),
       messages: [{ role: 'user', content: prompt }],
     })
     return sanitizePreferenceProfile(parseJsonFromText(text || '{}'))

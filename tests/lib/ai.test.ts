@@ -3,7 +3,7 @@
 // Getestet wird der Prompt-Vertrag — die KI selbst ist außen vor (lokal kein Key).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { attemptTimeoutMs, buildCoverLetterPrompt, buildScorePrompt, buildSearchQueryPrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, scoringModel } from '../../lib/ai'
+import { attemptTimeoutMs, buildCoverLetterPrompt, buildScorePrompt, buildSearchQueryPrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, noThinkingFetch, scoringModel } from '../../lib/ai'
 import type { PreferenceProfile } from '../../lib/preferences'
 
 const PROFILE: PreferenceProfile = {
@@ -90,9 +90,33 @@ test('score prompt demands the JSON verdict shape and the 1-10 scale', () => {
   assert.match(prompt, /"reason"/)
 })
 
-test('scoringModel sends Nebius scoring to GLM 5.3 Flash — the user model is deliberately ignored', () => {
-  assert.equal(scoringModel('nebius', 'moonshotai/Kimi-K3'), 'zai-org/GLM-5.3-Flash')
-  assert.equal(scoringModel('nebius', undefined), 'zai-org/GLM-5.3-Flash')
+test('scoringModel sends Nebius scoring to Kimi K2.6 — the user model is deliberately ignored', () => {
+  assert.equal(scoringModel('nebius', 'moonshotai/Kimi-K3'), 'moonshotai/Kimi-K2.6')
+  assert.equal(scoringModel('nebius', undefined), 'moonshotai/Kimi-K2.6')
+})
+
+test('noThinkingFetch injects chat_template_kwargs into JSON POST bodies', async () => {
+  let seenBody: unknown = null
+  const wrapped = noThinkingFetch(async (_input, init) => {
+    seenBody = JSON.parse(init?.body as string)
+    return new Response('{}')
+  })
+  await wrapped('https://example.com/v1/chat/completions', {
+    method: 'POST',
+    body: JSON.stringify({ model: 'moonshotai/Kimi-K2.6', messages: [] }),
+  })
+  assert.deepEqual((seenBody as { chat_template_kwargs?: unknown }).chat_template_kwargs, { thinking: false })
+  assert.equal((seenBody as { model?: string }).model, 'moonshotai/Kimi-K2.6', 'der Rest des Bodys bleibt unangetastet')
+})
+
+test('noThinkingFetch passes non-JSON requests through untouched', async () => {
+  let seenBody: unknown = null
+  const wrapped = noThinkingFetch(async (_input, init) => {
+    seenBody = init?.body
+    return new Response('{}')
+  })
+  await wrapped('https://example.com/v1/models', { method: 'GET' })
+  assert.equal(seenBody, undefined)
 })
 
 test('scoringModel leaves other providers with their own model choice', () => {

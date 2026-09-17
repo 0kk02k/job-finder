@@ -1,5 +1,5 @@
 // AI integration for job scoring, resume matching, and intelligent job extraction
-// Supports: Nebius Token Factory (Default, Kimi K2.5), Ollama (local), Gemini, OpenRouter
+// Supports: Nebius Token Factory (Default, Kimi K3), Ollama (local), Gemini, OpenRouter
 
 import { createOpenAI } from '@ai-sdk/openai'
 import { generateText } from 'ai'
@@ -59,8 +59,32 @@ export interface ExtractedJob {
   confidence: number // How confident is the AI about this extraction
 }
 
+// Kimi-K2.6 denkt standardmäßig nach — Reasoning, das Nebius nicht als solches
+// ausweist, aber als Output-Tokens abrechnet: gemessen 20s und 4.700 Output-
+// Tokens für einen Ranking-Chunk, gegenüber 3s und 550 Tokens mit abgeschalte-
+// tem Denken. Der Schalter ist das Moonshot-Template-Feld
+// chat_template_kwargs.thinking:false. Das AI-SDK reicht es nicht durch
+// (providerOptions deckt nur OpenAI-eigene Optionen ab; reasoning_effort:'none'
+// drosselt bei Nebius nur auf 13s/2.600 Tokens), deshalb greift dieser Wrapper
+// in den Request-Body ein. Er hängt nur am Scoring-Client (scoringChat) — das
+// Hauptmodell (K3, Anschreiben etc.) behält sein Denken.
+export function noThinkingFetch(baseFetch: typeof fetch = fetch): typeof fetch {
+  return async (input, init) => {
+    if (init?.method === 'POST' && typeof init.body === 'string') {
+      try {
+        const body = JSON.parse(init.body)
+        body.chat_template_kwargs = { thinking: false }
+        init = { ...init, body: JSON.stringify(body) }
+      } catch {
+        // kein JSON-Body — unverändert durchlassen
+      }
+    }
+    return baseFetch(input, init)
+  }
+}
+
 // Get AI client based on provider
-export function getAIClient(provider: string, apiKey?: string, baseUrl?: string) {
+export function getAIClient(provider: string, apiKey?: string, baseUrl?: string, opts?: { disableThinking?: boolean }) {
   if (provider === 'ollama') {
     return createOpenAI({
       baseURL: baseUrl || 'http://localhost:11434/v1',
@@ -72,6 +96,7 @@ export function getAIClient(provider: string, apiKey?: string, baseUrl?: string)
     return createOpenAI({
       baseURL: baseUrl || 'https://api.tokenfactory.nebius.com/v1',
       apiKey: apiKey || process.env.NEBIUS_API_KEY,
+      ...(opts?.disableThinking ? { fetch: noThinkingFetch() } : {}),
     })
   }
 
@@ -200,7 +225,7 @@ Wenn kein Job gefunden wird, gib null zurück.`
 
 // Der Ranking-Prompt bewertet Fähigkeiten, nicht Titel — dafür braucht er die
 // Anzeige in der Tiefe: 800 Zeichen statt 200, die passenden Skills stehen oft
-// tief in der Beschreibung. Kostet bei GLM Flash Cent-Bruchteile.
+// tief in der Beschreibung. Kostet auf dem Scoring-Modell Cent-Bruchteile.
 export function buildSemanticRankingPrompt(
   resume: string,
   searchQuery: string,
@@ -259,17 +284,16 @@ export async function semanticJobSearch(
   preferences?: PreferenceProfile | null,
   deadline?: number
 ): Promise<SemanticSearchResult> {
-  const ai = getAIClient(provider, apiKey, baseUrl)
-
   const prompt = buildSemanticRankingPrompt(resume, searchQuery, availableJobs, preferences)
 
   try {
     const { text } = await generateTextGuarded(
       {
         // Ranking ist eine strukturierte Index-Aufgabe — wie das Scoring auf dem
-        // schnellen Modell. K3 hier kostete die erste Jobsuche den Lauf: Es denkt
-        // minutenlang, der Request stirbt am 60s-Limit der Route (504).
-        model: ai.chat(scoringModel(provider, model)),
+        // schnellen Modell. Das Hauptmodell hier kostete die erste Jobsuche den
+        // Lauf: Es denkt minutenlang, der Request stirbt am 60s-Limit der Route
+        // (504).
+        model: scoringChat(provider, apiKey, baseUrl, model),
         messages: [{ role: 'user', content: prompt }],
       },
       // 30s, kein Retry: Der Lauf hat eine Gesamtfrist (Deadline der Route) —
@@ -366,13 +390,26 @@ Bewerte jetzt diesen Job wie oben beschrieben.`
 }
 
 // Scoring läuft auf eigenem, schnellem Modell: kleine strukturierte Aufgabe,
-// aber häufig — Kims Denken kostet hier Zeit und Geld ohne Gewinn. GLM 5.3
-// Flash antwortet in Sekunden für einen Bruchteil der Kosten. Nur Nebius kennt
-// diese ID; andere Provider behalten ihr Modell.
-const NEBIUS_SCORING_MODEL = 'zai-org/GLM-5.3-Flash'
+// aber häufig. K2.6 statt GLM-5.3-Flash, weil der GLM-Flash-Serving-Pool keine
+// Antworten mehr liefert: Aus Vercel-Produktion hängt jeder Call bis zum Guard-
+// Timeout (aus zwei Regionen belegt), lokal zuletzt ebenfalls — der Kimi-Pool
+// antwortet denselben Call in Sekunden (Beweiskette: HANDOFF-KI-SUCHE.md).
+// Die Denkpause von K2.6 schaltet scoringChat ab — sonst wartet jeder Call
+// 15–20s auf unsichtbares Reasoning. Nur Nebius kennt diese ID; andere
+// Provider behalten ihr Modell.
+const NEBIUS_SCORING_MODEL = 'moonshotai/Kimi-K2.6'
 
 export function scoringModel(provider: string, userModel?: string): string {
   return provider === 'nebius' ? NEBIUS_SCORING_MODEL : userModel || defaultModel(provider)
+}
+
+// Der eine Einstieg fürs schnelle Modell: Modell-ID und Denk-Abschaltung
+// gehören zusammen — ein K2.6-Call ohne thinking:false wartet 15–20s auf die
+// Denkpause. Gilt nur für Nebius; andere Provider bekommen ihr Modell ohne
+// Eingriff in den Request.
+export function scoringChat(provider: string, apiKey?: string, baseUrl?: string, userModel?: string) {
+  const ai = getAIClient(provider, apiKey, baseUrl, { disableThinking: provider === 'nebius' })
+  return ai.chat(scoringModel(provider, userModel))
 }
 
 // Score job against resume (enhanced with transferable skills)
@@ -390,8 +427,6 @@ export async function scoreJob(
   preferences?: PreferenceProfile | null,
   deadline?: number
 ): Promise<ScoreResult> {
-  const ai = getAIClient(provider, apiKey, baseUrl)
-
   const prompt = buildScorePrompt(jobDescription, resume, minSalary, preferences)
 
   try {
@@ -402,7 +437,7 @@ export async function scoreJob(
     // 1 Retry — nur noch, solange Restbudget da ist).
     const { text } = await generateTextGuarded(
       {
-        model: ai.chat(scoringModel(provider, model)),
+        model: scoringChat(provider, apiKey, baseUrl, model),
         messages: [{ role: 'user', content: prompt }],
       },
       25_000,
@@ -464,10 +499,10 @@ export async function generateSearchQueries(
   resume: string,
   originalQuery: string,
   provider: string = 'nebius',
-  preferences?: PreferenceProfile | null
+  preferences?: PreferenceProfile | null,
+  apiKey?: string,
+  baseUrl?: string
 ): Promise<string[]> {
-  const ai = getAIClient(provider)
-
   const prompt = buildSearchQueryPrompt(resume, originalQuery, preferences)
 
   try {
@@ -478,7 +513,7 @@ export async function generateSearchQueries(
     // es trotzdem aus, fängt die Route das ab (nur die Original-Query).
     const { text } = await generateTextGuarded(
       {
-        model: ai.chat(scoringModel(provider)),
+        model: scoringChat(provider, apiKey, baseUrl),
         messages: [{ role: 'user', content: prompt }],
       },
       // Enger bemessen als der Guard-Standard, kein Retry: Der Fächer ist

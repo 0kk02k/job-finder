@@ -62,3 +62,31 @@ Offene Teilfrage: Warum bedient der Provider aus prod Kimi, aber nicht GLM? (Ver
 1. Ist die Kausalkette (Provider-Erreichbarkeit abhängig von Egress-IP-Klasse, modellpoolspezifisch) schlüssig — oder übersehen wir eine Erklärungsebene (z. B. AI-SDK-Verhalten, Header, HTTP/2, Keep-alive, Vercel-Fluid-spezifisches Fetch)?
 2. Plan B richtig bestückt — K2.6 vs. `GLM-5.3` (full) vs. ganz anderer Provider fürs Scoring?
 3. Sollte die App das Modellwahl-Risiko bündeln (z. B. Fallback-Kette: GLM-Flash → K2.6 bei Guard-Timeout im Lauf selbst) statt statischer Modell-ID?
+
+## 8. Addendum 17.09.2026 (später Abend, Nachfolge-Session): Plan B umgesetzt — plus neue Befunde
+
+### Neue Messungen (lokal, Settings-Key, roher fetch bzw. SDK-Pfad)
+
+- **K2.6 Ranking-Chunk (15 Jobs):** ohne Schalter **19,6s / 4.716 Output-Tokens** (K2.6 ist ein Thinking-Modell; Nebius weist das Reasoning nicht als `reasoning_content` aus, rechnet es aber als Output ab — bei gekapptem `max_tokens` kam dadurch **leerer content** zurück). Mit **`chat_template_kwargs: { thinking: false }`: 2,7–3,0s / 499–554 Tokens**, valides Ranking-JSON.
+- **`reasoning_effort: 'none'` drosselt nur** (Ranking 12,9s / 2.643 Tokens) — bei Nebius kein vollständiger Aus-Schalter. Der SDK-native Weg (`providerOptions.openai.reasoningEffort`) reicht damit nicht.
+- **GLM-5.3-Flash lokal: Timeout bei 45s** (am Vortag noch 12,6s) — der Pool ist jetzt **auch außerhalb Vercels** gestört. GLM-5.3 (full) antwortet lokal winzig in 1,4s, ist aber ebenfalls Thinking-Modell.
+
+### Antworten auf die Review-Fragen (§7)
+
+1. **Kausalkette:** Die reine „Vercel-Egress-IP-Klasse"-Erklärung ist durch den neuen lokalen GLM-Flash-Timeout geschwächt — näher liegt eine **Degradation des GLM-Flash-Serving-Pools** (aus Vercel 100 % Ausfall seit ~13.09., lokal jetzt ebenfalls). AI-SDK-/Header-/HTTP-Ebene als Timeout-Ursache geprüft und ausgeschlossen: derselbe SDK-Pfad liefert mit Kimi-Modellen in 1,5–4s. Die SDK-Ebene war trotzdem relevant — für das Denk-Problem (s. o.): `chat_template_kwargs` wird nicht durchgereicht, der Chat-Pfad sendet `reasoning_effort` ungefiltert mit.
+2. **Plan B-Bestückung:** **K2.6 bestätigt.** GLM-5.3 (full) wäre derselbe Provider-Pool-Typus mit unbekannter Politik und eigenem Denk-Overhead; ein ganz anderer Provider ist Plan C. K2.6 liegt im beweisbar erreichbaren Kimi-Pool (Verbindungstest 16:13, K3 mit 200).
+3. **Fallback-Kette:** **nicht gebaut** — statischer Wechsel. Im Fehlerbild „Pool tot" würde eine Laufzeit-Kette pro Call erst die volle Guard-Zeit (10–30s) verbrennen, bevor sie wechselt; bei ~60 KI-Calls pro Suche wäre das fatal. Die Guards bleiben das ehrliche Messinstrument. Fällt auch K2.6 aus prod aus, bleibt Plan C (EU-Relay).
+
+### Umgesetzt (Plan B)
+
+- `lib/ai.ts`: `NEBIUS_SCORING_MODEL = 'moonshotai/Kimi-K2.6'`; neu `noThinkingFetch` (injiziert `chat_template_kwargs.thinking:false` in POST-Bodies) + `scoringChat(...)` als einziger Einstieg fürs schnelle Modell (Modell-ID und Denk-Abschaltung untrennbar). Alle Scoring-Call-Sites umgestellt: `semanticJobSearch`, `scoreJob`, `generateSearchQueries`, Präferenz-Gespräch (3 Stellen), HR-Interview. Hauptmodell K3 (Anschreiben, Insights etc.) unverändert **mit** Denken.
+- `generateSearchQueries` nimmt jetzt `apiKey`/`baseUrl` — vorher lief der Query-Fächer **nur** über die Env-Var, also in prod gegen den toten 401-Key (§3.4). Beide Aufrufer in `app/api/search/route.ts` reichen die Settings-Config durch.
+- Kommentare mit GLM-Referenzen aktualisiert (search route, cron score, preference-profile).
+- Tests: **134 grün** (2 neu: `noThinkingFetch` injiziert korrekt / lässt Nicht-JSON unberührt), `tsc --noEmit` sauber, ESLint auf geänderten Dateien sauber.
+- E2E lokal über den Produktionspfad: `scoreJob` 4,1s (Score 10, valides JSON), `semanticJobSearch` 1,5s (2 von 3 korrekt gerankt, Buchhalter korrekt raus), `generateSearchQueries` 1,6s (10 Queries).
+
+### Offen nach dem Deploy (push auf main = Prod-Deploy)
+
+1. **Live-Beweis:** Suche in prod laufen lassen → `SELECT count(*) FROM "Job" WHERE score IS NOT NULL` muss von 0 wegkommen; die Suche muss gerankte Treffer streamen statt `rankingFailed`.
+2. **Vercel-Env `NEBIUS_API_KEY`** auf den gültigen Wert setzen (steht heute auf der toten 401-Instanz) — betrifft noch `lib/platforms.ts` (`getAIClient(aiProvider)` ohne Key) und jeden Env-Fallback.
+3. Falls K2.6 aus prod wider Erwarten hängt: Plan C (EU-Relay, `baseUrl` konfigurierbar).
