@@ -4,5 +4,6 @@
       "path": "/api/cron/score",
       "schedule": "17 3 * * *"
     }
-  ]
+  ],
+  "regions": ["fra1"]
 }
