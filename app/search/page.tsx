@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { scoreTone } from '../components/ui'
 import { HIGH_MATCH_THRESHOLD, scoreLabel, scoreWord } from '@/lib/matching'
 import { platformLabel } from '@/lib/sources'
+import { mergeStreamedJobs } from '@/lib/search'
 import { textSnippet } from '../components/Markdown'
 import { useToast } from '../components/Toast'
 
@@ -43,6 +44,8 @@ type StreamEvent =
   | { type: 'progress'; stage: 'ai-matching'; total: number }
   | { type: 'progress'; stage: 'query-fan'; queries: string[] }
   | { type: 'progress'; stage: 'second-round'; terms: string[] }
+  // Live-Strom: ein Ranking-Chunk ist fertig — die Karten erscheinen sofort
+  | { type: 'jobs'; jobs: SearchResult[] }
   | {
       type: 'result'
       total: number
@@ -51,6 +54,9 @@ type StreamEvent =
       jobs: SearchResult[]
       ids: Record<string, string>
       semantic?: boolean
+      // true: das Ranking ist komplett ausgefallen — jobs ist der ungerankete
+      // Pool (nur Anzeige, nichts in der Liste)
+      rankingFailed?: boolean
     }
   | { type: 'error'; message: string }
 
@@ -245,6 +251,9 @@ function SearchPageContent() {
             } else if (event.stage === 'second-round') {
               setStages((prev) => ({ ...prev, secondRound: event.terms }))
             }
+          } else if (event.type === 'jobs') {
+            // Live-Strom: fertige Ranking-Chunks hängen ihre Treffer sofort an
+            setResults((prev) => mergeStreamedJobs(prev, event.jobs))
           } else if (event.type === 'result') {
             settled = true
             setResults(event.jobs || [])
@@ -255,7 +264,11 @@ function SearchPageContent() {
               newJobs: event.newJobs || 0,
             })
             setSearched(true)
-            setAnnounce(`Suche abgeschlossen: ${event.total} Treffer, ${event.highMatches} Top Matches`)
+            setAnnounce(
+              event.rankingFailed
+                ? `Suche abgeschlossen: ${event.total} Treffer, KI-Bewertung ausgefallen`
+                : `Suche abgeschlossen: ${event.total} Treffer, ${event.highMatches} Top Matches`
+            )
             // Abschlussmoment: der Sprung zur Liste — nicht lautlos unmounten
             requestAnimationFrame(() => resultsHeadingRef.current?.focus())
 
@@ -567,7 +580,7 @@ function SearchPageContent() {
                 <StageRow
                   done={false}
                   text="KI bewertet Treffer …"
-                  meta={`${elapsed} s`}
+                  meta={scoredCount > 0 ? `${elapsed} s · ${scoredCount} bewertet` : `${elapsed} s`}
                 />
               )}
               {stages.fan && stages.fan.length > 0 && (
@@ -582,13 +595,30 @@ function SearchPageContent() {
               )}
               <p className="text-xs text-primary-soft pt-1">Dauert meist 30–60 Sekunden.</p>
             </div>
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="bg-surface rounded-2xl p-8 border border-border animate-pulse motion-reduce:animate-none" aria-hidden="true">
-                <div className="h-5 w-2/3 bg-border rounded mb-4" />
-                <div className="h-4 w-1/3 bg-border-soft rounded mb-6" />
-                <div className="h-4 w-full bg-border-soft rounded" />
+            {results.length === 0 ? (
+              [0, 1, 2].map((i) => (
+                <div key={i} className="bg-surface rounded-2xl p-8 border border-border animate-pulse motion-reduce:animate-none" aria-hidden="true">
+                  <div className="h-5 w-2/3 bg-border rounded mb-4" />
+                  <div className="h-4 w-1/3 bg-border-soft rounded mb-6" />
+                  <div className="h-4 w-full bg-border-soft rounded" />
+                </div>
+              ))
+            ) : (
+              // Live-Strom: fertige Karten stehen unter dem Panel, während die
+              // KI die restlichen Chunks bewertet — die Fläche lebt sichtbar
+              <div className="space-y-4">
+                {results.map((job) => (
+                  <JobCard
+                    key={job.url}
+                    job={job}
+                    jobId={jobIds[job.url]}
+                    onIgnore={() => ignoreJob(job)}
+                    onSave={() => void saveJob(job)}
+                    saving={savingJobUrl === job.url}
+                  />
+                ))}
               </div>
-            ))}
+            )}
           </section>
         )}
 

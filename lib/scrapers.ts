@@ -434,6 +434,12 @@ export async function semanticSearch(params: {
   // Harte Gesamtfrist des Suchlaufs (Epoch-ms) — Phasen, die sie sprengen
   // würden, werden übersprungen, statt den Lauf an den 60s-Kill zu liefern
   deadline?: number
+  // Live-Strom: sobald ein Ranking-Chunk zurückkehrt, gehen seine Treffer
+  // sofort an die Fläche — nicht erst, wenn alle Chunks durch sind
+  onRanked?: (jobs: SemanticJob[]) => void
+  // Der Kandidatenpool vor dem Ranking — die Route zeigt ihn ungeranket,
+  // wenn der Ranking-Totalausfall keine Zeit für den zweiten Versuch lässt
+  onPool?: (jobs: ScrapedJob[]) => void
 }): Promise<SemanticJob[]> {
   // Original-Query mit Fortschritt, Fächer still — die Fläche zeigt eine
   // Quelle-Meldung pro Plattform, nicht vier
@@ -459,9 +465,11 @@ export async function semanticSearch(params: {
   // Maximum für einen Durchlauf; bei Überlauf gewinnt die Reihenfolge
   // (Original-Query zuerst)
   const pool = mergeJobsByUrl(pools).slice(0, 120)
+  params.onPool?.(pool)
 
   const rankPool = async (
-    jobs: ScrapedJob[]
+    jobs: ScrapedJob[],
+    onRanked?: (jobs: SemanticJob[]) => void
   ): Promise<{ jobs: SemanticJob[]; fuzzyMatches: string[] }> => {
     params.onProgress?.({ stage: 'ai-matching', total: jobs.length })
     const semanticJobs: SemanticJob[] = jobs.map(job => ({
@@ -494,21 +502,29 @@ export async function semanticSearch(params: {
           params.baseUrl,
           params.preferences,
           params.deadline
-        )
+        ).then(result => {
+          // Chunk fertig → sofort melden. Chunks sind URL-disjunkt (der Pool
+          // wurde vorher dedupliziert), nichts kann doppelt ankommen.
+          const ranked = result.jobs.filter(job => job.relevanceScore >= 0.6)
+          if (ranked.length > 0) onRanked?.(ranked)
+          return {
+            jobs: ranked,
+            fuzzyMatches: result.fuzzyMatches.filter((t): t is string => typeof t === 'string'),
+          }
+        })
       )
     )
 
     return {
-      jobs: results.flatMap(result => result.jobs).filter(job => job.relevanceScore >= 0.6),
-      fuzzyMatches: results.flatMap(result => result.fuzzyMatches).filter((t): t is string => typeof t === 'string'),
+      jobs: results.flatMap(result => result.jobs),
+      fuzzyMatches: results.flatMap(result => result.fuzzyMatches),
     }
   }
-
-  const first = await rankPool(pool)
 
   // Zweitrunde: die fuzzyMatches des Rankings benennen Begriffe, unter denen
   // ähnliche Jobs stehen könnten — einmal nachgefetcht, nur neue URLs, dieselben
   // Regeln. Verlängert die Suche um einen Fetch+Rank, nicht um eine Phase.
+  const first = await rankPool(pool, params.onRanked)
   const terms = pickFuzzyTerms(first.fuzzyMatches, [params.query, ...(params.extraQueries ?? [])], 2)
   let jobs = first.jobs
   // Zweitrunde nur mit Restbudget: Fetch+Rank brauchen zusammen ~35s — knapp
@@ -519,7 +535,7 @@ export async function semanticSearch(params: {
     const seen = new Set(pool.map(j => j.url))
     const pool2 = mergeJobsByUrl(pools2).filter(j => !seen.has(j.url)).slice(0, 60)
     if (pool2.length > 0) {
-      const second = await rankPool(pool2)
+      const second = await rankPool(pool2, params.onRanked)
       jobs = [...jobs, ...second.jobs.filter(e => !jobs.some(f => f.url === e.url))]
     }
   }

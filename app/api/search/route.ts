@@ -18,6 +18,9 @@ type StreamEvent =
   | { type: 'progress'; stage: 'ai-matching'; total: number }
   | { type: 'progress'; stage: 'query-fan'; queries: string[] }
   | { type: 'progress'; stage: 'second-round'; terms: string[] }
+  // Live-Strom: ein Ranking-Chunk ist fertig — die Treffer dürfen sofort auf
+  // die Fläche, nicht erst, wenn alle Chunks durch sind
+  | { type: 'jobs'; jobs: unknown[] }
   | {
       type: 'result'
       total: number
@@ -26,6 +29,9 @@ type StreamEvent =
       jobs: unknown[]
       ids: Record<string, string>
       semantic: boolean
+      // true: das Ranking ist komplett ausgefallen, jobs ist der ungerankete
+      // Pool (nur Anzeige, nichts gespeichert)
+      rankingFailed?: boolean
     }
   | { type: 'error'; message: string }
 
@@ -140,6 +146,9 @@ export async function POST(request: NextRequest) {
     const deadline = Date.now() + 50_000
     try {
       let jobs: SemanticJobResult[] = []
+      // Der Kandidatenpool der semantischen Suche — fällt das Ranking komplett
+      // aus, zeigt die Fläche ihn ungeranket, statt einer Fehlerwand ohne Inhalt
+      let pool: ScrapedJob[] = []
 
       // Semantic search - AI-powered matching (requires resume)
       if (semantic && resume && useAI !== false) {
@@ -155,6 +164,10 @@ export async function POST(request: NextRequest) {
             fan = []
           }
           if (fan.length > 0) emit({ type: 'progress', stage: 'query-fan', queries: fan })
+
+          // Dieselbe Skala wie der klassische Pfad: Relevanz (0–1) → Score (1–10),
+          // High Match ab HIGH_MATCH_THRESHOLD — nicht ab einer zweiten Wahrheit (0.7)
+          const semanticScore = (j: SemanticJobResult) => relevanceToScore(j.relevanceScore)
 
           jobs = await semanticSearch({
             resume: resume.content,
@@ -173,15 +186,18 @@ export async function POST(request: NextRequest) {
             preferences,
             onProgress,
             deadline,
+            onPool: (candidates) => { pool = candidates },
+            onRanked: (ranked) => emit({
+              type: 'jobs',
+              jobs: ranked
+                .filter(j => statusByUrl.get(j.url) !== 'ARCHIVED')
+                .map(j => ({ ...j, aiScore: semanticScore(j), aiReason: j.matchReason })),
+            }),
           })
 
           // Ignored (archived) jobs stay out of the result pool; best matches first
           jobs = jobs.filter(j => statusByUrl.get(j.url) !== 'ARCHIVED')
           jobs.sort((a, b) => b.relevanceScore - a.relevanceScore)
-
-          // Dieselbe Skala wie der klassische Pfad: Relevanz (0–1) → Score (1–10),
-          // High Match ab HIGH_MATCH_THRESHOLD — nicht ab einer zweiten Wahrheit (0.7)
-          const semanticScore = (j: SemanticJobResult) => relevanceToScore(j.relevanceScore)
 
           // Save matches (Vorab-Match ab 0.7 Relevanz); ohne autoSave wird nichts geschrieben
           const toSave = autoSave ? jobs.filter(job => job.relevanceScore >= 0.7) : []
@@ -254,14 +270,28 @@ export async function POST(request: NextRequest) {
           // Fall back to traditional search
         }
 
-        // Totalausfall des Rankings (0 Treffer oder Wurf) kostet den klassischen
-        // Pfad eine zweite Fetch-Welle (~35s Worst Case) plus Scoring — nur mit
-        // Restbudget. Sonst trägt er den Lauf ans 60s-Kill-Limit und die Fläche
-        // bekommt gar nichts; ein ehrlicher Fehler ist mehr wert als eine 504.
+        // Totalausfall des Rankings (0 Treffer oder Wurf): mit Restbudget darf
+        // der klassische Pfad eine zweite Fetch-Welle wagen (~35s Worst Case).
+        // Ohne Restbudget zeigt die Fläche den Pool ungeranket — nichts wird
+        // gespeichert, „Zu meiner Liste" übernimmt einzeln — statt einer
+        // Fehlerwand ohne Inhalt. Ganz ohne Pool bleibt es der ehrliche Fehler.
         if (!phaseFitsInBudget(deadline, Date.now())) {
+          if (pool.length === 0) {
+            emit({
+              type: 'error',
+              message: 'Die KI-Bewertung hat das Zeitlimit überschritten — bitte noch einmal suchen.',
+            })
+            return
+          }
           emit({
-            type: 'error',
-            message: 'Die KI-Bewertung hat das Zeitlimit überschritten — bitte noch einmal suchen.',
+            type: 'result',
+            total: pool.length,
+            highMatches: 0,
+            newJobs: 0,
+            jobs: pool.filter(j => statusByUrl.get(j.url) !== 'ARCHIVED'),
+            ids: {},
+            semantic: true,
+            rankingFailed: true,
           })
           return
         }

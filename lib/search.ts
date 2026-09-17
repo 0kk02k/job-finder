@@ -64,6 +64,18 @@ export function phaseFitsInBudget(deadline: number | undefined, now: number = Da
   return !deadline || now < deadline - 35_000
 }
 
+// Live-Strom aus der Fläche: Ranking-Chunks liefern ihre Treffer einzeln, die
+// Fläche hängt sie an ihre Liste. Nachfassen derselben URL ersetzt (die result-
+// Zeile wiederholt den Strom als Gesamtpaket), URL-lose fallen weg.
+export function mergeStreamedJobs<T extends { url: string }>(existing: readonly T[], incoming: readonly T[]): T[] {
+  const byUrl = new Map(existing.map(job => [job.url, job]))
+  for (const job of incoming) {
+    if (!job.url) continue
+    byUrl.set(job.url, job)
+  }
+  return [...byUrl.values()]
+}
+
 // Feste Parallelität statt unbegrenztem Promise.all: 50 gleichzeitige KI-Calls
 // erzeugen am Provider Rate-Limit-Staus, aus denen der Suchlauf nicht
 // rechtzeitig zurückkehrt. Ergebnisse bleiben reihengetreu (Index = Eingabe).

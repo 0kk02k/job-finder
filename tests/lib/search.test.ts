@@ -3,7 +3,7 @@
 // Ordnungsfunktionen hier sind rein — sie entscheiden, was gefetcht und gerankt wird.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mapWithConcurrency, mergeJobsByUrl, phaseFitsInBudget, pickFuzzyTerms, pickQueryFan } from '../../lib/search'
+import { mapWithConcurrency, mergeJobsByUrl, mergeStreamedJobs, phaseFitsInBudget, pickFuzzyTerms, pickQueryFan } from '../../lib/search'
 
 test('pickQueryFan trims, dedupes against the original and itself, caps at max', () => {
   const fan = pickQueryFan(
@@ -84,4 +84,26 @@ test('phaseFitsInBudget allows a phase whose worst case still fits before the de
 test('phaseFitsInBudget blocks a phase once its worst case would cross the deadline', () => {
   assert.equal(phaseFitsInBudget(50_000, 15_000), false)
   assert.equal(phaseFitsInBudget(50_000, 49_000), false)
+})
+
+// Der Live-Strom: Ranking-Chunks liefern ihre Treffer einzeln an die Fläche.
+// Der Vertrag: angehängt, nicht dupliziert — und ein Nachfassen derselben URL
+// (result-Zeile ersetzt den Strom) gewinnt.
+test('mergeStreamedJobs appends unseen jobs and keeps order', () => {
+  const a = { url: 'a', title: 'A' }
+  const b = { url: 'b', title: 'B' }
+  assert.deepEqual(mergeStreamedJobs([a], [b]), [a, b])
+})
+
+test('mergeStreamedJobs replaces by URL instead of duplicating', () => {
+  const a1 = { url: 'a', title: 'A aus dem Strom' }
+  const a2 = { url: 'a', title: 'A aus dem Ergebnis' }
+  assert.deepEqual(mergeStreamedJobs([a1], [a2]), [a2])
+})
+
+test('mergeStreamedJobs drops url-less entries and survives empty inputs', () => {
+  const a = { url: 'a', title: 'A' }
+  assert.deepEqual(mergeStreamedJobs([], [a]), [a])
+  assert.deepEqual(mergeStreamedJobs([a], []), [a])
+  assert.deepEqual(mergeStreamedJobs([], [{ url: '', title: 'X' }]), [])
 })
