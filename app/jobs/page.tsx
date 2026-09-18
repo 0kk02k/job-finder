@@ -81,6 +81,9 @@ export default function JobsPage() {
   const [bulkBusy, setBulkBusy] = useState(false)
   // Tastatur-Wegweiser (j/k): der markierte Job folgt der Tastatur, Enter öffnet
   const [highlightId, setHighlightId] = useState<string | null>(null)
+  // Batch-Abbruch auf Wunsch — der Rückstand wird in Etappen abgearbeitet,
+  // aber nie gegen den Willen der Nutzerin
+  const batchAbortRef = useRef(false)
 
   useEffect(() => {
     fetchJobs()
@@ -261,10 +264,12 @@ export default function JobsPage() {
     setBatchRunning(true)
     setBatchDone(0)
     setBatchTotal(unscoredTotal)
+    batchAbortRef.current = false
     try {
       // 20 Läufe à max. 20 Jobs decken jeden Freundeskreis-Rückstand ab; Abbruch,
       // wenn nichts mehr unbewertet ist oder ein Lauf nichts schafft (nur Skipped)
       for (let run = 0; run < 20; run++) {
+        if (batchAbortRef.current) break
         const response = await fetch('/api/jobs/score-batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -459,11 +464,16 @@ export default function JobsPage() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      onClick={() => void runScoreBatch()}
-                      disabled={batchRunning}
+                      onClick={() => {
+                        if (batchRunning) {
+                          batchAbortRef.current = true
+                        } else {
+                          void runScoreBatch()
+                        }
+                      }}
                     >
                       {batchRunning
-                        ? `Bewerte … ${batchDone}/${batchTotal}`
+                        ? `Stoppen (${batchDone}/${batchTotal})`
                         : `Unbewertete bewerten (${unscoredTotal})`}
                     </Button>
                   )}
@@ -515,7 +525,7 @@ export default function JobsPage() {
                 </p>
                 <div className="flex flex-wrap gap-2">
                   <StatusButton label="Beworben" onClick={() => void bulkSetStatus('APPLIED')} active={false} />
-                  <StatusButton label="Gespräch" onClick={() => void bulkSetStatus('INTERVIEW')} active={false} />
+                  <StatusButton label={STATUS_LABELS.INTERVIEW} onClick={() => void bulkSetStatus('INTERVIEW')} active={false} />
                   <StatusButton label="Archiv" onClick={() => void bulkSetStatus('ARCHIVED')} active={false} />
                 </div>
                 <button
@@ -616,7 +626,7 @@ export default function JobsPage() {
                           active={job.status === 'APPLIED'}
                         />
                         <StatusButton
-                          label="Gespräch"
+                          label={STATUS_LABELS.INTERVIEW}
                           onClick={() => updateStatus(job.id, 'INTERVIEW')}
                           active={job.status === 'INTERVIEW'}
                         />

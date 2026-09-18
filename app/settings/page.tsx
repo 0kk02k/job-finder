@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
 // Pure Kern-Modul (ohne AI-SDK) — Client-sicher, wie lib/anecdotes auf der
@@ -201,33 +201,35 @@ export default function SettingsPage() {
   const [baseline, setBaseline] = useState<Settings | null>(null)
 
   function hasUnsavedChanges(): boolean {
-    if (!settings || !baseline) return false
-    return (
-      JSON.stringify(newKeys) !== JSON.stringify(EMPTY_KEYS) ||
-      settings.aiProvider !== baseline.aiProvider ||
-      (settings.aiModel ?? '') !== (baseline.aiModel ?? '') ||
-      (settings.ollamaUrl ?? '') !== (baseline.ollamaUrl ?? '')
-    )
+    return dirty
   }
 
-  useEffect(() => {
-    if (!settings || !baseline) return
-    const dirty =
+  // Ein Dirty-Zustand für alles: Guard, Verbindungstest UND die Fläche teilen
+  // sich dieselbe Rechnung — was der Nutzer sieht, ist was der Browser schützt
+  const dirty = useMemo(() => {
+    if (!settings || !baseline) return false
+    return (
       settings.aiProvider !== baseline.aiProvider ||
       (settings.aiModel ?? '') !== (baseline.aiModel ?? '') ||
       (settings.ollamaUrl ?? '') !== (baseline.ollamaUrl ?? '') ||
       (settings.targetTitles ?? '') !== (baseline.targetTitles ?? '') ||
       (settings.targetLocations ?? '') !== (baseline.targetLocations ?? '') ||
       (settings.minSalary ?? null) !== (baseline.minSalary ?? null) ||
+      (settings.docTemplate ?? '') !== (baseline.docTemplate ?? '') ||
       settings.remote !== baseline.remote ||
       JSON.stringify(newKeys) !== JSON.stringify(EMPTY_KEYS) ||
       [profileName, profileHeadline, profileAbout, profileLocation, profileSkills].some((v) => v !== '')
+    )
+  }, [settings, baseline, newKeys, profileName, profileHeadline, profileAbout, profileLocation, profileSkills])
+
+  useEffect(() => {
+    if (!dirty) return
     const handler = (e: BeforeUnloadEvent) => {
-      if (dirty) e.preventDefault()
+      e.preventDefault()
     }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
-  }, [settings, baseline, newKeys, profileName, profileHeadline, profileAbout, profileLocation, profileSkills])
+  }, [dirty])
 
   async function saveSettings() {
     if (!settings) return
@@ -242,6 +244,7 @@ export default function SettingsPage() {
         targetLocations: settings.targetLocations,
         minSalary: settings.minSalary,
         remote: settings.remote,
+        docTemplate: settings.docTemplate,
       }
       if (newKeys.nebius.trim()) payload.nebiusApiKey = newKeys.nebius.trim()
       if (newKeys.gemini.trim()) payload.geminiApiKey = newKeys.gemini.trim()
@@ -264,9 +267,8 @@ export default function SettingsPage() {
       }
       setBaseline(data)
       await fetchSettings()
-      setBaseline(data)
       setTestResult(null)
-      toast.success('KI-Einstellungen gespeichert')
+      toast.success('Einstellungen gespeichert')
     } catch {
       toast.error('Fehler beim Speichern — prüfe deine Verbindung.')
     } finally {
@@ -451,14 +453,9 @@ export default function SettingsPage() {
                 help="Für LinkedIn-/XING-Jobsuche und Profil-Sync (experimentell). Kostenlos auf apify.com."
               />
 
+              {/* Speichern passiert am einen Save-Punkt unten (sticky) — hier
+                  bleibt der Verbindungstest, der bewusst die gespeicherte Welt prüft */}
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  onClick={saveSettings}
-                  disabled={saving}
-                  className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
-                >
-                  {saving ? 'Wird gespeichert …' : 'KI-Einstellungen speichern'}
-                </button>
                 <button
                   onClick={testConnection}
                   disabled={testing || saving}
@@ -888,17 +885,22 @@ export default function SettingsPage() {
             </div>
           </Section>
 
-          {/* Save — derselbe Payload wie „KI-Einstellungen speichern“ oben; der Button
-              steht hier, damit die Präferenzen nicht ohne sichtbaren Save-Punkt enden */}
-          <div className="flex justify-end">
-            <button
-              onClick={saveSettings}
-              disabled={saving}
-              className="px-8 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Wird gespeichert …' : 'Präferenzen speichern'}
-            </button>
-          </div>
+          {/* Der eine Save-Punkt der Seite: erscheint, sobald es ungespeicherte
+              Änderungen gibt, und klebt am unteren Rand — egal wie weit unten die
+              bearbeitete Sektion liegt. Nach dem Speichern verschwindet er. */}
+          {dirty && !saving && (
+            <div className="sticky bottom-4 z-10 flex justify-end">
+              <div className="flex items-center gap-3 bg-surface rounded-2xl border border-border shadow-sm px-4 py-3">
+                <span className="text-xs text-warning">Ungespeicherte Änderungen</span>
+                <button
+                  onClick={saveSettings}
+                  className="px-5 py-2 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium text-sm transition-colors"
+                >
+                  Speichern
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>

@@ -72,7 +72,16 @@ export default function InterviewPage() {
   }, [])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const bottom = bottomRef.current
+    const container = bottom?.parentElement
+    if (!bottom || !container) return
+    // Nur nachführen, wenn die Nutzerin bereits am unteren Rand liest —
+    // wer hochscrollt (Screenreader, Rückwärtslesen), wird nicht gerissen.
+    // Bewegungsreduktion wird respektiert.
+    const nearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 120
+    if (!nearBottom) return
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    bottom.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' })
   }, [interview?.messages.length])
 
   const [confirmingRestart, setConfirmingRestart] = useState(false)
@@ -450,11 +459,31 @@ export default function InterviewPage() {
                 >
                   {downloadingReport ? 'Wird erzeugt …' : 'Auswertung als PDF'}
                 </button>
+                {/* Derselbe Schutz wie im aktiven Chat: die Akte kostet 15–20
+                    Minuten Antworten — ein Klick darf sie nicht löschen.
+                    confirmingRestart wird hier wiederverwendet, weil beide
+                    Ansichten sich gegenseitig ausschließen */}
+                {confirmingRestart && (
+                  <span className="text-xs text-error" role="status">
+                    Die Akte mit allen Antworten wird gelöscht.
+                  </span>
+                )}
                 <button
-                  onClick={restart}
-                  className="text-sm text-primary hover:text-selection transition-colors"
+                  onClick={() => {
+                    if (confirmingRestart) {
+                      void restart()
+                    } else {
+                      setConfirmingRestart(true)
+                      setTimeout(() => setConfirmingRestart(false), 5000)
+                    }
+                  }}
+                  className={`text-sm transition-colors ${
+                    confirmingRestart
+                      ? 'font-medium text-error'
+                      : 'text-primary hover:text-selection'
+                  }`}
                 >
-                  Neues Interview starten
+                  {confirmingRestart ? 'Wirklich löschen' : 'Neues Interview starten'}
                 </button>
               </div>
             </div>

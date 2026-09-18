@@ -540,58 +540,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* Notiz & Wiedervorlage — dieselben Felder wie im Cockpit: der Überblick
-            dort, das Einzelheim hier, ein Schreibweg */}
-        {job && (
-          <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
-              <h2 className="text-sm font-medium text-primary-soft">Notiz & Wiedervorlage</h2>
-              <label className="flex items-center gap-2 text-sm">
-                <span className="text-primary-soft">Wiedervorlage</span>
-                <input
-                  type="date"
-                  value={followUp}
-                  onChange={(e) => {
-                    setFollowUp(e.target.value)
-                    void saveFollowUp(e.target.value)
-                  }}
-                  aria-label="Wiedervorlage"
-                  className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-foreground text-sm tabular-nums"
-                />
-              </label>
-              {job.followUpAt != null && isDue(job.followUpAt, new Date()) && (
-                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
-                  Fällig
-                </span>
-              )}
-            </div>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              onBlur={() => void saveNotes()}
-              rows={3}
-              placeholder="Gesprächsverlauf, Ansprechpartner, nächster Schritt …"
-              aria-label="Notiz zu diesem Job"
-              className="w-full px-4 py-3 rounded-xl bg-background border border-border text-foreground placeholder:text-primary-soft text-sm leading-relaxed resize-y"
-            />
-          </div>
-        )}
-
-        <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
-          <h2 className="text-sm font-medium text-primary-soft mb-4">
-            Beschreibung
-          </h2>
-          <div className="prose max-w-none">
-            {/* Strukturiert (Entities, Bullets, Satz-Absätze, Anzeigen-Überschriften) gerendert —
-                keine Formatierungsartefakte und keine Textwände aus den Job-Börsen-Feeds */}
-            <MarkdownContent content={structureJobDescription(job.description ?? '')} variant="description" />
-          </div>
-        </div>
-
-        {/* Anschreiben — das Artefakt, das einen Menschen erreicht: KI-Entwurf aus dem echten
-            Lebenslauf, editierbar vor dem Download. Kein stiller Fallback — ein KI-Ausfall
-            wird benannt, die Vorlage ist ausdrücklich als solche markiert. */}
-        <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
+        {/* Bewerben-Gruppe: Anschreiben und Unterlagen bilden den Handlungsweg —
+            direkt unter dem Urteil, nicht zwei Scroll-Screens tief zwischen
+            Notiz und Beschreibung. Anker für Sprunglinks: #bewerben */}
+        <div id="bewerben" className="bg-surface rounded-2xl p-6 border border-border mb-6">
           <h2 className="text-sm font-medium text-primary-soft mb-4">Anschreiben</h2>
 
           {!letter && !letterError && !chooser && (
@@ -836,6 +788,55 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             )}
           </div>
         </div>
+
+        {/* Notiz & Wiedervorlage — dieselben Felder wie im Cockpit: der Überblick
+            dort, das Einzelheim hier, ein Schreibweg */}
+        {job && (
+          <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
+              <h2 className="text-sm font-medium text-primary-soft">Notiz & Wiedervorlage</h2>
+              <label className="flex items-center gap-2 text-sm">
+                <span className="text-primary-soft">Wiedervorlage</span>
+                <input
+                  type="date"
+                  value={followUp}
+                  onChange={(e) => {
+                    setFollowUp(e.target.value)
+                    void saveFollowUp(e.target.value)
+                  }}
+                  aria-label="Wiedervorlage"
+                  className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-foreground text-sm tabular-nums"
+                />
+              </label>
+              {job.followUpAt != null && isDue(job.followUpAt, new Date()) && (
+                <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
+                  Fällig
+                </span>
+              )}
+            </div>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              onBlur={() => void saveNotes()}
+              rows={3}
+              placeholder="Gesprächsverlauf, Ansprechpartner, nächster Schritt …"
+              aria-label="Notiz zu diesem Job"
+              className="w-full px-4 py-3 rounded-xl bg-background border border-border text-foreground placeholder:text-primary-soft text-sm leading-relaxed resize-y"
+            />
+          </div>
+        )}
+
+        <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
+          <h2 className="text-sm font-medium text-primary-soft mb-4">
+            Beschreibung
+          </h2>
+          <div className="prose max-w-none">
+            {/* Strukturiert (Entities, Bullets, Satz-Absätze, Anzeigen-Überschriften) gerendert —
+                keine Formatierungsartefakte und keine Textwände aus den Job-Börsen-Feeds */}
+            <MarkdownContent content={structureJobDescription(job.description ?? '')} variant="description" />
+          </div>
+        </div>
+
       </main>
     </div>
   )

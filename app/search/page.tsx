@@ -334,9 +334,11 @@ function SearchPageContent() {
       if (res.ok) {
         setJustSaved(true)
         fetchSavedSearches()
+      } else {
+        toast.error('Suche konnte nicht gespeichert werden.')
       }
     } catch {
-      // ignore
+      toast.error('Netzwerkfehler — Suche konnte nicht gespeichert werden.')
     }
   }
 
@@ -687,6 +689,19 @@ function SearchPageContent() {
                 <Link href="/so-funktionierts" className="text-selection hover:text-selection-strong">
                   So funktioniert’s
                 </Link>
+              </p>
+            )}
+            {/* Der Speicher-Hebel gehört zum Lauf, nicht nur zu neuen Funden —
+                eine erfolgreiche Suche ohne Neueinträge ist genauso wiederholbar */}
+            {!justSaved && stats.newJobs === 0 && (
+              <p className="sm:col-span-2 text-sm">
+                <button
+                  onClick={saveCurrentSearch}
+                  className="font-medium text-selection hover:text-selection-strong transition-colors"
+                >
+                  + Suche speichern
+                </button>
+                <span className="text-primary-soft"> — später mit einem Klick wiederholen</span>
               </p>
             )}
           </section>
