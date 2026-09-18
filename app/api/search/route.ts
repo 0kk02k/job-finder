@@ -332,7 +332,7 @@ export async function POST(request: NextRequest) {
           if (!resumeContent || index >= SCORE_LIMIT || Date.now() > deadline) return job
           try {
             if (job.description) {
-              const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null, preferences, deadline)
+              const scoreResult = await scoreJob(job.description, resumeContent, aiProvider, aiModel, aiApiKey, aiBaseUrl, settings?.minSalary ?? null, preferences, deadline, job.title)
               if (scoreResult.score === null) return job // AI unreachable — leave unscored
               return {
                 ...job,

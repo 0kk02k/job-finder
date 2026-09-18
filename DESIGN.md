@@ -9,7 +9,7 @@ colors:
   border: "#e7e5e4"
   border-soft: "#f5f5f4"
   stone: "#57534e"
-  stone-soft: "#78716c"
+  stone-soft: "#6b645e"
   ochre: "#b45309"
   ochre-deep: "#92400e"
   ochre-tint: "#f0e2cd"
@@ -125,7 +125,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 | `paper` / `ink` | `#faf9f7` / `#1c1917` | getauscht |
 | `surface` / `surface-elevated` | `#ffffff` / `#ffffff` | `#292524` / `#2d2a28` |
 | `border` / `border-soft` | `#e7e5e4` / `#f5f5f4` | `#44403c` / `#292524` |
-| `stone` / `stone-soft` | `#57534e` / `#78716c` | `#d6d3d1` / `#9d968f` |
+| `stone` / `stone-soft` | `#57534e` / `#6b645e` | `#d6d3d1` / `#9d968f` |
 | `ochre` / `ochre-deep` | `#b45309` / `#92400e` | `#dfa04e` / `#ecb668` |
 | `ochre-tint` / `on-ochre` | `#f0e2cd` / `#ffffff` | `#5c452a` / `#1c1917` |
 | `ink-blue` / `ink-blue-strong` | `#3f5873` / `#32485f` | `#93b2cc` / `#a9c3d9` |
@@ -143,7 +143,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 - **Tusche** (`#1c1917`): Primärtext und dunkler Modus als Hintergrund.
 - **Blatt Weiß** (`#ffffff`): Karten und Nav-Fläche (`bg-surface`), mit Blur über dem Inhalt.
 - **Haarkante** (`#e7e5e4`) und **Papiernaht** (`#f5f5f4`): 1px-Borders erster und zweiter Ordnung; Papiernaht ist auch die Sekundär-Button-Füllung.
-- **Stein** (`#57534e`) und **Weicher Stein** (`#78716c`): Sekundär- und Tertiärtext — Hierarchie über drei Textstufen, nie über Grau-Willkür.
+- **Stein** (`#57534e`) und **Weicher Stein** (`#6b645e`): Sekundär- und Tertiärtext — Hierarchie über drei Textstufen, nie über Grau-Willkür. Weicher Stein hält auf Papier, Weiß und den gedämpften Tints ≥ 4.5:1 (AA).
 
 ### Semantic (Muted Signals)
 - **Moos** (`#55724f`): Erfolg — Score ≥ 8, „Top Match", „Angebot".

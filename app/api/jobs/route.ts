@@ -157,7 +157,9 @@ export async function POST(request: NextRequest) {
         baseUrl,
         settings?.minSalary ?? null,
         // Nur zukünftige Bewertungen sehen das Profil — bestehende Scores bleiben
-        parseStoredProfile(settings?.preferenceProfile)
+        parseStoredProfile(settings?.preferenceProfile),
+        undefined, // deadline: Einzelscore hat keine Gesamtfrist
+        job.title
       )
       // score is null when the AI was unreachable — keep the job unscored then
       if (scoreResult.score !== null) {

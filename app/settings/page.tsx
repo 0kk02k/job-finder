@@ -151,10 +151,10 @@ export default function SettingsPage() {
         setSyncPassword('')
         fetchSyncStatus()
       } else {
-        toast.error(data.error || 'Sync fehlgeschlagen')
+        toast.error(data.error || 'Abgleich fehlgeschlagen')
       }
     } catch {
-      toast.error('Sync fehlgeschlagen — bitte später erneut versuchen')
+      toast.error('Abgleich fehlgeschlagen — bitte später erneut versuchen')
     } finally {
       setSyncing(false)
     }
@@ -262,7 +262,7 @@ export default function SettingsPage() {
       })
       const data = await response.json().catch(() => undefined)
       if (!response.ok) {
-        toast.error(data?.error || 'Fehler beim Speichern')
+        toast.error(data?.error || 'Speichern fehlgeschlagen — versuch es erneut.')
         return
       }
       setBaseline(data)
@@ -270,7 +270,7 @@ export default function SettingsPage() {
       setTestResult(null)
       toast.success('Einstellungen gespeichert')
     } catch {
-      toast.error('Fehler beim Speichern — prüfe deine Verbindung.')
+      toast.error('Speichern fehlgeschlagen — prüfe deine Verbindung.')
     } finally {
       setSaving(false)
     }
@@ -287,7 +287,7 @@ export default function SettingsPage() {
       const response = await fetch('/api/settings/test', { method: 'POST' })
       const data = await response.json().catch(() => undefined)
       if (response.ok && data?.ok) {
-        setTestResult({ ok: true, message: `Verbindung steht — Modell: ${data.model}` })
+        setTestResult({ ok: true, message: `Verbindung steht — die KI antwortet (Modell: ${data.model})` })
       } else {
         setTestResult({ ok: false, message: data?.error || 'Der Verbindungstest ist fehlgeschlagen.' })
       }
@@ -317,10 +317,10 @@ export default function SettingsPage() {
       if (response.ok) {
         toast.success('Profil gespeichert')
       } else {
-        toast.error('Fehler beim Speichern')
+        toast.error('Speichern fehlgeschlagen — versuch es erneut.')
       }
     } catch {
-      toast.error('Fehler beim Speichern — prüfe deine Verbindung.')
+      toast.error('Speichern fehlgeschlagen — prüfe deine Verbindung.')
     } finally {
       setSavingProfile(false)
     }
@@ -376,10 +376,10 @@ export default function SettingsPage() {
 
   // Ein Key-Feld pro Provider statt einer Fünf-Felder-Wand
   const keyFieldFor: Record<string, { key: keyof NewKeys; label: string; hint?: string | null; help: string } | null> = {
-    nebius: { key: 'nebius', label: 'Nebius API-Key', hint: settings.nebiusKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
-    gemini: { key: 'gemini', label: 'Google Gemini API-Key', hint: settings.geminiKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
-    openai: { key: 'openai', label: 'OpenAI API-Key', hint: settings.openaiKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
-    openrouter: { key: 'openrouter', label: 'OpenRouter API-Key', hint: settings.openrouterKeyHint, help: 'Wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    nebius: { key: 'nebius', label: 'KI-Schlüssel (Nebius)', hint: settings.nebiusKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    gemini: { key: 'gemini', label: 'KI-Schlüssel (Google Gemini)', hint: settings.geminiKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    openai: { key: 'openai', label: 'KI-Schlüssel (OpenAI)', hint: settings.openaiKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    openrouter: { key: 'openrouter', label: 'KI-Schlüssel (OpenRouter)', hint: settings.openrouterKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
     ollama: null,
   }
   const activeKeyField = keyFieldFor[settings.aiProvider] ?? null
@@ -391,7 +391,7 @@ export default function SettingsPage() {
 
         <div className="space-y-12">
           {/* KI-Einstellungen */}
-          <Section title="KI-Einstellungen" description="Anbieter und Schlüssel für Suche, Bewertung und Anschreiben">
+          <Section title="KI-Einstellungen" description="Wer die KI stellt und wie sie sich bei ihm ausweist — für Suche, Bewertung und Anschreiben">
             <div className="space-y-6">
               <div>
                 <label htmlFor="settings-provider" className="block text-sm font-medium text-foreground mb-2">KI-Anbieter</label>
@@ -401,31 +401,35 @@ export default function SettingsPage() {
                   onChange={(e) => setSettings({ ...settings, aiProvider: e.target.value })}
                   className="w-full px-4 py-3 rounded-xl border border-border bg-background text-foreground"
                 >
-                  <option value="nebius">Nebius Token Factory (Kimi K3)</option>
-                  <option value="ollama">Ollama (lokal)</option>
+                  <option value="nebius">Nebius (Standard — ein Schlüssel genügt)</option>
+                  <option value="ollama">Ollama (KI läuft auf deinem Rechner)</option>
                   <option value="gemini">Google Gemini</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="openrouter">OpenRouter</option>
+                  <option value="openai">OpenAI (die KI hinter ChatGPT)</option>
+                  <option value="openrouter">OpenRouter (bündelt viele KIs)</option>
                 </select>
+                <p className="mt-2 text-xs text-primary-soft">
+                  Die App braucht eine KI, um Jobs zu bewerten und Anschreiben zu schreiben.
+                  Bei wem sie dafür anklopft, wählst du hier.
+                </p>
               </div>
 
               <InputField
-                label="KI-Modell (optional)"
+                label="Konkretes KI-Modell (optional — normalerweise frei lassen)"
                 type="text"
                 value={settings.aiModel || ''}
                 onChange={(v) => setSettings({ ...settings, aiModel: v })}
                 placeholder="moonshotai/Kimi-K3"
-                help="Nur ändern, wenn die Bewertungen fehlschlagen — dann lohnt ein Blick auf die Modell-ID beim Anbieter."
+                help="Jeder Anbieter führt mehrere KIs mit kryptischen Namen. Die App weiß, welche sie nehmen soll — ändere das hier nur, wenn die Bewertungen fehlschlagen und du beim Anbieter eine neue Modell-ID findest."
               />
 
               {settings.aiProvider === 'ollama' && (
                 <InputField
-                  label="Ollama-URL"
+                  label="Adresse der lokalen KI (Ollama)"
                   type="text"
                   value={settings.ollamaUrl || ''}
                   onChange={(v) => setSettings({ ...settings, ollamaUrl: v })}
                   placeholder="http://localhost:11434"
-                  help="Ollama muss lokal laufen — kostenlos und ohne API-Key, aber langsamer."
+                  help="Ollama ist ein kostenloses Programm, das die KI auf deinem eigenen Rechner laufen lässt — privat, ohne Schlüssel, aber langsamer. Diese Adresse stimmt meist unverändert."
                 />
               )}
 
@@ -437,20 +441,20 @@ export default function SettingsPage() {
                   onChange={(v) => setNewKeys({ ...newKeys, [activeKeyField.key]: v })}
                   placeholder={
                     activeKeyField.hint
-                      ? `Gespeichert: ${activeKeyField.hint} — leer lassen zum Behalten`
-                      : 'Noch kein Key hinterlegt'
+                      ? `Bereits hinterlegt: ${activeKeyField.hint} — zum Behalten leer lassen`
+                      : 'Noch kein Schlüssel hinterlegt'
                   }
                   help={activeKeyField.help}
                 />
               )}
 
               <InputField
-                label="Apify API-Key (optional)"
+                label="Schlüssel für Apify (optional)"
                 type="password"
                 value={newKeys.apify}
                 onChange={(v) => setNewKeys({ ...newKeys, apify: v })}
-                placeholder={settings.apifyKeyHint ? `Gespeichert: ${settings.apifyKeyHint} — leer lassen zum Behalten` : 'Noch kein Key hinterlegt'}
-                help="Für LinkedIn-/XING-Jobsuche und Profil-Sync (experimentell). Kostenlos auf apify.com."
+                placeholder={settings.apifyKeyHint ? `Bereits hinterlegt: ${settings.apifyKeyHint} — zum Behalten leer lassen` : 'Noch kein Schlüssel hinterlegt'}
+                help="Apify ist ein Dienst, der LinkedIn und XING nach Stellen durchsucht und dein Profil abgleicht (versuchsweise). Den Schlüssel bekommst du kostenlos auf apify.com."
               />
 
               {/* Speichern passiert am einen Save-Punkt unten (sticky) — hier
@@ -481,7 +485,7 @@ export default function SettingsPage() {
           </Section>
 
           {/* Profil-Optimierung */}
-          <Section title="Profil-Optimierung">
+          <Section title="Profil-Optimierung" description="Dein öffentliches Profil pflegen — und mit KI auf deine Wunschberufe zuschneiden lassen.">
             <div className="space-y-6">
               <div>
                 <label htmlFor="profile-platform" className="block text-sm font-medium text-foreground mb-2">Plattform</label>
@@ -506,7 +510,7 @@ export default function SettingsPage() {
               />
 
               <InputField
-                label="Headline"
+                label="Headline (dein Satz unter dem Namen)"
                 type="text"
                 value={profileHeadline}
                 onChange={setProfileHeadline}
@@ -534,7 +538,7 @@ export default function SettingsPage() {
               </div>
 
               <InputField
-                label="Stärken und Skills (kommagetrennt)"
+                label="Stärken und Fähigkeiten (kommagetrennt)"
                 type="text"
                 value={profileSkills}
                 onChange={setProfileSkills}
@@ -554,7 +558,7 @@ export default function SettingsPage() {
                   disabled={optimizing || !profileName}
                   className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
                 >
-                  {optimizing ? 'Optimiert …' : 'KI-Optimierung'}
+                  {optimizing ? 'Optimiert …' : 'Mit KI verbessern'}
                 </button>
               </div>
 
@@ -563,7 +567,7 @@ export default function SettingsPage() {
                 <div className="mt-6 space-y-4 p-6 bg-background rounded-xl border border-border-soft">
                   <div className="flex items-center gap-3">
                     <span className="text-3xl font-light text-primary tabular-nums">{optimization.overallScore}</span>
-                    <span className="text-sm text-primary-soft">/ 100 Profil-Score</span>
+                    <span className="text-sm text-primary-soft">/ 100 Punkte</span>
                   </div>
 
                   {optimization.strengths?.length > 0 && (
@@ -606,7 +610,7 @@ export default function SettingsPage() {
 
                   {optimization.missingSkills?.length > 0 && (
                     <div>
-                      <h3 className="text-sm font-medium text-foreground mb-2">Fehlende Skills</h3>
+                      <h3 className="text-sm font-medium text-foreground mb-2">Fehlende Fähigkeiten</h3>
                       <div className="flex flex-wrap gap-2">
                         {optimization.missingSkills.map((s: string, i: number) => (
                           <span key={i} className="text-xs bg-border-soft text-foreground px-3 py-1.5 rounded-full">{s}</span>
@@ -620,12 +624,13 @@ export default function SettingsPage() {
           </Section>
 
           {/* Portal-Sync */}
-          <Section title="Portal-Sync (experimentell)">
+          <Section title="Profil-Abgleich mit Jobportalen (versuchsweise)">
             <div className="space-y-6">
               <div className="p-4 bg-warning/10 rounded-xl border border-warning/20">
                 <p className="text-sm text-warning">
-                  Der Sync nutzt Browser-Automatisierung und kann durch Schutzmaßnahmen oder
-                  Zwei-Faktor-Anmeldung fehlschlagen. Passwörter werden verschlüsselt gespeichert.
+                  Die App meldet sich dabei wie ein Browser bei deinem Portal an. Das kann
+                  fehlschlagen, wenn das Portal Schutzabfragen oder eine Zwei-Faktor-Anmeldung
+                  verlangt. Dein Passwort wird verschlüsselt gespeichert.
                 </p>
               </div>
 
@@ -856,31 +861,31 @@ export default function SettingsPage() {
           </Section>
 
           {/* Job-Quellen */}
-          <Section title="Job-Quellen" description="Zusätzliche Anbieter für die Jobsuche — ohne Angaben durchsucht die Suche Arbeitsagentur, Remotive und Arbeitnow">
+          <Section title="Job-Quellen" description="Zusätzliche Stellen-Sammlungen — ohne Angaben sucht die App bei der Arbeitsagentur, Remotive und Arbeitnow">
             <div className="space-y-6">
               <InputField
-                label="Jooble API-Key (optional)"
+                label="Schlüssel für Jooble (optional)"
                 type="password"
                 value={newKeys.jooble}
                 onChange={(v) => setNewKeys({ ...newKeys, jooble: v })}
-                placeholder={settings.joobleKeyHint ? `Gespeichert: ${settings.joobleKeyHint} — leer lassen zum Behalten` : 'Noch kein Key hinterlegt'}
-                help="Bündelt Stellen aus Hunderten deutschen Börsen. Kostenloser Key auf jooble.org/api."
+                placeholder={settings.joobleKeyHint ? `Bereits hinterlegt: ${settings.joobleKeyHint} — zum Behalten leer lassen` : 'Noch kein Schlüssel hinterlegt'}
+                help="Jooble sammelt Stellen aus hunderten deutschen Jobbörsen an einem Ort. Den Schlüssel bekommst du kostenlos auf jooble.org/api — dort heißt er „API key“, gemeint ist genau das."
               />
               <InputField
                 label="Adzuna App-ID (optional)"
                 type="text"
                 value={newKeys.adzunaAppId}
                 onChange={(v) => setNewKeys({ ...newKeys, adzunaAppId: v })}
-                placeholder={settings.adzunaAppIdHint ? `Gespeichert: ${settings.adzunaAppIdHint} — leer lassen zum Behalten` : 'Noch keine App-ID hinterlegt'}
-                help="Die App-ID ist kein Geheimnis, gehört aber zum App-Key — erst zusammen aktiv."
+                placeholder={settings.adzunaAppIdHint ? `Bereits hinterlegt: ${settings.adzunaAppIdHint} — zum Behalten leer lassen` : 'Noch keine App-ID hinterlegt'}
+                help="Adzuna bringt deutsche Stellen mit Gehaltsangaben in die Suche. Du bekommst zwei Angaben, die zusammengehören: diese ID und den Schlüssel darunter. Die ID ist kein Geheimnis — aber erst beide zusammen schalten die Quelle frei."
               />
               <InputField
-                label="Adzuna App-Key (optional)"
+                label="Adzuna-Schlüssel (App-Key, optional)"
                 type="password"
                 value={newKeys.adzunaAppKey}
                 onChange={(v) => setNewKeys({ ...newKeys, adzunaAppKey: v })}
-                placeholder={settings.adzunaAppKeyHint ? `Gespeichert: ${settings.adzunaAppKeyHint} — leer lassen zum Behalten` : 'Noch kein Key hinterlegt'}
-                help="Bringt deutsche Stellen mit Gehaltsangaben in die Suche. Kostenlos auf developer.adzuna.com."
+                placeholder={settings.adzunaAppKeyHint ? `Bereits hinterlegt: ${settings.adzunaAppKeyHint} — zum Behalten leer lassen` : 'Noch kein Schlüssel hinterlegt'}
+                help="Der zweite Teil des Adzuna-Zugangs — gemeinsam mit der ID oben. Kostenlos auf developer.adzuna.com."
               />
             </div>
           </Section>

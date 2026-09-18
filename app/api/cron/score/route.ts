@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       },
       jobs: {
         where: { score: null, status: { notIn: [JobStatus.ARCHIVED, JobStatus.REJECTED] } },
-        select: { id: true, description: true, score: true, createdAt: true },
+        select: { id: true, title: true, description: true, score: true, createdAt: true },
         orderBy: { createdAt: 'asc' },
         take: BATCH_LIMIT,
       },
@@ -87,7 +87,9 @@ export async function GET(request: NextRequest) {
               apiKey,
               baseUrl,
               settings?.minSalary ?? null,
-              parseStoredProfile(settings?.preferenceProfile)
+              parseStoredProfile(settings?.preferenceProfile),
+              undefined, // deadline: Cron-Lauf hat eigene Budgetlogik
+              job.title
             )
             return { job, result }
           } catch {

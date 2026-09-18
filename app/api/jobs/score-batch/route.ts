@@ -63,7 +63,9 @@ export async function POST(request: NextRequest) {
             baseUrl,
             settings?.minSalary ?? null,
             // Nur zukünftige Bewertungen sehen das Profil — bestehende Scores bleiben
-            parseStoredProfile(settings?.preferenceProfile)
+            parseStoredProfile(settings?.preferenceProfile),
+            undefined, // deadline: Batch hat keine Gesamtfrist
+            job.title
           )
           if (result.score === null) return 'failed' as const
           await prisma.job.update({

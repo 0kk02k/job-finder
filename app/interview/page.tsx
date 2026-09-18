@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { MarkdownContent } from '../components/Markdown'
+import { Card } from '../components/ui'
 import { COMPETENCIES } from '@/lib/competencies'
 
 interface Message {
@@ -252,33 +253,37 @@ export default function InterviewPage() {
           </section>
         )}
 
-        {/* 16Personalities CTA — immer sichtbar */}
-        <section className="bg-surface rounded-2xl p-8 border border-border shadow-sm mb-8">
+        {/* Vorbereitungs-Tipp: 16Personalities — ruhige Erklärbox im
+            Startbereich, bevor das Gespräch läuft */}
+        <Card className="p-8 mb-8 shadow-sm">
           <h2 className="text-lg font-medium text-foreground mb-2">
-            Ergänze deine Akte: 16Personalities
+            Vorbereitungs-Tipp: Dein Persönlichkeitstyp
           </h2>
-          <p className="text-sm text-primary-soft mb-4">
-            Mache den kostenlosen Test (ca. 10 Minuten) und trage deinen Typ hier ein.
-            Hinweis: Der Test ist ein Selbstbild, keine wissenschaftliche Auswahl-Diagnostik —
-            er liefert vor allem gutes Vokabular für deine Selbstbeschreibung.
+          <p className="text-sm text-primary-soft leading-relaxed mb-4">
+            Im HR-Interview kommen fast immer Fragen nach deinem Typ: Was sind deine Stärken?
+            Wo wird es schwierig? Wie arbeitest du im Team? Der kostenlose 16Personalities-Test
+            (etwa 10 Minuten) beschreibt deinen Typ in Alltagsworten — wer diese Beschreibung
+            vorab kennt, beantwortet solche Fragen ruhiger und mit passenden Worten. Der Test
+            ist ein Selbstbild und keine wissenschaftliche Diagnose, aber ein ehrlicher
+            Vorbereitungs-Hebel.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
             <a
-              href="https://www.16personalities.com/de"
+              href="https://www.16personalities.com/"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center px-6 py-3 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium transition-colors"
             >
-              Test starten →
+              Kostenlosen Test öffnen (neues Fenster) ↗
             </a>
             <form onSubmit={savePersonalityType} className="flex gap-2 flex-1">
               <input
                 type="text"
                 value={personalityType}
                 onChange={(e) => setPersonalityType(e.target.value)}
-                placeholder={savedType ? `Gespeichert: ${savedType}` : 'z.B. INFJ-T'}
+                placeholder={savedType ? `In der Akte: ${savedType}` : 'Optional — dein Typ, z. B. INFJ-T'}
                 maxLength={6}
-                aria-label="16Personalities-Typ eintragen"
+                aria-label="16Personalities-Typ eintragen (optional)"
                 className="flex-1 px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft"
               />
               <button
@@ -294,7 +299,7 @@ export default function InterviewPage() {
               Dein Typ {savedType} ist in deiner Akte hinterlegt.
             </p>
           )}
-        </section>
+        </Card>
 
         {/* Intro / Start */}
         {!isActive && !isCompleted && (

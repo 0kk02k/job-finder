@@ -3,7 +3,7 @@
 // Getestet wird der Prompt-Vertrag — die KI selbst ist außen vor (lokal kein Key).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { attemptTimeoutMs, buildCoverLetterPrompt, buildScorePrompt, buildSearchQueryPrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, noThinkingFetch, scoringModel } from '../../lib/ai'
+import { attemptTimeoutMs, buildCoverLetterPrompt, buildScorePrompt, buildSearchQueryPrompt, buildSemanticRankingPrompt, buildTranslateResumePrompt, defaultModel, demoteEntryLevelSemanticMatch, detectEntryLevelRole, entryLevelRoleVerdict, noThinkingFetch, scoringModel } from '../../lib/ai'
 import type { PreferenceProfile } from '../../lib/preferences'
 
 const PROFILE: PreferenceProfile = {
@@ -218,4 +218,106 @@ test('search query prompt biases toward preferences and forbids negations', () =
   assert.match(withPrefs, /keine Negationen|Keine Negationen/)
   assert.match(withPrefs, /LEBENSLAUF/)
   assert.ok(!without.includes('PRÄFERENZEN'), 'ohne Profil unverändert')
+})
+
+// --- Eligibility: Werkstudenten-/Praktikums-Erkennung ----------------------
+// Der Nutzer sucht Vollzeit-Festanstellung — solche Stellen bekommen einen
+// gedeckelten Score mit Begründung statt eines KI-Scores. Getestet wird der
+// deterministische Vertrag (kein LLM-Mock nötig, Muster wie oben).
+test('Werkstudent im Titel — erkannt und auf den Cap-Score gedeckelt', () => {
+  const verdict = entryLevelRoleVerdict('Werkstudent (m/w/d) im Bereich Softwareentwicklung', 'Wir suchen Unterstützung für unser Team.')
+  assert.ok(verdict)
+  assert.equal(verdict.score, 3)
+  assert.match(verdict.reason, /Werkstudenten-Stelle/)
+  assert.match(verdict.reason, /gedeckelt/)
+})
+
+test('Werkstudierende-Varianten im Titel werden erkannt', () => {
+  for (const title of ['Werkstudierende (m/w/d) Finance', 'Werkstudent:in Datenanalyse', 'Werkstudenten (f/m/d) Marketing']) {
+    assert.ok(detectEntryLevelRole(title), `Titel sollte erkannt werden: ${title}`)
+  }
+})
+
+test('Senior Software Engineer — keine Signale, Bewertung bleibt unverändert', () => {
+  assert.equal(detectEntryLevelRole('Senior Software Engineer', 'Wir suchen eine:n erfahrene:n Entwickler:in für unser Backend-Team.'), null)
+  assert.equal(entryLevelRoleVerdict('Senior Software Engineer', 'Vollzeit, unbefristet.'), null)
+})
+
+test('Praktikum Softwareentwicklung — erkannt und gedeckelt', () => {
+  const verdict = entryLevelRoleVerdict('Praktikum Softwareentwicklung', 'Du unterstützt unser Team für 6 Monate.')
+  assert.ok(verdict)
+  assert.equal(verdict.score, 3)
+  assert.match(verdict.reason, /Praktikum/)
+})
+
+test('Praktikum (6 Monate) als Mischform im Titel wird erkannt', () => {
+  const verdict = entryLevelRoleVerdict('Praktikum (6 Monate) im Projektmanagement', 'Beschreibung ohne weitere Signale.')
+  assert.ok(verdict)
+  assert.equal(verdict.score, 3)
+})
+
+test('Normaler Job ohne Signale bleibt unverändert', () => {
+  assert.equal(
+    detectEntryLevelRole('Product Manager', 'Du verantwortest die Roadmap unseres B2B-Produkts und arbeitest eng mit Engineering zusammen.'),
+    null
+  )
+})
+
+test('Signale nur im Fließtext: Kontextwort nötig, „Werkstudent (m/w/d)" reicht', () => {
+  assert.ok(
+    detectEntryLevelRole('Softwareentwickler', 'Zur Verstärkung unseres Teams suchen wir ab sofort einen Werkstudenten (m/w/d).'),
+    'Beschreibung mit Werkstudent (m/w/d) sollte erkannt werden'
+  )
+  assert.ok(
+    detectEntryLevelRole('Projektassistent', 'Wir bieten ein Praktikum (6 Monate) mit Option auf Übernahme.'),
+    'Beschreibung mit „Praktikum (6 Monate)" sollte erkannt werden'
+  )
+})
+
+test('Fließtext-Guard: „intern und extern" ist kein Internship-Signal', () => {
+  assert.equal(
+    detectEntryLevelRole('Key Account Manager', 'Sie koordinieren intern und extern mit Kunden und Dienstleistern.'),
+    null,
+    'das Adjektiv „intern" darf nicht als Internship zählen'
+  )
+})
+
+test('Trainee wird nur abgewertet, nicht verworfen — Vollzeit-Einstieg bleibt sichtbar', () => {
+  const verdict = entryLevelRoleVerdict('Trainee (m/w/d) Consulting', 'Vollzeit, 18 Monate, unbefristet danach.')
+  assert.ok(verdict, 'Trainee sollte erkannt werden')
+  assert.equal(verdict.score, 3)
+  assert.match(verdict.reason, /Trainee/)
+})
+
+test('semantic match mit Werkstudent-Signal wird unter die Speicherschwelle gedrückt', () => {
+  const demoted = demoteEntryLevelSemanticMatch({
+    title: 'Werkstudent Softwareentwicklung',
+    company: 'F',
+    location: 'L',
+    description: 'D',
+    url: 'u',
+    platform: 'p',
+    relevanceScore: 0.92,
+    matchReason: 'Skills matchen sehr gut',
+    transferableSkills: ['TypeScript'],
+  })
+  assert.equal(demoted.relevanceScore, 0.3)
+  assert.match(demoted.matchReason, /Abgewertet/)
+  assert.match(demoted.matchReason, /Werkstudenten-Stelle/)
+  assert.deepEqual(demoted.transferableSkills, ['TypeScript'], 'die übrigen Felder bleiben unangetastet')
+})
+
+test('semantic match ohne Signale bleibt unverändert', () => {
+  const job = {
+    title: 'Senior Software Engineer',
+    company: 'F',
+    location: 'L',
+    description: 'D',
+    url: 'u',
+    platform: 'p',
+    relevanceScore: 0.92,
+    matchReason: 'Sehr gute Skill-Überdeckung',
+    transferableSkills: ['TypeScript'],
+  }
+  assert.equal(demoteEntryLevelSemanticMatch(job), job)
 })

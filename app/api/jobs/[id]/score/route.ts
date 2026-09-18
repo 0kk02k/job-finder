@@ -53,7 +53,9 @@ export async function POST(
       baseUrl,
       settings?.minSalary ?? null,
       // Nur zukünftige Bewertungen sehen das Profil — bestehende Scores bleiben
-      parseStoredProfile(settings?.preferenceProfile)
+      parseStoredProfile(settings?.preferenceProfile),
+      undefined, // deadline: Einzelscore hat keine Gesamtfrist
+      job.title
     )
     // Ehrlich statt erfunden: ohne erreichbare KI gibt es keinen Score (Produktprinzip)
     if (result.score === null) {

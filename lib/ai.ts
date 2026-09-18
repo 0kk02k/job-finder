@@ -272,6 +272,20 @@ Gib zurück als JSON:
 Antworte kompakt: matchReason in max. 1 Satz, transferableSkills mit max. 3 Skills — die Antwortzeit entscheidet, ob das Ranking ins Zeitlimit passt.`
 }
 
+// Erkannte Werkstudent-/Praktikums-Stellen im semantischen Ranking abwerten:
+// relevanceScore unter den Speicher-/High-Match-Schwellen (0.7 → nicht
+// gespeichert), mit Begründungs-Präfix statt verworfen — derselbe Vertrag
+// wie im scoreJob-Cap, nur auf der 0-1-Relevanz-Skala.
+export function demoteEntryLevelSemanticMatch(job: SemanticJob): SemanticJob {
+  const label = detectEntryLevelRole(job.title, job.description)
+  if (!label) return job
+  return {
+    ...job,
+    relevanceScore: Math.min(job.relevanceScore, 0.3),
+    matchReason: `Abgewertet — „${label}" erkannt: ${job.matchReason}`,
+  }
+}
+
 // Semantic job search - finds jobs that match even with different titles
 export async function semanticJobSearch(
   resume: string,
@@ -324,6 +338,9 @@ export async function semanticJobSearch(
         matchReason: typeof m.matchReason === 'string' ? m.matchReason : '',
         transferableSkills: Array.isArray(m.transferableSkills) ? m.transferableSkills : [],
       }))
+      // Werkstudent-/Praktikums-Signale auch im Ranking abwerten: unter den
+      // Speicher-Schwellen (0.7) und ans Ende sortiert, aber sichtbar.
+      .map(demoteEntryLevelSemanticMatch)
 
     return {
       query: searchQuery,
@@ -412,10 +429,79 @@ export function scoringChat(provider: string, apiKey?: string, baseUrl?: string,
   return ai.chat(scoringModel(provider, userModel))
 }
 
+// --- Erkennung von Werkstudenten-/Praktikums-Signalen -----------------------
+// Kernversprechen der App: „breit suchen, aber passend zu den Kompetenzen
+// jenseits von Labels". Eine Werkstudenten-Stelle, deren Skills perfekt matchen,
+// ist genau so ein Label-Fehlgriff — sie bekam Score 9, obwohl der Nutzer eine
+// Vollzeit-Festanstellung sucht. Solche Anzeigen werden deshalb nicht verworfen
+// (der Nutzer soll im UI nachvollziehen können, was passiert ist, und sie ggf.
+// manuell prüfen), sondern auf ENTRY_LEVEL_ROLE_MAX_SCORE gedeckelt — mit
+// Begründung in `reason`, die landet in Job.scoreReason.
+// Trainee ist hier bewusst MIT im Muster: Es ist oft eine echte
+// Vollzeit-Einstiegsrolle — ein harter Filter würde sie falsch verwerfen. Da
+// wir aber nur abwerten statt filtern, bleibt eine Trainee-Stelle sichtbar,
+// rutscht nur ans Ende des Rankings. Sollte das Profil je eine
+// Teilzeit-Präferenz bekommen, ist diese Stelle der einzige Knopf dafür.
+const ENTRY_LEVEL_ROLE_MAX_SCORE = 3
+
+// Titel-Signale: Wortgrenzen + Endungen, damit „Werkstudent (m/w/d)",
+// „Praktikum (6 Monate)", „Praktikant:in" und „Working Student" alle erfasst
+// werden. „intern" steht im Titel einer echten Anzeige praktisch nie als
+// Adjektiv („Intern, Finance" ist ein Internship) — im Titel also erlaubt.
+const ENTRY_ROLE_TITLE_PATTERN =
+  /\b(?:werkstud(?:ent|ierende)[a-z]*|praktikum[a-z]*|praktikant[a-z]*|intern(?:ship)?s?|working[ -]student[a-z]*|trainee[a-z]*)\b/i
+
+// Fließtext-Signale: hier darf „intern" NICHT frei stehen — „Sie koordinieren
+// intern und extern" ist ein klassisches Falsch-Positiv. Deshalb nur
+// „internship" plus ein Kontextwort in Laufnähe (max. 40 Zeichen), z. B.
+// „Werkstudent (m/w/d)", „ein Praktikum ab sofort", „Praktikum (6 Monate)".
+const ENTRY_ROLE_DESC_PATTERN =
+  /\b(?:werkstud(?:ent|ierende)[a-z]*|praktikum[a-z]*|praktikant[a-z]*|internship|working[ -]student[a-z]*|trainee[a-z]*)\b(?=[\s\S]{0,40}?(?:\(|\[|m\/w\/d|m\/f\/d|f\/m\/d|gesucht|stelle|position|role|ab sofort|monat))/i
+
+function entryLevelRoleLabel(matched: string): string {
+  const t = matched.toLowerCase()
+  if (t.includes('praktik')) return 'Praktikum'
+  if (t.startsWith('werkstud') || t.includes('working')) return 'Werkstudenten-Stelle'
+  if (t.includes('trainee')) return 'Trainee-Stelle'
+  return 'Internship'
+}
+
+// Erkannte Einstiegs-/Nebenjob-Signale als lesbare Kategorie — null heißt:
+// keine Signale, die Bewertung bleibt unverändert. Rein deterministisch,
+// damit getestet werden kann, ohne die KI zu brauchen.
+export function detectEntryLevelRole(title: string, description?: string | null): string | null {
+  const titleMatch = title?.match(ENTRY_ROLE_TITLE_PATTERN)
+  if (titleMatch) return entryLevelRoleLabel(titleMatch[0])
+  const descMatch = description?.match(ENTRY_ROLE_DESC_PATTERN)
+  if (descMatch) return entryLevelRoleLabel(descMatch[0])
+  return null
+}
+
+// Der gedeckelte Score für eine erkannte Werkstudenten-/Praktikums-Stelle.
+// Bewusst ohne KI-Call: die Antwort ist deterministisch und spart der breiten
+// Suche einen LLM-Call pro erkannter Stelle. strengths/gaps bleiben leer —
+// die Begründung steht komplett in `reason`.
+export function entryLevelRoleVerdict(title: string, description?: string | null): ScoreResult | null {
+  const label = detectEntryLevelRole(title, description)
+  if (!label) return null
+  return {
+    score: ENTRY_LEVEL_ROLE_MAX_SCORE,
+    reason:
+      `Stark abgewertet (Score gedeckelt bei ${ENTRY_LEVEL_ROLE_MAX_SCORE}): „${label}" in Titel oder Anzeige erkannt. ` +
+      'Der Nutzer sucht eine Vollzeit-Festanstellung — Werkstudenten-Stellen, Praktika und Internships passen nicht zum Zielprofil, ' +
+      'auch wenn die Skills matchen. Bewusst nur abgewertet statt verworfen — im Zweifel manuell prüfen.',
+    gaps: [],
+    strengths: [],
+  }
+}
+
 // Score job against resume (enhanced with transferable skills)
 // minSalary: Wunscheinstellung aus den Settings — als Kontext in die Bewertung,
 // damit die gespeicherte Einstellung eine Wirkung hat statt nur zu existieren.
 // preferences: Profil aus dem Präferenz-Gespräch (UserSettings.preferenceProfile).
+// jobTitle: nötig für die Werkstudent-/Praktikums-Erkennung — die Beschreibung
+// allein trägt den Signal-Titel oft nicht (Score-Vertrag bleibt unverändert,
+// solange kein Titel übergeben wird).
 export async function scoreJob(
   jobDescription: string,
   resume: string,
@@ -425,8 +511,14 @@ export async function scoreJob(
   baseUrl?: string,
   minSalary?: number | null,
   preferences?: PreferenceProfile | null,
-  deadline?: number
+  deadline?: number,
+  jobTitle?: string
 ): Promise<ScoreResult> {
+  // Eligibility vor dem LLM-Call: erkannte Werkstudenten-/Praktikums-Stellen
+  // bekommen den gedeckelten Score mit Begründung — ohne KI-Call.
+  const eligibilityVerdict = entryLevelRoleVerdict(jobTitle ?? '', jobDescription)
+  if (eligibilityVerdict) return eligibilityVerdict
+
   const prompt = buildScorePrompt(jobDescription, resume, minSalary, preferences)
 
   try {
