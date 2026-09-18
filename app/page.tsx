@@ -460,6 +460,12 @@ export default function Dashboard() {
                 />
               ))}
             </ol>
+            <p className="mt-8 text-sm text-primary-soft">
+              Warum die Suche findet, was sie findet:{' '}
+              <Link href="/so-funktionierts" className="text-selection hover:text-foreground">
+                So funktioniert’s
+              </Link>
+            </p>
           </section>
         )}
 

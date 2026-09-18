@@ -17,6 +17,9 @@ export function Footer() {
           <Link href="/settings" className="hover:text-foreground transition-colors">
             Einstellungen
           </Link>
+          <Link href="/so-funktionierts" className="hover:text-foreground transition-colors">
+            So funktioniert’s
+          </Link>
           <Link href="/impressum" className="hover:text-foreground transition-colors">
             Impressum
           </Link>
