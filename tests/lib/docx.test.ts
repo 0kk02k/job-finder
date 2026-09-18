@@ -3,7 +3,7 @@
 // müssen sich im Dokument niederschlagen.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { renderResumeDocx, renderCoverLetterDocx, renderResumeTextDocx, resumeParagraphs, DOCX_THEMES } from '../../lib/docx'
+import { renderResumeDocx, renderCoverLetterDocx, renderResumeTextDocx, resumeParagraphs, DOCX_THEMES, extractDocxText } from '../../lib/docx'
 import type { ResumeData, CoverLetterData } from '../../lib/pdf'
 
 const SAMPLE_RESUME: ResumeData = {
@@ -76,4 +76,17 @@ test('renders raw-text resume as a real DOCX container', async () => {
   const buffer = await renderResumeTextDocx('Ein Absatz ohne erkennbare Struktur.\nZweite Zeile.')
   assert.ok(buffer.length > 1000)
   assert.equal(buffer.subarray(0, 2).toString('latin1'), 'PK', 'docx ist ein ZIP-Container')
+})
+
+// Upload-Richtung: extractDocxText muss zurücklesen, was der Export schreibt —
+// Absätze bleiben Zeilen, Entitäten sind decodiert.
+test('extractDocxText reads back paragraphs and decodes entities', async () => {
+  const buffer = await renderResumeTextDocx('Erster Absatz.\nZweite Zeile mit <Spitzen> & "Entitäten".')
+  const text = await extractDocxText(new Uint8Array(buffer))
+  assert.ok(text.includes('Erster Absatz.'), 'Absatz 1 fehlt')
+  assert.ok(text.includes('Zweite Zeile mit <Spitzen> & "Entitäten".'), 'Entitäten nicht decodiert')
+})
+
+test('extractDocxText rejects non-docx bytes instead of returning garbage', async () => {
+  await assert.rejects(() => extractDocxText(new Uint8Array([1, 2, 3, 4])))
 })

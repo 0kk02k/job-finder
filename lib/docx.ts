@@ -228,3 +228,32 @@ export async function renderResumeTextDocx(rawText: string): Promise<Buffer> {
     }))
   return Buffer.from(await Packer.toBuffer(new Document({ sections: [{ properties: {}, children: paragraphs }] })))
 }
+
+// DOCX-Import (Lebenslauf-Upload): Lesetext aus word/document.xml. Absätze und
+// Zeilenumbrüche werden zu \n, Tabs zu Leerzeichen, alles andere Markup fällt
+// weg — der Upload will Text für die KI, keine Formatierung. Ohne diesen Weg
+// decodierte die Route das ZIP roh als UTF-8 und speicherte Binärmüll, der
+// als „Lebenslauf" in Scoring und Ranking lief. jszip liegt schon im Bundle
+// (Abhängigkeit des docx-Pakets oben) — kein zweiter Parser fürs Projekt.
+export async function extractDocxText(bytes: Uint8Array): Promise<string> {
+  const JSZip = (await import('jszip')).default
+  const zip = await JSZip.loadAsync(bytes)
+  const documentXml = zip.file('word/document.xml')
+  if (!documentXml) throw new Error('kein Word-Dokument (word/document.xml fehlt)')
+  const xml = await documentXml.async('string')
+  return xml
+    .replace(/<w:tab\s*\/>/g, ' ')
+    .replace(/<w:br\s*\/?>/g, '\n')
+    .replace(/<\/w:p>/g, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&amp;/g, '&')
+    .split('\n')
+    .map((line) => line.trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}

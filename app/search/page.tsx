@@ -6,7 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { scoreTone } from '../components/ui'
 import { HIGH_MATCH_THRESHOLD, scoreLabel, scoreWord } from '@/lib/matching'
 import { platformLabel } from '@/lib/sources'
-import { mergeStreamedJobs } from '@/lib/search'
+import { mergeStreamedJobs, SCORE_LIMIT } from '@/lib/search'
 import { textSnippet } from '../components/Markdown'
 import { useToast } from '../components/Toast'
 
@@ -656,16 +656,16 @@ function SearchPageContent() {
             {scoredCount > 0 && scoredCount < results.length && (
               <p className="sm:col-span-2 text-sm text-primary tabular-nums">
                 KI-Bewertung: {scoredCount} von {results.length} Treffern bewertet — bewertet
-                werden die ersten 15 Treffer pro Suche, der Rest bleibt ohne Score.
+                werden die ersten {SCORE_LIMIT} Treffer pro Suche, der Rest bleibt ohne Score.
               </p>
             )}
             {/* Die „Kein Score"-Wand (0 bewertet): erklären, statt schweigen —
-                ohne Resume redet der Hinweis oben, hier bleibt das KI-Limit */}
+                ohne Resume redet der Hinweis oben, hier bleibt der KI-Ausfall */}
             {scoredCount === 0 && hasResume !== false && (
               <p className="sm:col-span-2 text-sm text-primary">
-                Kein Treffer wurde bewertet — die KI bewertet maximal 15 Treffer pro Suche,
-                und bei KI-Ausfall bleibt ein Lauf ohne Scores. Der nächste Suchlauf kann
-                andere Treffer bewerten.
+                Kein Treffer wurde bewertet — die KI war in diesem Lauf nicht
+                erreichbar. Der nächste Suchlauf versucht es erneut; einzelne
+                Treffer kannst du in deiner Liste öffnen und „Jetzt bewerten“.
               </p>
             )}
           </section>

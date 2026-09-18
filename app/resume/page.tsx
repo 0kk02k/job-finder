@@ -316,7 +316,7 @@ export default function ResumePage() {
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".pdf,.txt,.md,.markdown"
+                accept=".pdf,.docx,.txt,.md,.markdown"
                 onChange={handleFileUpload}
                 className="hidden"
                 aria-hidden="true"
@@ -330,7 +330,7 @@ export default function ResumePage() {
                     Datei hochladen
                   </p>
                   <p className="text-sm text-primary-soft">
-                    Klicken und PDF-, .txt- oder .md-Datei wählen
+                    Klicken und PDF-, DOCX-, .txt- oder .md-Datei wählen
                   </p>
                 </>
               )}

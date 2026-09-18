@@ -41,6 +41,20 @@ export async function POST(request: NextRequest) {
         error: `PDF konnte nicht gelesen werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`,
       }, { status: 422 })
     }
+  } else if (
+    file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    file.name.endsWith('.docx')
+  ) {
+    // DOCX ist ein ZIP — roh decodiert gäbe es Binärmüll als „Lebenslauf"
+    try {
+      const { extractDocxText } = await import('@/lib/docx')
+      text = await extractDocxText(bytes)
+    } catch (err) {
+      console.error('DOCX extraction error:', err)
+      return NextResponse.json({
+        error: `DOCX konnte nicht gelesen werden: ${err instanceof Error ? err.message : 'Unbekannter Fehler'}`,
+      }, { status: 422 })
+    }
   } else {
     text = new TextDecoder().decode(bytes)
   }

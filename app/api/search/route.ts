@@ -5,7 +5,7 @@ import { searchJobs, semanticSearch, type ScrapedJob, type SearchProgressEvent }
 import { scoreJob, generateSearchQueries, aiConfigFromSettings } from '@/lib/ai'
 import { parseStoredProfile } from '@/lib/preferences'
 import { HIGH_MATCH_THRESHOLD, relevanceToScore } from '@/lib/matching'
-import { pickQueryFan, mapWithConcurrency, phaseFitsInBudget } from '@/lib/search'
+import { pickQueryFan, mapWithConcurrency, phaseFitsInBudget, SCORE_LIMIT } from '@/lib/search'
 
 export const maxDuration = 60
 
@@ -316,7 +316,6 @@ export async function POST(request: NextRequest) {
       // nur Bruchteile eines Cents (schnelles Scoring-Modell, siehe scoringModel) — die
       // Suche soll ihre Treffer liefern, nicht den Rückstand füttern; Reste
       // drainiert der nächtliche Cron (/api/cron/score).
-      const SCORE_LIMIT = 50
       const resumeContent = useAI !== false ? resume?.content : undefined
       if (resumeContent && rawJobs.length > 0) {
         emit({ type: 'progress', stage: 'ai-matching', total: Math.min(SCORE_LIMIT, rawJobs.length) })

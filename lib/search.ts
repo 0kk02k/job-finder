@@ -76,6 +76,11 @@ export function mergeStreamedJobs<T extends { url: string }>(existing: readonly 
   return [...byUrl.values()]
 }
 
+// Wie viele Treffer einer Suche die KI pro Lauf bewertet — Reste drainiert der
+// nächtliche Cron (/api/cron/score). Ein Ort, weil die Fläche die Zahl im
+// Interface benennt (app/search/page.tsx) und die Route sie durchsetzt.
+export const SCORE_LIMIT = 50
+
 // Feste Parallelität statt unbegrenztem Promise.all: 50 gleichzeitige KI-Calls
 // erzeugen am Provider Rate-Limit-Staus, aus denen der Suchlauf nicht
 // rechtzeitig zurückkehrt. Ergebnisse bleiben reihengetreu (Index = Eingabe).
