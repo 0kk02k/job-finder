@@ -53,7 +53,8 @@ export default function RegisterPage() {
         router.refresh()
       }
     } catch {
-      setError('Ein Fehler ist aufgetreten')
+      // Der Fetch selbst warf — das ist ein Netzwerkproblem, kein Server-Fehler
+      setError('Der Server ist nicht erreichbar — prüfe deine Verbindung und versuch es erneut.')
       setLoading(false)
     }
   }
@@ -73,9 +74,10 @@ export default function RegisterPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="name" className="block text-sm font-medium text-foreground mb-2">
               Name (optional)
               <input
+                id="name"
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -85,9 +87,10 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
               E-Mail
               <input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -98,9 +101,10 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
               Passwort
               <input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

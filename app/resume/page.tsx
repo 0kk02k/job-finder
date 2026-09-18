@@ -352,7 +352,7 @@ export default function ResumePage() {
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
                 rows={10}
-                placeholder="Füge hier deinen Lebenslauf ein..."
+                placeholder="Füge hier deinen Lebenslauf ein…"
               />
               <button
                 onClick={handlePasteSubmit}

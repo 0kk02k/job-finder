@@ -47,15 +47,16 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="bg-surface rounded-2xl p-6 shadow-sm border border-border space-y-4">
           {error && (
-            <div className="bg-error/10 text-error text-sm p-3 rounded-xl border border-error/20">
+            <div role="alert" className="bg-error/10 text-error text-sm p-3 rounded-xl border border-error/20">
               {error}
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
               E-Mail
               <input
+                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -66,9 +67,10 @@ export default function LoginPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
               Passwort
               <input
+                id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}

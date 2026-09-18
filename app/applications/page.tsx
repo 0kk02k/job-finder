@@ -53,6 +53,9 @@ function ApplicationCard({
   const [followUp, setFollowUp] = useState(
     application.followUpAt ? application.followUpAt.slice(0, 10) : ''
   )
+  // Sichtbarer Abschluss für das stille onBlur-Autospeichern — „Gespeichert um
+  // HH:MM", verschwindet beim nächsten Tastenschlag
+  const [savedAt, setSavedAt] = useState<string | null>(null)
   const due = application.followUpAt != null && isDue(application.followUpAt, new Date())
 
   async function patch(body: Record<string, unknown>): Promise<boolean> {
@@ -63,8 +66,12 @@ function ApplicationCard({
     })
     if (!response.ok) {
       toast.error('Speichern fehlgeschlagen — der Eintrag bleibt unverändert.')
+      setSavedAt(null)
       return false
     }
+    setSavedAt(
+      new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    )
     return true
   }
 
@@ -117,6 +124,7 @@ function ApplicationCard({
             type="date"
             value={followUp}
             onChange={(e) => {
+              setSavedAt(null)
               setFollowUp(e.target.value)
               void saveFollowUp(e.target.value)
             }}
@@ -124,6 +132,11 @@ function ApplicationCard({
             className="px-2.5 py-1.5 rounded-lg bg-background border border-border text-foreground text-sm"
           />
         </label>
+        {savedAt && (
+          <span className="text-xs text-primary-soft tabular-nums" role="status">
+            Gespeichert um {savedAt}
+          </span>
+        )}
         {due && (
           <span className="px-2.5 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning border border-warning/20">
             Fällig
@@ -133,7 +146,10 @@ function ApplicationCard({
 
       <textarea
         value={notes}
-        onChange={(e) => setNotes(e.target.value)}
+        onChange={(e) => {
+          setSavedAt(null)
+          setNotes(e.target.value)
+        }}
         onBlur={() => void saveNotes()}
         rows={2}
         placeholder="Notiz — Gesprächsverlauf, Ansprechpartner, nächster Schritt …"
@@ -279,11 +295,13 @@ export default function ApplicationsPage() {
             <p className="text-primary-soft mb-6">
               Noch nichts beworben.
             </p>
+            {/* Der Weg führt in die Liste, nicht in den High-Match-Filter —
+                beworben wird aus dem eigenen Bestand */}
             <Link
-              href="/jobs?filter=high_match"
+              href="/jobs"
               className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors"
             >
-              Top Matches ansehen
+              Zu den Jobs
             </Link>
           </section>
         ) : (

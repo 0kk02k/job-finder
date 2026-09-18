@@ -362,8 +362,10 @@ export default function InterviewPage() {
           </section>
         )}
 
-        {/* Vorbereitungs-Tipp: 16Personalities — dezenter Hinweis unter den
-            beiden Phasen, bevor das Gespräch läuft */}
+        {/* Vorbereitungs-Tipp: 16Personalities — gehört zum Startbereich, bevor
+            das Gespräch läuft; mitten im Chat oder über der fertigen Akte
+            lenkt er nur noch ab */}
+        {!isActive && !isCompleted && (
         <Card className="p-8 mb-8 shadow-sm">
           <h2 className="text-lg font-medium text-foreground mb-2">
             Vorbereitungs-Tipp: Dein Persönlichkeitstyp
@@ -409,6 +411,7 @@ export default function InterviewPage() {
             </p>
           )}
         </Card>
+        )}
 
         {/* Chat */}
         {isActive && interview && (

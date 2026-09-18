@@ -170,6 +170,16 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
+  // Speicher-Signal für die Blur-Felder: nach erfolgreichem Patch steht
+  // „Gespeichert um HH:MM" am Feld; beim nächsten Tastenschlag verschwindet
+  // es wieder — ein stilles onBlur bekommt einen sichtbaren Abschluss
+  const [savedAt, setSavedAt] = useState<string | null>(null)
+  function markSaved() {
+    setSavedAt(
+      new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    )
+  }
+
   async function saveCockpitField(body: Record<string, unknown>) {
     if (!job) return false
     const response = await fetch(`/api/jobs/${job.id}`, {
@@ -179,8 +189,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     })
     if (!response.ok) {
       toast.error('Speichern fehlgeschlagen — der Eintrag bleibt unverändert.')
+      setSavedAt(null)
       return false
     }
+    markSaved()
     return true
   }
 
@@ -795,12 +807,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mb-4">
               <h2 className="text-sm font-medium text-primary-soft">Notiz & Wiedervorlage</h2>
+              {savedAt && (
+                <span className="text-xs text-primary-soft tabular-nums" role="status">
+                  Gespeichert um {savedAt}
+                </span>
+              )}
               <label className="flex items-center gap-2 text-sm">
                 <span className="text-primary-soft">Wiedervorlage</span>
                 <input
                   type="date"
                   value={followUp}
                   onChange={(e) => {
+                    setSavedAt(null)
                     setFollowUp(e.target.value)
                     void saveFollowUp(e.target.value)
                   }}
@@ -816,7 +834,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             </div>
             <textarea
               value={notes}
-              onChange={(e) => setNotes(e.target.value)}
+              onChange={(e) => {
+                setSavedAt(null)
+                setNotes(e.target.value)
+              }}
               onBlur={() => void saveNotes()}
               rows={3}
               placeholder="Gesprächsverlauf, Ansprechpartner, nächster Schritt …"

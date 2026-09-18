@@ -648,7 +648,7 @@ function SearchPageContent() {
             {!justSaved && (
               <button
                 onClick={saveCurrentSearch}
-                className="text-sm font-medium text-primary hover:text-selection transition-colors"
+                className="px-4 py-2 bg-accent hover:bg-accent-strong text-on-accent rounded-xl text-sm font-medium transition-colors"
               >
                 + Suche speichern
               </button>
@@ -692,17 +692,19 @@ function SearchPageContent() {
               </p>
             )}
             {/* Der Speicher-Hebel gehört zum Lauf, nicht nur zu neuen Funden —
-                eine erfolgreiche Suche ohne Neueinträge ist genauso wiederholbar */}
+                eine erfolgreiche Suche ohne Neueinträge ist genauso wiederholbar.
+                Die eine Handlungs-Fläche am Ende eines Laufs: Ocker wie der
+                Suchen-Button, der Textlink ersetzt */}
             {!justSaved && stats.newJobs === 0 && (
-              <p className="sm:col-span-2 text-sm">
+              <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
                 <button
                   onClick={saveCurrentSearch}
-                  className="font-medium text-selection hover:text-selection-strong transition-colors"
+                  className="px-4 py-2 bg-accent hover:bg-accent-strong text-on-accent rounded-xl text-sm font-medium transition-colors"
                 >
                   + Suche speichern
                 </button>
-                <span className="text-primary-soft"> — später mit einem Klick wiederholen</span>
-              </p>
+                <span className="text-sm text-primary-soft">— später mit einem Klick wiederholen</span>
+              </div>
             )}
           </section>
         )}
@@ -947,13 +949,15 @@ function JobCard({
           >
             {confirming ? 'Sicher? Erneut klicken' : 'Ignorieren'}
           </button>
+          {/* „Ansehen" führt raus ins Portal — ein Weg, kein CTA: Textlink wie
+              auf /jobs, damit „Zu meiner Liste" die einzige Button-Fläche bleibt */}
           <a
             href={job.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-on-accent rounded-xl text-sm font-medium transition-colors"
+            className="px-2 py-2.5 text-sm text-primary hover:text-selection transition-colors"
           >
-            Ansehen
+            Job ansehen →
           </a>
         </div>
       </div>

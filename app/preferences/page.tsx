@@ -354,6 +354,7 @@ export default function PreferencesPage() {
                           </span>
                           <span className={item.done ? 'text-primary-soft line-through' : 'text-foreground'}>
                             {item.topic}
+                            {item.done && <span className="sr-only"> (erledigt)</span>}
                           </span>
                         </li>
                       ))}

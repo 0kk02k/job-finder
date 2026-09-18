@@ -9,7 +9,9 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Redirect to login for page requests without a session
-  // API routes handle their own auth (return 401 JSON)
+  // API routes handle their own auth (return 401 JSON).
+  // Rechts- und Erklärseiten sind öffentlich — dafür greift der Matcher
+  // unten, dieser Check sieht sie nie.
   if (!pathname.startsWith('/api/') && !token) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
@@ -18,5 +20,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api/auth|login|register|_next|favicon.ico).*)'],
+  matcher: ['/((?!api/auth|login|register|so-funktionierts|impressum|datenschutz|_next|favicon.ico).*)'],
 }
