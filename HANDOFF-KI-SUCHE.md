@@ -90,3 +90,28 @@ Offene Teilfrage: Warum bedient der Provider aus prod Kimi, aber nicht GLM? (Ver
 1. **Live-Beweis:** Suche in prod laufen lassen → `SELECT count(*) FROM "Job" WHERE score IS NOT NULL` muss von 0 wegkommen; die Suche muss gerankte Treffer streamen statt `rankingFailed`.
 2. **Vercel-Env `NEBIUS_API_KEY`** auf den gültigen Wert setzen (steht heute auf der toten 401-Instanz) — betrifft noch `lib/platforms.ts` (`getAIClient(aiProvider)` ohne Key) und jeden Env-Fallback.
 3. Falls K2.6 aus prod wider Erwarten hängt: Plan C (EU-Relay, `baseUrl` konfigurierbar).
+
+---
+
+## 9. Addendum 18.09.2026: Live-Beweis erbracht — die KI-Bewertung läuft in prod
+
+- **Live-Suche des Nutzers in prod:** `score IS NOT NULL` ging von **0 → 40** (40 von 41 gefundenen Jobs bewertet). Semantischer Pfad, Ranking und Scoring laufen mit K2.6 (thinking off) wie lokal gemessen. Damit ist Punkt 1 erledigt; **Plan C (EU-Relay) ist nicht nötig**.
+- **Punkt 2 (Vercel-Env `NEBIUS_API_KEY`) weiterhin offen** — Status unbekannt. Die App funktioniert, weil der Settings-Key die Quelle der Wahrheit ist (`aiConfigFromSettings`), aber jeder Env-Fallback (u. a. `lib/platforms.ts`) läuft weiter gegen die tote 401-Instanz.
+- **K2.6 aus prod:** kein einziger Hänger seit dem Wechsel — bestätigt, dass das Problem der GLM-Serving-Pool war, nicht Vercels Egress.
+
+### In derselben Session mitgefixt (alles gepusht)
+
+- **DOCX-Upload:** die Upload-Route decodierte `.docx` roh als UTF-8 → `extractDocxText` in `lib/docx.ts` (jszip). Der aktive Lebenslauf war ein 33-Zeichen-Skeleton, nach Fix 2296 Zeichen echter Text.
+- **Erklärseite `/so-funktionierts`** (verlinkt im Footer + unter „Erste Schritte").
+- **Zwei Impeccable-Critique-Läufe** (Dual-Agent, Snapshots in `.impeccable/critique/`): 29/40 → 30/40; alle Priority Issues in drei Commit-Paketen gefixt (Jobs-Toolbar-Verdichtung, JobCard-Kürzungen, Shortcuts S/J/K/Enter, Mehrfachauswahl, „Rückstand bewerten"-Button, Erklärlinks, Leere-Suche-Hebel, Absage-Trichter, Settings-Save-Modell inkl. **docTemplate-Persistierung** (war toter Endpunkt), Bewerben-Gruppe auf Job-Detail, „Gespräch"→„Interview", Interview-Neustart-Confirm, Chat-Scrollverhalten, „+ Suche speichern" bei 0 Funden, Toasts statt Stillfehlern).
+- **Kontrast-Fix:** `--stone-soft` light von `#78716c` (~4,2:1 auf Papier, 3,7:1 auf Ocker-Tint) auf **`#6b645e`** (≥4,5:1 überall, AA) — Token-Änderung in `app/globals.css`, DESIGN.md nachgezogen.
+- **Settings-Seite in Alltagssprache** für Nicht-Tech-Nutzer (Key-Felder, Provider-Auswahl, Portal-Sync, Fehlermeldungen — Eingabewerte unverändert).
+- **Interview-Seite:** 16Personalities-Vorbereitungs-Karte (Startbereich, Card-Komponente, externer Link, ehrlicher Hinweis „Selbstbild, keine Diagnose").
+- **Werkstudent-/Praktikums-Filter im Scoring** (`lib/ai.ts`): Titel-/Beschreibungssignale („Werkstudent", „Praktikum", „Working Student", „Intern", „Trainee") werden **deterministisch ohne LLM-Call** erkannt und auf **Score ≤ 3 mit deutscher Begründung** (in `scoreReason`) gedeckelt; im semantischen Ranking wird die Relevanz analog auf ≤ 0,3 gedrückt. Such-Breite unverändert — der Filter greift erst bei der Bewertung. 11 neue Tests.
+- **Tests: 147 grün**, `tsc --noEmit` sauber, Build kompiliert, ESLint ohne neue Probleme (13 altbestandene in `lib/apify.ts`/`platforms.ts`/`autoapply.ts` + 2 react-hooks-Warnings in den jobs-Seiten, absichtlich nicht angerührt).
+
+### Weiterhin offen
+
+- Backfill: bereits gespeicherte Werkstudent-Jobs mit hohem Score werden nicht zurückwirkend neu bewertet (Score löschen oder einzeln nachscoren lässt sie vom Cron/neuem Lauf erfassen).
+- Vercel-Env `NEBIUS_API_KEY` (s. o.).
+- HR-Interview: dieselben Guard-Defekte wie früher dokumentiert (kein Guard, Substring-Filter, kein Abschließen-Button) — unverändert offen; Zwei-Phasen-Merge der Interviews war der beschlossene nächste Schritt.
