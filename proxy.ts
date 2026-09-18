@@ -1,6 +1,13 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+// Öffentliche Seiten — ohne Session erreichbar (Footer-Grundsatz: Rechtsseiten
+// kennen keine Anmeldung). Authentifizierte Nutzer sehen sie mit voller Nav.
+const PUBLIC_PAGES = ['/so-funktionierts', '/impressum', '/datenschutz']
+// Auth-Seiten — ohne Session erreichbar, MIT Session dorthin unnötig:
+// eingeloggte Nutzer landen auf dem Dashboard statt vor verschlossener Tür.
+const AUTH_PAGES = ['/login', '/register']
+
 export function proxy(request: NextRequest) {
   const token =
     request.cookies.get('authjs.session-token') ||
@@ -8,11 +15,16 @@ export function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Redirect to login for page requests without a session
-  // API routes handle their own auth (return 401 JSON).
-  // Rechts- und Erklärseiten sind öffentlich — dafür greift der Matcher
-  // unten, dieser Check sieht sie nie.
-  if (!pathname.startsWith('/api/') && !token) {
+  // API routes handle their own auth (return 401 JSON)
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next()
+  }
+
+  if (token && AUTH_PAGES.includes(pathname)) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
+  if (!token && !PUBLIC_PAGES.includes(pathname) && !AUTH_PAGES.includes(pathname)) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
@@ -20,5 +32,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api/auth|login|register|so-funktionierts|impressum|datenschutz|_next|favicon.ico).*)'],
+  // login/register laufen jetzt durch den Proxy (Umleitung eingeloggter
+  // Nutzer) — alles andere wie gehabt
+  matcher: ['/((?!api/auth|_next|favicon.ico).*)'],
 }

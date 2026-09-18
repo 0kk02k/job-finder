@@ -73,6 +73,7 @@ export default function SettingsPage() {
   const [profileAbout, setProfileAbout] = useState('')
   const [profileLocation, setProfileLocation] = useState('')
   const [profileSkills, setProfileSkills] = useState('')
+  const [profileError, setProfileError] = useState(false)
   const [savingProfile, setSavingProfile] = useState(false)
   const [optimizing, setOptimizing] = useState(false)
   const [optimization, setOptimization] = useState<ProfileOptimization | null>(null)
@@ -163,7 +164,11 @@ export default function SettingsPage() {
   async function fetchProfile() {
     try {
       const response = await fetch(`/api/platforms/profile?platform=${profilePlatform}`)
-      if (!response.ok) return
+      if (!response.ok) {
+        setProfileError(true)
+        return
+      }
+      setProfileError(false)
       const profiles = await response.json()
       const profile = Array.isArray(profiles) ? profiles[0] : null
       if (profile) {
@@ -185,7 +190,8 @@ export default function SettingsPage() {
         setProfileSkills('')
       }
     } catch {
-      // Profil kann nicht geladen werden — Felder bleiben leer
+      // Kein stiller Leerstand: Felder bleiben leer, die Sektion meldet den Fehler
+      setProfileError(true)
     }
   }
 
@@ -487,6 +493,20 @@ export default function SettingsPage() {
           {/* Profil-Optimierung */}
           <Section title="Profil-Optimierung" description="Dein öffentliches Profil pflegen — und mit KI auf deine Wunschberufe zuschneiden lassen.">
             <div className="space-y-6">
+              {profileError && (
+                <div
+                  role="status"
+                  className="p-3 bg-warning/10 rounded-xl border border-warning/20 flex flex-wrap items-center justify-between gap-3"
+                >
+                  <p className="text-sm text-primary">Profil konnte nicht geladen werden.</p>
+                  <button
+                    onClick={() => void fetchProfile()}
+                    className="text-sm font-medium text-primary hover:text-selection transition-colors"
+                  >
+                    Erneut versuchen
+                  </button>
+                </div>
+              )}
               <div>
                 <label htmlFor="profile-platform" className="block text-sm font-medium text-foreground mb-2">Plattform</label>
                 <select
@@ -599,7 +619,13 @@ export default function SettingsPage() {
                         {optimization.suggestions.map((s, i) => (
                           <div key={i} className="p-4 bg-surface rounded-xl border border-border-soft">
                             <p className="text-xs font-medium text-primary mb-1">{s.section}</p>
-                            <p className="text-xs text-primary-soft line-through mb-1">{s.current}</p>
+                            {/* Der durchstrichene Ist-Stand trägt ein sichtbares
+                                „alt"-Kennzeichen — Durchstreichung allein ist
+                                farb- und schriftbildkodiert (WCAG 1.4.1) */}
+                            <p className="text-xs text-primary-soft line-through mb-1">
+                              {s.current}
+                              <span className="sr-only"> (bisheriger Text)</span>
+                            </p>
                             <p className="text-sm text-foreground">{s.suggested}</p>
                             <p className="text-xs text-primary-soft mt-1">{s.reason}</p>
                           </div>

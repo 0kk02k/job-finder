@@ -31,11 +31,12 @@ export default function RootLayout({
       lang="de"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-screen flex flex-col">
         <Providers>
           <Nav />
-          {/* flex-1 drückt den Footer auch auf kurzen Seiten an die Unterkante */}
-          <div id="inhalt" className="flex-1">
+          {/* flex-1 drückt den Footer auch auf kurzen Seiten an die Unterkante —
+              bei langem Content bleibt er einfach im Fluss */}
+          <div id="inhalt" className="flex-1 flex flex-col">
             {children}
           </div>
           <Footer />

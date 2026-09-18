@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useToast } from '../../components/Toast'
 import { MarkdownContent, structureJobDescription } from '../../components/Markdown'
-import { Button, StatusBadge, StatusButton, buttonClasses, scoreTone } from '../../components/ui'
-import { scoreLabel } from '@/lib/matching'
+import { Button, StatusBadge, StatusButton, buttonClasses, ScoreBadge } from '../../components/ui'
 import { STATUS_LABELS } from '@/lib/status'
 import { isDue } from '@/lib/applications'
 import { SCORE_LIMIT } from '@/lib/search'
@@ -491,15 +490,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         {job.score != null ? (
           <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
             <div className="flex items-baseline gap-3 mb-3">
-              <span className={`text-5xl font-light tabular-nums ${scoreTone(job.score)}`}>
-                <span className="sr-only">
-                  KI-Score: {job.score} von 10 — {scoreLabel(job.score)}
-                </span>
-                <span aria-hidden="true">
-                  {job.score}
-                  <span className="text-2xl text-primary-soft">/10</span>
-                </span>
-              </span>
+              <ScoreBadge score={job.score} size="xl" />
               <span className="text-sm text-primary-soft">KI-Score</span>
             </div>
             {job.scoreReason && (

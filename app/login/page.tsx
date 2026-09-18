@@ -56,7 +56,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="flex-1 bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {/* Wortmarke dekorativ, die Seite trägt eine echte H1 */}
         <p className="text-xl font-semibold text-foreground mb-2 text-center">

@@ -59,6 +59,7 @@ export default function ResumePage() {
   // Anekdoten: eigene Sektion mit eigenem Ladezyklus — sie hängt nicht am Modus
   // des Lebenslaufs (view/upload/edit), sondern steht immer unten.
   const [anecdotes, setAnecdotes] = useState<Anecdote[]>([])
+  const [anecdotesError, setAnecdotesError] = useState(false)
   const [anecdotePanel, setAnecdotePanel] = useState<'none' | 'extract' | 'manual'>('none')
   const [editingAnecdote, setEditingAnecdote] = useState<Anecdote | null>(null)
   const [proposals, setProposals] = useState<Proposal[] | null>(null)
@@ -102,9 +103,13 @@ export default function ResumePage() {
       if (response.ok) {
         const data = await response.json()
         setAnecdotes(Array.isArray(data) ? data : [])
+        setAnecdotesError(false)
+      } else {
+        setAnecdotesError(true)
       }
     } catch {
-      // Stille Liste: ohne Anekdoten bleibt die Sektion einfach leer
+      // Kein stiller Leerstand: die Sektion meldet den Fehler mit Retry
+      setAnecdotesError(true)
     }
   }
 
@@ -343,10 +348,11 @@ export default function ResumePage() {
 
             {/* Paste Text */}
             <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
-              <label className="block text-sm font-medium text-foreground mb-3">
+              <label htmlFor="resume-paste" className="block text-sm font-medium text-foreground mb-3">
                 Text einfügen
               </label>
               <textarea
+                id="resume-paste"
                 value={pastedText}
                 onChange={(e) => setPastedText(e.target.value)}
                 rows={10}
@@ -532,7 +538,20 @@ export default function ResumePage() {
             </div>
           )}
 
-          {anecdotes.length > 0 ? (
+          {anecdotesError ? (
+            <div
+              role="status"
+              className="p-4 bg-warning/10 rounded-xl border border-warning/20 flex flex-wrap items-center justify-between gap-3"
+            >
+              <p className="text-sm text-primary">Anekdoten konnten nicht geladen werden.</p>
+              <button
+                onClick={() => void fetchAnecdotes()}
+                className="text-sm font-medium text-primary hover:text-selection transition-colors"
+              >
+                Erneut versuchen
+              </button>
+            </div>
+          ) : anecdotes.length > 0 ? (
             <div className="space-y-4">
               {anecdotes.map((a) => (
                 <AnecdoteCard

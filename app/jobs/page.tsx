@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { useToast } from '../components/Toast'
+import { useToast, UNDO_TOAST_DURATION_MS } from '../components/Toast'
 import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, ScoreBadge } from '../components/ui'
 import { STATUS_LABELS, isBacklogJob } from '@/lib/status'
 import { SCORE_LIMIT } from '@/lib/search'
@@ -57,7 +57,10 @@ export default function JobsPage() {
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(
     () => new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s)))
   )
-  const [showMoreStatuses, setShowMoreStatuses] = useState(false)
+  // null = automatisch (aufgeklappt, sobald ein Mehr-Status aktiv ist);
+  // true/false = explizite Wahl. aria-expanded spiegelt damit immer den
+  // tatsächlich sichtbaren Zustand, und der Button klappt wirklich zu.
+  const [showMoreStatuses, setShowMoreStatuses] = useState<boolean | null>(null)
   // Deep-Links aus dem Dashboard: /jobs?filter=high_match · /jobs?filter=unscored
   // (und /jobs?filter=scored — „all" ist die Abwesenheit des Parameters)
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>(() => {
@@ -131,7 +134,7 @@ export default function JobsPage() {
       // Fehlklicks passieren an vier nebeneinanderstehenden Buttons — jeder
       // Wechsel bekommt einen Rückgängig-Weg, bevor er Realität wird
       toast.success(`Status geändert zu ‚${STATUS_LABELS[status] ?? status}‘`, {
-        duration: 7000,
+        duration: UNDO_TOAST_DURATION_MS,
         action: {
           label: 'Rückgängig',
           onClick: () =>
@@ -171,26 +174,50 @@ export default function JobsPage() {
     const previousById = new Map(
       jobs.filter((j) => selectedIds.has(j.id)).map((j) => [j.id, j.status])
     )
-    const count = selectedIds.size
+    const ids = [...selectedIds]
+    const count = ids.length
     try {
-      await Promise.all(
-        [...selectedIds].map((id) =>
-          fetch(`/api/jobs/${id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status }),
-          })
-        )
+      // Einzelergebnisse zählen statt pauschal zu glauben: ein still
+      // fehlgeschlagenes PATCH darf nicht unter dem Erfolgs-Toast verschwinden
+      const results = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const response = await fetch(`/api/jobs/${id}`, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ status }),
+            })
+            return response.ok
+          } catch {
+            return false
+          }
+        })
       )
-      setSelectedIds(new Set())
+      const failedIds = ids.filter((_, i) => !results[i])
+      const failed = failedIds.length
+      const succeeded = count - failed
       fetchJobs()
-      toast.success(`Status geändert zu ‚${STATUS_LABELS[status] ?? status}‘ — ${count} Jobs`, {
-        duration: 7000,
-        action: {
-          label: 'Rückgängig',
-          onClick: () => void revertBulk(previousById),
-        },
-      })
+      if (failed === 0) {
+        setSelectedIds(new Set())
+        toast.success(`Status geändert zu ‚${STATUS_LABELS[status] ?? status}‘ — ${count} Jobs`, {
+          duration: UNDO_TOAST_DURATION_MS,
+          action: {
+            label: 'Rückgängig',
+            onClick: () => void revertBulk(previousById),
+          },
+        })
+      } else {
+        // Fehlgeschlagene bleiben angehakt — der Retry ist ein zweiter Klick,
+        // kein Neu-Anhaken der ganzen Liste
+        setSelectedIds(new Set(failedIds))
+        if (succeeded === 0) {
+          toast.error('Sammelaktion fehlgeschlagen — bitte erneut versuchen.')
+        } else {
+          toast.error(
+            `${succeeded} von ${count} geändert — ${failed} fehlgeschlagen. Die verbleibenden Jobs sind weiterhin ausgewählt.`
+          )
+        }
+      }
     } catch {
       toast.error('Sammelaktion fehlgeschlagen — bitte erneut versuchen.')
     } finally {
@@ -395,7 +422,11 @@ export default function JobsPage() {
     activeStatuses.size !== defaultActive.size ||
     [...activeStatuses].some((s) => !defaultActive.has(s))
   const moreActiveCount = [...activeStatuses].filter((s) => !(CORE_STATUSES as readonly string[]).includes(s)).length
-  const moreOpen = showMoreStatuses || moreActiveCount > 0
+  const moreOpen = showMoreStatuses ?? moreActiveCount > 0
+
+  function toggleMoreStatuses() {
+    setShowMoreStatuses(!moreOpen)
+  }
 
   function statusChip(status: string) {
     const active = activeStatuses.has(status)
@@ -486,7 +517,7 @@ export default function JobsPage() {
               <div className="flex flex-wrap items-center gap-2">
                 {CORE_STATUSES.map(statusChip)}
                 <button
-                  onClick={() => setShowMoreStatuses((prev) => !prev)}
+                  onClick={toggleMoreStatuses}
                   aria-expanded={moreOpen}
                   className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors border border-dashed border-border text-primary-soft hover:text-foreground hover:border-primary-soft"
                 >
@@ -625,7 +656,8 @@ export default function JobsPage() {
                 <div className="flex flex-wrap gap-2">
                   <StatusButton label="Beworben" onClick={() => void bulkSetStatus('APPLIED')} active={false} />
                   <StatusButton label={STATUS_LABELS.INTERVIEW} onClick={() => void bulkSetStatus('INTERVIEW')} active={false} />
-                  <StatusButton label="Archiv" onClick={() => void bulkSetStatus('ARCHIVED')} active={false} />
+                  {/* Handlung als Verb, der Zustand heißt „Archiviert" (Badge) */}
+                  <StatusButton label="Archivieren" onClick={() => void bulkSetStatus('ARCHIVED')} active={false} />
                 </div>
                 <button
                   onClick={() => setSelectedIds(new Set())}
@@ -706,11 +738,15 @@ export default function JobsPage() {
                           rel="noopener noreferrer"
                           className="text-sm text-primary hover:text-selection transition-colors"
                         >
-                          Job ansehen →
+                          Job ansehen <span aria-hidden="true">→</span>
                         </a>
                       </div>
 
-                      <div className="flex gap-2">
+                      {/* 2+2-Gewichtung: die häufigsten Pipeline-Schritte bleiben
+                          Buttons, die seltenen/destruktiveren Wege werden
+                          dezente Textlinks — vier gleichgewichtige Flächen
+                          laden zu Fehlklicken ein */}
+                      <div className="flex items-center gap-2">
                         <StatusButton
                           label="Beworben"
                           onClick={() => updateStatus(job.id, 'APPLIED')}
@@ -721,16 +757,28 @@ export default function JobsPage() {
                           onClick={() => updateStatus(job.id, 'INTERVIEW')}
                           active={job.status === 'INTERVIEW'}
                         />
-                        <StatusButton
-                          label="Abgelehnt"
+                        <button
                           onClick={() => updateStatus(job.id, 'REJECTED')}
-                          active={job.status === 'REJECTED'}
-                        />
-                        <StatusButton
-                          label="Archiv"
+                          aria-pressed={job.status === 'REJECTED'}
+                          className={`text-sm underline underline-offset-4 transition-colors ${
+                            job.status === 'REJECTED'
+                              ? 'text-error decoration-error/60'
+                              : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
+                          }`}
+                        >
+                          Abgelehnt
+                        </button>
+                        <button
                           onClick={() => updateStatus(job.id, 'ARCHIVED')}
-                          active={job.status === 'ARCHIVED'}
-                        />
+                          aria-pressed={job.status === 'ARCHIVED'}
+                          className={`text-sm underline underline-offset-4 transition-colors ${
+                            job.status === 'ARCHIVED'
+                              ? 'text-primary-soft decoration-primary-soft/60'
+                              : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
+                          }`}
+                        >
+                          Archivieren
+                        </button>
                       </div>
                     </div>
                   </div>

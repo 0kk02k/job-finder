@@ -37,6 +37,11 @@ interface ToastContextValue {
   error: (message: string) => void
 }
 
+// Anzeigedauer für Toasts mit „Rückgängig"-Aktion. Bewusst länger als reine
+// Bestätigungen: wer lange Listen abarbeitet, braucht das Fenster beim
+// Weiterklicken nicht im Nacken — Hover/Fokus pausiert zusätzlich.
+export const UNDO_TOAST_DURATION_MS = 12_000
+
 const ToastContext = createContext<ToastContextValue | null>(null)
 
 export function useToast(): ToastContextValue {

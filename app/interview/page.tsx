@@ -405,6 +405,9 @@ export default function InterviewPage() {
               </button>
             </form>
           </div>
+          <p className="text-xs text-primary-soft mt-2">
+            Wie vom Test ausgegeben, z. B. INFJ-T — maximal 6 Zeichen.
+          </p>
           {savedType && (
             <p className="text-sm text-success mt-3">
               Dein Typ {savedType} ist in deiner Akte hinterlegt.

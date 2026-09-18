@@ -90,11 +90,14 @@ export function ScoreBadge({
   className = '',
 }: {
   score: number
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }) {
-  const sizeClass = size === 'lg' ? 'text-3xl' : size === 'sm' ? 'text-base' : 'text-lg'
-  const subClass = size === 'lg' ? 'text-base' : 'text-xs'
+  // xl ist die bewusste Detailseiten-Ausnahme: größer als jede Listenstufe,
+  // weil dort der Score der Anker der ganzen Seite ist
+  const sizeClass =
+    size === 'xl' ? 'text-5xl' : size === 'lg' ? 'text-3xl' : size === 'sm' ? 'text-base' : 'text-lg'
+  const subClass = size === 'xl' ? 'text-2xl' : size === 'lg' ? 'text-base' : 'text-xs'
   return (
     <span className={`font-light tabular-nums ${scoreTone(score)} ${sizeClass} ${className}`}>
       <span className="sr-only">KI-Score: {score} von 10 — {scoreLabel(score)}</span>

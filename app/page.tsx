@@ -102,12 +102,15 @@ export default function Dashboard() {
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([])
   const [searchesError, setSearchesError] = useState(false)
   const [refreshError, setRefreshError] = useState(false)
+  // Erneut-laden läuft — der Button zeigt Pending statt doppelt zu klicken
+  const [refreshing, setRefreshing] = useState(false)
   // Erneut versuchen darf die Seite nicht aufs Skeleton zurückwerfen — der Inhalt bleibt stehen
   const hasLoadedOnce = useRef(false)
 
   const loadAll = useCallback(async () => {
     const isFirstLoad = !hasLoadedOnce.current
     if (isFirstLoad) setJobsState('loading')
+    else setRefreshing(true)
     setJobsError(null)
     setResumeError(false)
     setSearchesError(false)
@@ -213,6 +216,8 @@ export default function Dashboard() {
       } else {
         setRefreshError(true)
       }
+    } finally {
+      setRefreshing(false)
     }
   }, [])
 
@@ -497,8 +502,8 @@ export default function Dashboard() {
                 · <span className="whitespace-nowrap">{stats.applied} in der Pipeline</span>
               </p>
             </div>
-            <Button size="sm" variant="secondary" onClick={() => void loadAll()}>
-              Aktualisieren
+            <Button size="sm" variant="secondary" onClick={() => void loadAll()} disabled={refreshing}>
+              {refreshing ? 'Lädt …' : 'Aktualisieren'}
             </Button>
           </div>
         )}

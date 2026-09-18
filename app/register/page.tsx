@@ -76,7 +76,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+    <div className="flex-1 bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <h1 className="text-2xl font-light text-foreground mb-8 text-center">
           Account erstellen

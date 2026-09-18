@@ -159,14 +159,21 @@ function SearchPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedId, savedSearches])
 
+  // Ein Ladefehler bleibt ein Fehler: schlanke Meldung mit Retry, nicht eine
+  // leere Sektion (Muster: Dashboard)
+  const [savedSearchesError, setSavedSearchesError] = useState(false)
+
   async function fetchSavedSearches() {
     try {
       const res = await fetch('/api/searches')
       if (res.ok) {
         setSavedSearches(await res.json())
+        setSavedSearchesError(false)
+      } else {
+        setSavedSearchesError(true)
       }
     } catch {
-      // silently ignore
+      setSavedSearchesError(true)
     }
   }
 
@@ -434,6 +441,20 @@ function SearchPageContent() {
         </section>
 
         {/* Saved Searches */}
+        {savedSearchesError && (
+          <div
+            role="status"
+            className="mb-6 p-3 bg-warning/10 rounded-xl border border-warning/20 flex flex-wrap items-center justify-between gap-3"
+          >
+            <p className="text-sm text-primary">Gespeicherte Suchen konnten nicht geladen werden.</p>
+            <button
+              onClick={() => void fetchSavedSearches()}
+              className="text-sm font-medium text-primary hover:text-selection transition-colors"
+            >
+              Erneut versuchen
+            </button>
+          </div>
+        )}
         {savedSearches.length > 0 && (
           <section className="mb-6">
             <p className="text-sm font-medium text-foreground mb-3">
