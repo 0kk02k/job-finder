@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 
 const links = [
   { href: '/search', label: 'Suchen' },
@@ -45,11 +45,45 @@ function linkClasses(active: boolean) {
   }`
 }
 
+// Rechts- und Erklärseiten sind öffentlich (proxy.ts) — für anonyme Besucher
+// ist die App-Nav ein Irrweg: jeder Link landet im Login-Redirect. Die
+// Public-Nav kennt nur Wortmarke und Anmelden.
+const PUBLIC_PAGES = ['/so-funktionierts', '/impressum', '/datenschutz']
+
 export function Nav() {
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
+  const { status } = useSession()
 
   if (pathname === '/login' || pathname === '/register') return null
+
+  // Eingeloggte Nutzer behalten die volle Nav, auch auf den Public-Seiten
+  if (PUBLIC_PAGES.includes(pathname) && status !== 'authenticated') {
+    return (
+      <nav className="border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-10">
+        <a
+          href="#inhalt"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-accent focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:text-on-accent"
+        >
+          Zum Inhalt springen
+        </a>
+        <div className="max-w-5xl mx-auto px-6 py-5">
+          <div className="flex items-center justify-between">
+            <Link href="/" className="text-xl font-semibold text-foreground">
+              Job-Finder
+            </Link>
+            <Link
+              href="/login"
+              aria-current={pathname === '/login' ? 'page' : undefined}
+              className={linkClasses(false)}
+            >
+              Anmelden
+            </Link>
+          </div>
+        </div>
+      </nav>
+    )
+  }
 
   return (
     <nav className="border-b border-border bg-surface/80 backdrop-blur-sm sticky top-0 z-10">

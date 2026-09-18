@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
-import { Button, StatusBadge, scoreTone } from '../components/ui'
+import { Button, StatusBadge, ScoreBadge } from '../components/ui'
 import { collectFollowUps, isDue } from '@/lib/applications'
 
 interface Application {
@@ -102,13 +102,7 @@ function ApplicationCard({
         </div>
         <div className="flex items-center gap-3 flex-shrink-0">
           {application.score != null && (
-            <span
-              className={`text-xl font-light tabular-nums ${scoreTone(application.score)}`}
-              title={`KI-Score ${application.score} von 10`}
-            >
-              <span className="sr-only">KI-Score: {application.score} von 10</span>
-              <span aria-hidden="true">{application.score}</span>
-            </span>
+            <ScoreBadge score={application.score} />
           )}
           <StatusBadge status={application.status} />
         </div>

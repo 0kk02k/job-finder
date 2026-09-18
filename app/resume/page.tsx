@@ -45,7 +45,9 @@ export default function ResumePage() {
   const [mode, setMode] = useState<'view' | 'upload' | 'edit'>('view')
   const [content, setContent] = useState('')
   const [pastedText, setPastedText] = useState('')
-  const [downloading, setDownloading] = useState(false)
+  // Pro Format ein eigener Zustand — ein gemeinsames Flag zeigt bei zwei
+  // parallelen Klicks „Wird geladen …" auf beiden Buttons, obwohl nur einer läuft
+  const [downloading, setDownloading] = useState<null | 'pdf' | 'docx'>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -222,7 +224,7 @@ export default function ResumePage() {
   }
 
   async function handleDownloadPDF(format: 'pdf' | 'docx' = 'pdf') {
-    setDownloading(true)
+    setDownloading(format)
     try {
       const response = await fetch('/api/pdf', {
         method: 'POST',
@@ -245,7 +247,7 @@ export default function ResumePage() {
     } catch {
       toast.error('Dokument konnte nicht erzeugt werden')
     } finally {
-      setDownloading(false)
+      setDownloading(null)
     }
   }
 
@@ -271,33 +273,29 @@ export default function ResumePage() {
           </div>
           {resume && mode === 'view' && (
             <div className="flex gap-3">
-              <button
+              <Button
+                size="sm"
+                variant="secondary"
                 onClick={() => void handleDownloadPDF('pdf')}
-                disabled={downloading}
-                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+                disabled={downloading !== null}
               >
-                {downloading ? 'Wird geladen …' : 'Als PDF'}
-              </button>
-              <button
+                {downloading === 'pdf' ? 'Wird geladen …' : 'Als PDF'}
+              </Button>
+              <Button
+                size="sm"
+                variant="secondary"
                 onClick={() => void handleDownloadPDF('docx')}
-                disabled={downloading}
-                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors disabled:opacity-50"
+                disabled={downloading !== null}
               >
-                {downloading ? 'Wird geladen …' : 'Als DOCX'}
-              </button>
-              <button
-                onClick={() => setMode('edit')}
-                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors"
-              >
+                {downloading === 'docx' ? 'Wird geladen …' : 'Als DOCX'}
+              </Button>
+              <Button size="sm" variant="secondary" onClick={() => setMode('edit')}>
                 Bearbeiten
-              </button>
+              </Button>
               {/* Selten + ersatzlos — deshalb Sekundär, nicht der eine Ocker-Primary */}
-              <button
-                onClick={() => setMode('upload')}
-                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl font-medium text-sm transition-colors"
-              >
+              <Button size="sm" variant="secondary" onClick={() => setMode('upload')}>
                 Ersetzen
-              </button>
+              </Button>
             </div>
           )}
         </section>
@@ -354,13 +352,13 @@ export default function ResumePage() {
                 rows={10}
                 placeholder="Füge hier deinen Lebenslauf ein…"
               />
-              <button
+              <Button
                 onClick={handlePasteSubmit}
                 disabled={loading || !pastedText.trim()}
-                className="w-full py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="w-full"
               >
-                {loading ? 'Wird gespeichert...' : 'Speichern'}
-              </button>
+                {loading ? 'Wird gespeichert …' : 'Speichern'}
+              </Button>
             </div>
           </section>
         )}
@@ -379,13 +377,9 @@ export default function ResumePage() {
               className="w-full px-5 py-4 rounded-xl border border-border bg-background text-foreground font-mono text-sm leading-relaxed resize-none mb-4"
             />
             <div className="flex gap-3">
-              <button
-                onClick={saveEdit}
-                disabled={loading}
-                className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
-              >
+              <Button onClick={saveEdit} disabled={loading}>
                 {loading ? 'Speichert …' : 'Speichern'}
-              </button>
+              </Button>
               {/* Ungespeicherte Änderungen gehen nicht still verloren —
                   zweiter Klick verwirft bewusst */}
               <button

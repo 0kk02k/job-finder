@@ -3,8 +3,8 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { scoreTone } from '../components/ui'
-import { HIGH_MATCH_THRESHOLD, scoreLabel, scoreWord } from '@/lib/matching'
+import { Button, ScoreBadge } from '../components/ui'
+import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 import { platformLabel } from '@/lib/sources'
 import { mergeStreamedJobs, SCORE_LIMIT } from '@/lib/search'
 import { textSnippet } from '../components/Markdown'
@@ -33,6 +33,7 @@ interface SavedSearch {
   remote: boolean
   semantic: boolean
   lastRunAt: string | null
+  lastNewJobs: number | null
 }
 
 // Stream-Zeilen des Such-Endpoints: Progress unterwegs, am Ende genau ein
@@ -449,6 +450,11 @@ function SearchPageContent() {
                   {saved.query}
                   {saved.location ? ` · ${saved.location}` : ''}
                   {saved.remote ? ' · Remote' : ''}
+                  {saved.lastNewJobs != null && saved.lastNewJobs > 0 && (
+                    <span className="ml-1.5 inline-block px-1.5 py-0.5 rounded-full bg-success/10 text-success border border-success/20 text-xs font-medium tabular-nums">
+                      {saved.lastNewJobs} neu
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -521,7 +527,9 @@ function SearchPageContent() {
                 <span className="text-sm text-foreground">KI-Suche — findet auch anders betitelte Jobs</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-pointer" title="Ausgeschaltet werden Treffer nur angezeigt und nicht in deine Liste übernommen">
+              {/* Die Erklärung zum Haken gehört auf die Fläche, nicht ins title —
+                  Hover ist kein tragfähiger Kanal (Touch, Tastatur) */}
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={autoSave}
@@ -530,6 +538,11 @@ function SearchPageContent() {
                 />
                 <span className="text-sm text-foreground">Treffer automatisch in meine Liste übernehmen</span>
               </label>
+              {!autoSave && (
+                <span className="text-xs text-primary-soft">
+                  Ausgeschaltet werden Treffer nur angezeigt, nicht übernommen.
+                </span>
+              )}
               <Link href="/so-funktionierts" className="text-xs text-primary-soft hover:text-selection transition-colors">
                 Wie entscheidet die Suche?
               </Link>
@@ -646,12 +659,9 @@ function SearchPageContent() {
               {stats.newJobs} {stats.newJobs === 1 ? 'neuer Job' : 'neue Jobs'} zu deiner Liste hinzugefügt
             </p>
             {!justSaved && (
-              <button
-                onClick={saveCurrentSearch}
-                className="px-4 py-2 bg-accent hover:bg-accent-strong text-on-accent rounded-xl text-sm font-medium transition-colors"
-              >
+              <Button size="sm" onClick={saveCurrentSearch}>
                 + Suche speichern
-              </button>
+              </Button>
             )}
             {justSaved && (
               <span className="text-sm text-primary-soft">Gespeichert.</span>
@@ -697,12 +707,9 @@ function SearchPageContent() {
                 Suchen-Button, der Textlink ersetzt */}
             {!justSaved && stats.newJobs === 0 && (
               <div className="sm:col-span-2 flex flex-wrap items-center gap-3">
-                <button
-                  onClick={saveCurrentSearch}
-                  className="px-4 py-2 bg-accent hover:bg-accent-strong text-on-accent rounded-xl text-sm font-medium transition-colors"
-                >
+                <Button size="sm" onClick={saveCurrentSearch}>
                   + Suche speichern
-                </button>
+                </Button>
                 <span className="text-sm text-primary-soft">— später mit einem Klick wiederholen</span>
               </div>
             )}
@@ -861,8 +868,7 @@ function JobCard({
   const reasonLabelClass = isHighMatch ? 'text-success' : 'text-foreground'
   // Eine Skala, ein Vokabular: semanticScore kommt als aiScore (1–10) an —
   // Prozentwerte sind hier Vergangenheit, damit klassischer und semantischer
-  // Pfad dasselbe sagen
-  const scoreColor = typeof job.aiScore === 'number' ? scoreTone(job.aiScore) : 'text-primary-soft'
+  // Pfad dasselbe sagen. Der Score selbst rendert zentral als ScoreBadge.
   const detailCount =
     (job.strengths?.length ?? 0) + (job.gaps?.length ?? 0) + (job.transferableSkills?.length ?? 0)
   // Lange Begründungen werden auf zwei Zeilen gekappt — die Karte bleibt eine
@@ -902,12 +908,9 @@ function JobCard({
               .join(' · ') || 'Ohne Angabe'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft tabular-nums ${scoreColor}`}>
+            <span className="px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft tabular-nums">
               {typeof job.aiScore === 'number' ? (
-                <>
-                  <span className="sr-only">KI-Score: {job.aiScore} von 10 — {scoreLabel(job.aiScore)}</span>
-                  <span aria-hidden="true">Score {job.aiScore}/10 · {scoreWord(job.aiScore)}</span>
-                </>
+                <ScoreBadge score={job.aiScore} size="sm" />
               ) : (
                 'Kein Score'
               )}

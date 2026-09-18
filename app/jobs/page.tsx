@@ -4,8 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
-import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
-import { scoreLabel } from '@/lib/matching'
+import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, ScoreBadge } from '../components/ui'
 import { STATUS_LABELS, isBacklogJob } from '@/lib/status'
 import { SCORE_LIMIT } from '@/lib/search'
 
@@ -368,8 +367,6 @@ export default function JobsPage() {
     }
   }
 
-  const getScoreColor = scoreTone
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -433,7 +430,7 @@ export default function JobsPage() {
             </p>
           </div>
           <ButtonLink href="/jobs/new">
-            + Job hinzufügen
+            <span aria-hidden="true">+</span> Job hinzufügen
           </ButtonLink>
         </section>
 
@@ -647,12 +644,9 @@ export default function JobsPage() {
                   Keine Jobs für diese Filter.
                 </p>
                 <div className="flex flex-wrap justify-center gap-3">
-                  <button
-                    onClick={resetFilters}
-                    className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors"
-                  >
+                  <Button onClick={resetFilters}>
                     Filter zurücksetzen
-                  </button>
+                  </Button>
                   <ButtonLink href="/search" variant="secondary">
                     Neue Suche starten
                   </ButtonLink>
@@ -695,12 +689,7 @@ export default function JobsPage() {
                         </div>
                       </div>
                       {job.score != null ? (
-                        <div className={`text-3xl font-light tabular-nums ${getScoreColor(job.score)}`}>
-                          <span className="sr-only">
-                            KI-Score: {job.score} von 10 — {scoreLabel(job.score)}
-                          </span>
-                          <span aria-hidden="true">{job.score}</span>
-                        </div>
+                        <ScoreBadge score={job.score} size="lg" />
                       ) : (
                         <div className="text-xs text-primary-soft pt-3">
                           Noch keine Bewertung

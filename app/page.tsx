@@ -2,8 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { Button, ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, scoreTone } from './components/ui'
-import { scoreLabel } from '@/lib/matching'
+import { Button, ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, ScoreBadge } from './components/ui'
 import { SCORE_LIMIT } from '@/lib/search'
 import { isBacklogJob } from '@/lib/status'
 
@@ -489,10 +488,11 @@ export default function Dashboard() {
               )}
               <p>
                 <span className="whitespace-nowrap">
+                  Rückstand:{' '}
                   <span className="font-medium text-foreground">
                     {unscoredAllCount} von {stats.total}
                   </span>{' '}
-                  aktiven Jobs im Rückstand
+                  aktiven Jobs unbewertet
                 </span>{' '}
                 · <span className="whitespace-nowrap">{stats.applied} in der Pipeline</span>
               </p>
@@ -539,18 +539,7 @@ export default function Dashboard() {
                         {job.title}
                       </p>
                       {job.score != null && (
-                        <span
-                          className={`flex-shrink-0 text-lg font-light tabular-nums ${scoreTone(job.score)}`}
-                        >
-                          {/* Bedeutung als Text getragen, nicht nur als Farbe (WCAG 1.4.1) */}
-                          <span className="sr-only">
-                            KI-Score: {job.score} von 10 — {scoreLabel(job.score)}
-                          </span>
-                          <span aria-hidden="true">
-                            {job.score}
-                            <span className="text-xs text-primary-soft">/10</span>
-                          </span>
-                        </span>
+                        <ScoreBadge score={job.score} className="flex-shrink-0" />
                       )}
                     </div>
                     <p className="text-xs text-primary-soft">

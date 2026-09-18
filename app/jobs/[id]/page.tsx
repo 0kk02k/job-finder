@@ -209,6 +209,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
+  // Anschreiben verwerfen ist destruktiv (der bearbeitete Text ist weg) —
+  // zweistufig wie die anderen Destruktiven: erster Klick fragt, der zweite führt aus
+  const [confirmingDiscardLetter, setConfirmingDiscardLetter] = useState(false)
+
+  // Anecdote-Chooser: die drei besten Passungen liegen offen, der Rest hinter
+  // einer Disclosure — die ganze Sammlung als Radio-Liste überfordert den
+  // Entscheidungspunkt (Muster: „Weitere Status" auf /jobs)
+  const [showAllAnecdotes, setShowAllAnecdotes] = useState(false)
+
   // Löschen ist unwiderruflich (Historie kaskadiert mit) — deshalb zweistufig
   const [confirmingDelete, setConfirmingDelete] = useState(false)
 
@@ -604,7 +613,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   </p>
                 )}
                 <div className="space-y-2">
-                  {orderedChoices.map(({ anecdote, reason }) => (
+                  {orderedChoices.slice(0, 3).map(({ anecdote, reason }) => (
                     <label
                       key={anecdote.id}
                       className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
@@ -632,6 +641,47 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       </span>
                     </label>
                   ))}
+                  {orderedChoices.length > 3 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setShowAllAnecdotes((prev) => !prev)}
+                        aria-expanded={showAllAnecdotes}
+                        className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors border border-dashed border-border text-primary-soft hover:text-foreground hover:border-primary-soft"
+                      >
+                        Aus allen {orderedChoices.length} Anekdoten wählen {showAllAnecdotes ? '▾' : '▸'}
+                      </button>
+                      {showAllAnecdotes &&
+                        orderedChoices.slice(3).map(({ anecdote, reason }) => (
+                          <label
+                            key={anecdote.id}
+                            className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
+                              chosenAnecdote === anecdote.id ? 'border-selection' : 'border-border'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="anekdote-wahl"
+                              value={anecdote.id}
+                              checked={chosenAnecdote === anecdote.id}
+                              onChange={() => setChosenAnecdote(anecdote.id)}
+                              className="mt-1 accent-selection"
+                            />
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium text-foreground">{anecdote.title}</span>
+                              {reason ? (
+                                <span className="block text-xs text-primary-soft mt-0.5">{reason}</span>
+                              ) : (
+                                <span className="block text-xs text-primary-soft mt-0.5">
+                                  {anecdote.situation.slice(0, 90)}
+                                  {anecdote.situation.length > 90 ? '…' : ''}
+                                </span>
+                              )}
+                            </span>
+                          </label>
+                        ))}
+                    </>
+                  )}
                   <label
                     className={`flex items-start gap-3 rounded-xl border p-3 cursor-pointer transition-colors ${
                       chosenAnecdote === 'none' ? 'border-selection' : 'border-border'
@@ -724,10 +774,22 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   {matching ? 'Wird geprüft …' : 'Neu erzeugen'}
                 </Button>
                 <button
-                  onClick={() => setLetter(null)}
-                  className="text-sm text-primary underline decoration-selection/60 underline-offset-4 hover:text-foreground hover:decoration-selection"
+                  onClick={() => {
+                    if (!confirmingDiscardLetter) {
+                      setConfirmingDiscardLetter(true)
+                      setTimeout(() => setConfirmingDiscardLetter(false), 5000)
+                      return
+                    }
+                    setConfirmingDiscardLetter(false)
+                    setLetter(null)
+                  }}
+                  className={`text-sm underline underline-offset-4 transition-colors ${
+                    confirmingDiscardLetter
+                      ? 'text-error decoration-error/60 hover:decoration-error'
+                      : 'text-primary decoration-selection/60 hover:text-foreground hover:decoration-selection'
+                  }`}
                 >
-                  Verwerfen
+                  {confirmingDiscardLetter ? 'Verwerfen?' : 'Verwerfen'}
                 </button>
               </div>
             </div>
@@ -847,15 +909,42 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
-          <h2 className="text-sm font-medium text-primary-soft mb-4">
-            Beschreibung
-          </h2>
-          <div className="prose max-w-none">
+        {/* Anzeigentext als Referenz-Material, nicht als Seitenabschluss:
+            hinter einer Disclosure, mit kurzem Vorspann für die eingeklappte
+            Ansicht. <details>/<summary> bringt Tastatur und Screenreader
+            ohne eigenen State */}
+        <details className="bg-surface rounded-2xl border border-border mb-6 group">
+          <summary className="p-6 cursor-pointer list-none [&::-webkit-details-marker]:hidden transition-colors">
+            <span className="text-sm font-medium text-primary-soft group-open:text-foreground">
+              Anzeigentext (Portal)
+            </span>
+            <span aria-hidden="true" className="text-xs text-primary-soft ml-2">
+              {job.description
+                ? `${job.description.replace(/\s+/g, ' ').trim().slice(0, 140)}${job.description.replace(/\s+/g, ' ').trim().length > 140 ? ' …' : ''}`
+                : 'Kein Text vorhanden'}
+            </span>
+            <span aria-hidden="true" className="block text-xs text-selection mt-1 group-open:hidden">
+              Anzeigen ▸
+            </span>
+            <span aria-hidden="true" className="hidden text-xs text-selection mt-1 group-open:block">
+              Einklappen ▾
+            </span>
+          </summary>
+          <div className="px-6 pb-6 prose max-w-none">
             {/* Strukturiert (Entities, Bullets, Satz-Absätze, Anzeigen-Überschriften) gerendert —
                 keine Formatierungsartefakte und keine Textwände aus den Job-Börsen-Feeds */}
             <MarkdownContent content={structureJobDescription(job.description ?? '')} variant="description" />
           </div>
+        </details>
+
+        {/* Ruhiger Abschluss mit Rückweg — die Seite endet nicht in der Anzeige */}
+        <div className="mb-6">
+          <Link
+            href="/jobs"
+            className="text-sm text-primary hover:text-selection transition-colors"
+          >
+            ← Zurück zu allen Jobs
+          </Link>
         </div>
 
       </main>

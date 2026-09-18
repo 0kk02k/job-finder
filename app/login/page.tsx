@@ -15,7 +15,24 @@ export default function LoginPage() {
   async function handleGoogle() {
     setLoading(true)
     setError('')
-    await signIn('google', { callbackUrl: '/' })
+    // Derselbe Vertrag wie beim Credentials-Login: redirect:false liefert ein
+    // Ergebnis-Objekt statt sofort umzuleiten — ein Fehler oder Abbruch hängt
+    // sonst ewig in „Wird angemeldet …"
+    try {
+      const result = await signIn('google', { callbackUrl: '/', redirect: false })
+      if (result?.error) {
+        setError('Anmeldung mit Google fehlgeschlagen — versuch es erneut.')
+        setLoading(false)
+      } else if (result?.url) {
+        router.push(result.url)
+        router.refresh()
+      } else {
+        setLoading(false)
+      }
+    } catch {
+      setError('Anmeldung mit Google fehlgeschlagen — versuch es erneut.')
+      setLoading(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -41,8 +58,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <h1 className="text-2xl font-light text-foreground mb-8 text-center">
+        {/* Wortmarke dekorativ, die Seite trägt eine echte H1 */}
+        <p className="text-xl font-semibold text-foreground mb-2 text-center">
           Job-Finder
+        </p>
+        <h1 className="text-2xl font-light text-foreground mb-8 text-center">
+          Anmelden
         </h1>
 
         <form onSubmit={handleSubmit} className="bg-surface rounded-2xl p-6 shadow-sm border border-border space-y-4">

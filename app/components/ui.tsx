@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
-import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
+import { HIGH_MATCH_THRESHOLD, scoreLabel, scoreWord } from '@/lib/matching'
 
 export { HIGH_MATCH_THRESHOLD }
 
@@ -78,6 +78,32 @@ export function scoreTone(score: number | null | undefined): string {
   if (score >= 8) return 'text-success'
   if (score >= 6) return 'text-warning'
   return 'text-error'
+}
+
+// Eine Schreibweise für den Score überall: Zahl + /10 + Kurzwort, farbcodiert
+// nach scoreTone, Bedeutung zusätzlich als sr-only-Text (WCAG 1.4.1). Das
+// visuelle Gewicht trägt der size-Parameter (Chip klein, Detail groß) — das
+// Vokabular bleibt identisch.
+export function ScoreBadge({
+  score,
+  size = 'md',
+  className = '',
+}: {
+  score: number
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+}) {
+  const sizeClass = size === 'lg' ? 'text-3xl' : size === 'sm' ? 'text-base' : 'text-lg'
+  const subClass = size === 'lg' ? 'text-base' : 'text-xs'
+  return (
+    <span className={`font-light tabular-nums ${scoreTone(score)} ${sizeClass} ${className}`}>
+      <span className="sr-only">KI-Score: {score} von 10 — {scoreLabel(score)}</span>
+      <span aria-hidden="true">
+        {score}
+        <span className={`text-primary-soft ${subClass}`}>/10 · {scoreWord(score)}</span>
+      </span>
+    </span>
+  )
 }
 
 const STATUS_BADGES: Record<string, { label: string; className: string }> = {

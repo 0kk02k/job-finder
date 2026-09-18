@@ -16,7 +16,23 @@ export default function RegisterPage() {
   async function handleGoogle() {
     setLoading(true)
     setError('')
-    await signIn('google', { callbackUrl: '/' })
+    // redirect:false, damit Fehler und Abbruch als Ergebnis zurückkommen
+    // statt die Fläche in „Wird erstellt …" hängen zu lassen
+    try {
+      const result = await signIn('google', { callbackUrl: '/', redirect: false })
+      if (result?.error) {
+        setError('Registrierung mit Google fehlgeschlagen — versuch es erneut.')
+        setLoading(false)
+      } else if (result?.url) {
+        router.push(result.url)
+        router.refresh()
+      } else {
+        setLoading(false)
+      }
+    } catch {
+      setError('Registrierung mit Google fehlgeschlagen — versuch es erneut.')
+      setLoading(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {

@@ -95,8 +95,8 @@ export default function SoFunktioniertsPage() {
             Der KI-Provider steht in den{' '}
             <Link href="/settings" className="text-selection hover:text-foreground">Einstellungen</Link> — mit deinem
             eigenen Schlüssel, der verschlüsselt gespeichert wird. Anzeigen-, Lebenslauf- und
-            Gesprächstexte gehen an genau diesen Provider (Zero Data Retention, keine
-            Trainingsnutzung); Details stehen im{' '}
+            Gesprächstexte gehen an genau diesen Provider — ohne Speicherung der Inhalte, ohne
+            Trainingsnutzung; Details stehen im{' '}
             <Link href="/datenschutz" className="text-selection hover:text-foreground">Datenschutz</Link>.
           </p>
         </section>
