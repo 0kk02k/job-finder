@@ -12,14 +12,28 @@ import {
 
 type ToastType = 'success' | 'error'
 
+interface ToastAction {
+  label: string
+  onClick: () => void
+}
+
 interface ToastItem {
   id: number
   message: string
   type: ToastType
+  action?: ToastAction
+  // Anzeigedauer in ms — Toasts mit Handlungsangebot (z. B. „Rückgängig")
+  // bleiben länger stehen als reine Bestätigungen
+  duration?: number
+}
+
+interface ToastOptions {
+  action?: ToastAction
+  duration?: number
 }
 
 interface ToastContextValue {
-  success: (message: string) => void
+  success: (message: string, options?: ToastOptions) => void
   error: (message: string) => void
 }
 
@@ -40,14 +54,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const push = useCallback(
-    (message: string, type: ToastType) => {
+    (message: string, type: ToastType, options?: ToastOptions) => {
       const id = ++idRef.current
-      setToasts((prev) => [...prev, { id, message, type }])
+      setToasts((prev) => [...prev, { id, message, type, ...options }])
     },
     []
   )
 
-  const success = useCallback((message: string) => push(message, 'success'), [push])
+  const success = useCallback(
+    (message: string, options?: ToastOptions) => push(message, 'success', options),
+    [push]
+  )
   const error = useCallback((message: string) => push(message, 'error'), [push])
 
   return (
@@ -71,9 +88,9 @@ function Toast({ toast, onClose }: { toast: ToastItem; onClose: () => void }) {
 
   useEffect(() => {
     if (paused) return
-    const timer = setTimeout(() => setExiting(true), 3700)
+    const timer = setTimeout(() => setExiting(true), toast.duration ?? 3700)
     return () => clearTimeout(timer)
-  }, [paused])
+  }, [paused, toast.duration])
 
   useEffect(() => {
     if (!exiting) return
@@ -102,6 +119,17 @@ function Toast({ toast, onClose }: { toast: ToastItem; onClose: () => void }) {
       <p className="flex-1 text-sm text-foreground leading-relaxed">
         {toast.message}
       </p>
+      {toast.action && (
+        <button
+          onClick={() => {
+            toast.action!.onClick()
+            onClose()
+          }}
+          className="flex-shrink-0 text-sm font-medium text-selection hover:text-selection-strong transition-colors motion-reduce:transition-none"
+        >
+          {toast.action.label}
+        </button>
+      )}
       <button
         onClick={onClose}
         className="flex-shrink-0 p-1 -m-1 text-primary-soft hover:text-foreground transition-colors motion-reduce:transition-none"

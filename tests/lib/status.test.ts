@@ -3,7 +3,7 @@
 // überschrieben oder zurückgenommen.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { appliedAtFor, rejectedAtFor, STATUS_LABELS } from '../../lib/status'
+import { appliedAtFor, rejectedAtFor, STATUS_LABELS, isBacklogJob } from '../../lib/status'
 
 const NOW = new Date('2026-09-08T12:00:00Z')
 const EARLIER = new Date('2026-08-01T09:00:00Z')
@@ -48,4 +48,15 @@ test('every JobStatus has a German label', () => {
   for (const status of ['DISCOVERED', 'SCORED', 'HIGH_MATCH', 'APPLIED', 'INTERVIEW', 'OFFER', 'REJECTED', 'ARCHIVED']) {
     assert.ok(STATUS_LABELS[status], `label fehlt für ${status}`)
   }
+})
+
+// Eine Rückstand-Definition für Dashboard, /jobs und score-batch: Score fehlt
+// UND weder archiviert (ignorieren landet dort) noch abgelehnt.
+test('backlog = score null and neither archived nor rejected', () => {
+  assert.equal(isBacklogJob({ score: null, status: 'DISCOVERED' }), true)
+  assert.equal(isBacklogJob({ score: null, status: 'HIGH_MATCH' }), true)
+  assert.equal(isBacklogJob({ score: null, status: 'APPLIED' }), true)
+  assert.equal(isBacklogJob({ score: 8, status: 'DISCOVERED' }), false)
+  assert.equal(isBacklogJob({ score: null, status: 'ARCHIVED' }), false)
+  assert.equal(isBacklogJob({ score: null, status: 'REJECTED' }), false)
 })

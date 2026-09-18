@@ -63,7 +63,7 @@ export default function SoFunktioniertsPage() {
             Instanz: Er begründet sich, die Entscheidung triffst du.
           </p>
         </section>
-        <section>
+        <section id="score-limit" className="scroll-mt-24">
           <h2 className="text-sm font-medium text-foreground mb-2">5 · Ehrliche Grenzen</h2>
           <p>
             Die klassische Suche bewertet bis zu 50 Treffer pro Lauf (einer kostet nur einen

@@ -28,3 +28,11 @@ export function rejectedAtFor(nextStatus: string, current: Date | null, now: Dat
   if (nextStatus !== 'REJECTED') return current ?? null
   return current ?? now
 }
+
+// Der Bewertungs-Rückstand — eine Definition für Dashboard, /jobs und die
+// score-batch-Route: Score fehlt UND weder archiviert (ignorieren landet dort)
+// noch abgelehnt. Ein abgelehntes oder archiviertes Job braucht keine Bewertung
+// mehr; alles andere schon.
+export function isBacklogJob(job: { score: number | null; status: string }): boolean {
+  return job.score == null && job.status !== 'ARCHIVED' && job.status !== 'REJECTED'
+}

@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useToast } from '../components/Toast'
 import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
 import { scoreLabel } from '@/lib/matching'
-import { STATUS_LABELS } from '@/lib/status'
+import { STATUS_LABELS, isBacklogJob } from '@/lib/status'
 import { SCORE_LIMIT } from '@/lib/search'
 
 interface Job {
@@ -50,6 +50,8 @@ export default function JobsPage() {
   const toast = useToast()
   const [jobs, setJobs] = useState<Job[]>([])
   const [loading, setLoading] = useState(true)
+  // Fehler beim Laden — kein stiller „0 Jobs": eigene Meldung mit Wiederholung
+  const [loadError, setLoadError] = useState(false)
 
   const [search, setSearch] = useState('')
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -70,6 +72,8 @@ export default function JobsPage() {
   const [batchRunning, setBatchRunning] = useState(false)
   const [batchDone, setBatchDone] = useState(0)
   const [batchTotal, setBatchTotal] = useState(0)
+  // Was nach dem Lauf noch offen ist — die 20-Lauf-Hartgrenze bricht sonst still ab
+  const [batchRemaining, setBatchRemaining] = useState<number | null>(null)
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     if (typeof window === 'undefined') return 'newest'
     // Deep-Link aus dem Dashboard: die am längsten wartenden zuerst
@@ -95,20 +99,25 @@ export default function JobsPage() {
       if (!response.ok) {
         if (response.status === 401) {
           router.push('/login')
+          return
         }
-        setJobs([])
+        setLoadError(true)
         return
       }
       const data = await response.json()
       setJobs(data)
+      setLoadError(false)
     } catch (error) {
       console.error('Failed to fetch jobs:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
   }
 
   async function updateStatus(jobId: string, status: string) {
+    const previous = jobs.find((j) => j.id === jobId)?.status
+    if (!previous || previous === status) return
     try {
       const response = await fetch(`/api/jobs/${jobId}`, {
         method: 'PATCH',
@@ -120,14 +129,50 @@ export default function JobsPage() {
         return
       }
       fetchJobs()
+      // Fehlklicks passieren an vier nebeneinanderstehenden Buttons — jeder
+      // Wechsel bekommt einen Rückgängig-Weg, bevor er Realität wird
+      toast.success(`Status geändert zu ‚${STATUS_LABELS[status] ?? status}‘`, {
+        duration: 7000,
+        action: {
+          label: 'Rückgängig',
+          onClick: () =>
+            void revertStatus(jobId, previous, previous !== 'REJECTED' && status === 'REJECTED'),
+        },
+      })
     } catch {
       toast.error('Status konnte nicht aktualisiert werden')
+    }
+  }
+
+  // Derselbe Endpunkt wie der Wechsel selbst, nur mit dem vorherigen Status;
+  // undoRejectedAt verspricht dem Server, dass genau der rückerstattete Klick
+  // rejectedAt gesetzt hat (dann darf das Datum zurück auf null)
+  async function revertStatus(jobId: string, previous: string, undoRejectedAt: boolean) {
+    try {
+      const response = await fetch(`/api/jobs/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: previous, ...(undoRejectedAt ? { undoRejectedAt: true } : {}) }),
+      })
+      if (!response.ok) {
+        toast.error('Rückgängigmachen fehlgeschlagen — der Status bleibt wie er ist.')
+        return
+      }
+      fetchJobs()
+    } catch {
+      toast.error('Rückgängigmachen fehlgeschlagen — der Status bleibt wie er ist.')
     }
   }
 
   async function bulkSetStatus(status: string) {
     if (selectedIds.size === 0 || bulkBusy) return
     setBulkBusy(true)
+    // Vorherige Status je Job merken — die Sammel-Rückgängig-Aktion setzt
+    // jeden Einzelnen zurück auf seinen eigenen Ausgangswert
+    const previousById = new Map(
+      jobs.filter((j) => selectedIds.has(j.id)).map((j) => [j.id, j.status])
+    )
+    const count = selectedIds.size
     try {
       await Promise.all(
         [...selectedIds].map((id) =>
@@ -140,6 +185,13 @@ export default function JobsPage() {
       )
       setSelectedIds(new Set())
       fetchJobs()
+      toast.success(`Status geändert zu ‚${STATUS_LABELS[status] ?? status}‘ — ${count} Jobs`, {
+        duration: 7000,
+        action: {
+          label: 'Rückgängig',
+          onClick: () => void revertBulk(previousById),
+        },
+      })
     } catch {
       toast.error('Sammelaktion fehlgeschlagen — bitte erneut versuchen.')
     } finally {
@@ -147,9 +199,29 @@ export default function JobsPage() {
     }
   }
 
+  async function revertBulk(previousById: Map<string, string>) {
+    try {
+      await Promise.all(
+        [...previousById].map(([id, previous]) =>
+          fetch(`/api/jobs/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            // undoRejectedAt ist serverseitig abgesichert: gelöscht wird nur,
+            // was dieser Klick selbst gesetzt hat
+            body: JSON.stringify({ status: previous, undoRejectedAt: true }),
+          })
+        )
+      )
+      fetchJobs()
+    } catch {
+      toast.error('Rückgängigmachen fehlgeschlagen — die Status bleiben wie sie sind.')
+    }
+  }
+
   // Der globale Bewertungsrückstand — unabhängig von Filtern, denn der Server
-  // bewertet ebenfalls den globalen Rückstand
-  const unscoredTotal = useMemo(() => jobs.filter((job) => job.score == null).length, [jobs])
+  // bewertet ebenfalls den globalen Rückstand (dasselbe Zählprinzip wie die
+  // score-batch-Route: score null und weder archiviert noch abgelehnt)
+  const unscoredTotal = useMemo(() => jobs.filter(isBacklogJob).length, [jobs])
 
   const filteredJobs = useMemo(() => {
     let result = jobs.filter((job) => activeStatuses.has(job.status))
@@ -157,7 +229,8 @@ export default function JobsPage() {
     if (scoreFilter === 'top') {
       result = result.filter((job) => (job.score ?? 0) >= HIGH_MATCH_THRESHOLD)
     } else if (scoreFilter === 'unscored') {
-      result = result.filter((job) => job.score == null)
+      // „Rückstand" zählt wie überall: score null und weder archiviert noch abgelehnt
+      result = result.filter(isBacklogJob)
     } else if (scoreFilter === 'scored') {
       result = result.filter((job) => job.score != null)
     }
@@ -264,6 +337,7 @@ export default function JobsPage() {
     setBatchRunning(true)
     setBatchDone(0)
     setBatchTotal(unscoredTotal)
+    setBatchRemaining(null)
     batchAbortRef.current = false
     try {
       // 20 Läufe à max. 20 Jobs decken jeden Freundeskreis-Rückstand ab; Abbruch,
@@ -283,6 +357,7 @@ export default function JobsPage() {
           return
         }
         setBatchDone((done) => done + data.scored + data.failed + data.skipped)
+        setBatchRemaining(data.remaining)
         if (data.remaining === 0 || (data.scored === 0 && data.failed === 0)) break
       }
     } catch {
@@ -363,6 +438,17 @@ export default function JobsPage() {
         </section>
 
         {jobs.length === 0 ? (
+          loadError ? (
+            /* Fehler beim Laden — nicht als „0 Jobs" maskieren */
+            <section role="alert" className="bg-surface rounded-2xl p-16 text-center border border-border">
+              <p className="text-primary-soft mb-6">
+                Jobs konnten nicht geladen werden — prüfe deine Verbindung und versuch es erneut.
+              </p>
+              <Button size="sm" variant="secondary" onClick={() => void fetchJobs()}>
+                Erneut laden
+              </Button>
+            </section>
+          ) : (
           /* Empty State — no jobs at all */
           <section className="bg-surface rounded-2xl p-16 text-center border border-border">
             <p className="text-primary-soft mb-6">
@@ -372,6 +458,7 @@ export default function JobsPage() {
               Ersten Job hinzufügen
             </ButtonLink>
           </section>
+          )
         ) : (
           <>
             {/* Filter Toolbar */}
@@ -427,7 +514,7 @@ export default function JobsPage() {
                     ['all', 'Alle'],
                     ['top', 'Top Matches'],
                     ['scored', 'Bewertet'],
-                    ['unscored', 'Unbewertet'],
+                    ['unscored', 'Rückstand'],
                   ] as const
                 ).map(([value, label]) => {
                   const active = scoreFilter === value
@@ -456,7 +543,7 @@ export default function JobsPage() {
                   <p className="text-xs text-primary-soft">
                     Scores entstehen bei der Suche (bis zu {SCORE_LIMIT} pro Lauf) — der Rest
                     wartet hier.{' '}
-                    <Link href="/so-funktionierts" className="text-selection hover:text-selection-strong">
+                    <Link href="/so-funktionierts#score-limit" className="text-selection hover:text-selection-strong">
                       Warum gibt es Reste?
                     </Link>
                   </p>
@@ -474,7 +561,7 @@ export default function JobsPage() {
                     >
                       {batchRunning
                         ? `Stoppen (${batchDone}/${batchTotal})`
-                        : `Unbewertete bewerten (${unscoredTotal})`}
+                        : `Rückstand bewerten (${unscoredTotal})`}
                     </Button>
                   )}
                 </div>
@@ -494,6 +581,21 @@ export default function JobsPage() {
                 <p className="text-xs text-primary-soft tabular-nums">
                   Bewerte … {batchDone}/{batchTotal}
                 </p>
+              )}
+              {/* Hartgrenze erreicht oder manuell gestoppt: der Rest wird
+                  benannt statt still abzubrechen — ein Klick startet die nächste Etappe */}
+              {!batchRunning && batchRemaining != null && batchRemaining > 0 && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-xs text-primary-soft tabular-nums">
+                    Noch {batchRemaining} unbewertet — erneut starten für den Rest.
+                  </p>
+                  <button
+                    onClick={() => void runScoreBatch()}
+                    className="text-sm text-primary hover:text-selection transition-colors"
+                  >
+                    Erneut starten
+                  </button>
+                </div>
               )}
             </section>
 

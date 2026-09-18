@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Button, ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, scoreTone } from './components/ui'
 import { scoreLabel } from '@/lib/matching'
 import { SCORE_LIMIT } from '@/lib/search'
+import { isBacklogJob } from '@/lib/status'
 
 interface Job {
   id: string
@@ -144,8 +145,11 @@ export default function Dashboard() {
       // Eine Menge, eine Semantik: alle Kennzahlen über dieselben aktiven Jobs
       const active = jobs.filter((j) => !['ARCHIVED', 'REJECTED'].includes(j.status))
       const scored = active.filter((j) => j.score != null)
-      // Ohne Bewertung — über die aktive Menge, identisch zum Zähler auf /jobs (Korpus-Wahrheit)
-      const unscoredAll = active.filter((j) => j.score == null)
+      // Der Rückstand — dieselbe Definition wie auf /jobs und in der
+      // score-batch-Route (isBacklogJob): Score fehlt und weder archiviert
+      // noch abgelehnt. Der Schnitt über aktive Jobs trägt dasselbe Ergebnis,
+      // die Funktion macht die Definition aber zur einzigen Quelle.
+      const unscoredAll = active.filter(isBacklogJob)
       // Handlungsfähiger Teil: unbewertet UND nicht schon in der Pipeline
       const unscored = unscoredAll.filter((j) => !PIPELINE_AHEAD.includes(j.status))
       const weekAgo = Date.now() - WEEK_MS
@@ -307,19 +311,12 @@ export default function Dashboard() {
     },
     {
       step: 3,
-      title: 'Jobs suchen',
-      description: 'Suche nach einem Beruf oder Ort — oder füge einen Job per Link ein.',
-      done: (stats?.total ?? 0) > 0,
+      title: 'Jobs suchen und bewerten lassen',
+      description:
+        'Suche nach einem Beruf oder Ort — die KI bewertet die Treffer gegen deinen Lebenslauf.',
+      done: (stats?.total ?? 0) > 0 && (stats?.scored ?? 0) > 0,
       href: '/search',
       cta: 'Jetzt suchen',
-    },
-    {
-      step: 4,
-      title: 'KI-Matching',
-      description: 'Die KI bewertet Treffer gegen deinen Lebenslauf.',
-      done: (stats?.scored ?? 0) > 0,
-      href: '/search',
-      cta: 'Suche starten',
     },
   ]
   const firstOpenStep = onboardingSteps.findIndex((s) => !s.done)
@@ -495,7 +492,7 @@ export default function Dashboard() {
                   <span className="font-medium text-foreground">
                     {unscoredAllCount} von {stats.total}
                   </span>{' '}
-                  aktiven Jobs ohne Bewertung
+                  aktiven Jobs im Rückstand
                 </span>{' '}
                 · <span className="whitespace-nowrap">{stats.applied} in der Pipeline</span>
               </p>

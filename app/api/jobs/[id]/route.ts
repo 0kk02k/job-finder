@@ -42,7 +42,7 @@ export async function PATCH(
 
   const { id } = await params
   const body = await request.json()
-  const { status, notes, followUpAt } = body
+  const { status, notes, followUpAt, undoRejectedAt } = body
 
   if (status !== undefined && !VALID_STATUSES.includes(status)) {
     return NextResponse.json({ error: 'Ungültiger Status' }, { status: 400 })
@@ -73,6 +73,21 @@ export async function PATCH(
       // Erster Bewerbungsversand und erste Absage werden festgehalten und nie überschrieben
       data.appliedAt = appliedAtFor(status, existing.appliedAt, new Date())
       data.rejectedAt = rejectedAtFor(status, existing.rejectedAt, new Date())
+      // Rückgängig-Flag (nur vom Undo-Toast gesetzt): ein sofort widerrufener
+      // Fehlklick auf „Abgelehnt" darf die Absage-Statistik nicht vergiften.
+      // rejectedAt wird nur gelöscht, wenn (a) der Rücksprung von REJECTED
+      // kommt, (b) der Client verspricht, dass genau dieser Klick das Datum
+      // gesetzt hat, und (c) es jung genug ist, um wirklich von diesem Klick
+      // zu stammen — ein rejectedAt von früher bleibt unberührt.
+      if (
+        undoRejectedAt === true &&
+        status !== 'REJECTED' &&
+        existing.status === 'REJECTED' &&
+        existing.rejectedAt &&
+        Date.now() - existing.rejectedAt.getTime() < 60_000
+      ) {
+        data.rejectedAt = null
+      }
     }
     if (notes !== undefined) {
       // Eine geleerte Notiz ist eine gelöschte — kein Unsichtbarer Restwert
