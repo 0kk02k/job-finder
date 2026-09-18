@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Button, ButtonLink, StatusBadge, HIGH_MATCH_THRESHOLD, scoreTone } from './components/ui'
 import { scoreLabel } from '@/lib/matching'
+import { SCORE_LIMIT } from '@/lib/search'
 
 interface Job {
   id: string
@@ -578,14 +579,14 @@ export default function Dashboard() {
         )}
 
         {/* Leer-Ausgabe statt stumm verschwindender Sektion: der Grund, warum hier
-            nichts steht, und der Ausweg — Scores entstehen bei der Suche (15 pro Suche). */}
+            nichts steht, und der Ausweg — Scores entstehen bei der Suche (SCORE_LIMIT pro Suche). */}
         {jobsState === 'ok' && !showOnboarding && topMatches.length === 0 && (
           <section className="mb-12">
             <h2 className="text-xl font-medium text-foreground mb-4">Top Matches</h2>
             <div className="bg-surface rounded-2xl p-8 border border-border-soft">
               <p className="font-medium text-foreground mb-1">Noch keine bewerteten Jobs</p>
               <p className="text-sm text-primary leading-relaxed max-w-prose mb-5">
-                Bewertungen entstehen bei der Suche — die KI bewertet dort die ersten 15 Treffer
+                Bewertungen entstehen bei der Suche — die KI bewertet dort bis zu {SCORE_LIMIT} Treffer
                 gegen deinen Lebenslauf.
               </p>
               <ButtonLink href="/search" variant="secondary" size="sm">
