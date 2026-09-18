@@ -245,6 +245,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     }
   }
 
+  // Anschreiben: ein „beschäftigt"-Zustand für beide Buttons sperrt alle,
+  // das Format-Flag sagt, welcher gerade lädt (Muster: resume/page.tsx)
+  const [letterFormat, setLetterFormat] = useState<null | 'pdf' | 'docx'>(null)
   // Anschreiben verwerfen ist destruktiv (der bearbeitete Text ist weg) —
   // zweistufig wie die anderen Destruktiven: erster Klick fragt, der zweite führt aus
   const [confirmingDiscardLetter, setConfirmingDiscardLetter] = useState(false)
@@ -414,6 +417,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
     if (!job) return
 
     setBusy(type)
+    // Eigenes Format-Flag für die Brief-Buttons: ein gemeinsames 'letter'
+    // zeigte bei laufendem Download auf beiden „Wird geladen …"
+    if (type === 'letter') setLetterFormat(format)
     try {
       const response = await fetch('/api/pdf', {
         method: 'POST',
@@ -444,6 +450,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
       toast.error('Netzwerkfehler — das Dokument konnte nicht geladen werden.')
     } finally {
       setBusy(null)
+      setLetterFormat(null)
     }
   }
 
@@ -811,10 +818,10 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               />
               <div className="flex flex-wrap items-center gap-3 mt-4">
                 <Button size="sm" onClick={() => void handleDownloadPDF('letter', 'pdf')} disabled={busy !== null}>
-                  {busy === 'letter' ? 'Wird geladen …' : 'Als PDF'}
+                  {busy === 'letter' && letterFormat === 'pdf' ? 'Wird geladen …' : 'Als PDF'}
                 </Button>
                 <Button size="sm" variant="secondary" onClick={() => void handleDownloadPDF('letter', 'docx')} disabled={busy !== null}>
-                  {busy === 'letter' ? 'Wird geladen …' : 'Als DOCX'}
+                  {busy === 'letter' && letterFormat === 'docx' ? 'Wird geladen …' : 'Als DOCX'}
                 </Button>
                 <Button
                   size="sm"

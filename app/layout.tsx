@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Job Finder",
+  title: "Job-Finder",
   description:
     "Private Jobsuche und Bewerbungs-Verwaltung: semantische Suche, KI-Matching gegen deinen Lebenslauf, Pipeline-Tracking und Interview-Training.",
 };

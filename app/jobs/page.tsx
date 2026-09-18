@@ -317,6 +317,10 @@ export default function JobsPage() {
         const job = filteredJobs[next]
         setHighlightId(job.id)
         document.getElementById(`job-${job.id}`)?.scrollIntoView({ block: 'nearest' })
+        // Screenreader-Sichtbarkeit: Fokus folgt dem Highlight (ohne Scroll,
+        // den übernimmt scrollIntoView) — die Karte hat tabIndex={-1} und
+        // verrät sich so als aktuelle Position
+        document.getElementById(`job-${job.id}`)?.focus({ preventScroll: true })
         return
       }
       if (e.key === 'Enter' && highlightId) {
@@ -735,7 +739,8 @@ export default function JobsPage() {
                   <div
                     key={job.id}
                     id={`job-${job.id}`}
-                    className={`bg-surface rounded-2xl p-8 border shadow-sm ${
+                    tabIndex={-1}
+                    className={`bg-surface rounded-2xl p-8 border shadow-sm outline-offset-2 ${
                       highlightId === job.id ? 'border-selection' : 'border-border'
                     }`}
                   >

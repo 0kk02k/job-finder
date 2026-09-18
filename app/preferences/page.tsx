@@ -91,10 +91,34 @@ export default function PreferencesPage() {
     }
   }
 
+  // Eingabefeld-Ref für Autogrow (Höhe folgt dem Inhalt, gedeckelt)
+  const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  // Enter bricht die Zeile um, Strg/Cmd+Enter sendet — der sichtbare Hinweis
+  // unter dem Feld trägt den Vertrag
+  function handleInputKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      e.preventDefault()
+      e.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    setInput(e.target.value)
+    // Autogrow: Höhe folgt dem Inhalt, bei ~6 Zeilen stoppt das Wachstum
+    // (max-h-40 + Scrollbalken)
+    e.target.style.height = 'auto'
+    e.target.style.height = `${e.target.scrollHeight}px`
+  }
+
   async function sendMessage(e: React.FormEvent) {
     e.preventDefault()
     const message = input.trim()
     if (!message || sending) return
+
+    // Eingabefeld auf eine Zeile zurücksetzen (Autogrow-Höhe inklusive)
+    setInput('')
+    if (inputRef.current) inputRef.current.style.height = 'auto'
 
     // Optimistisch anzeigen
     setSession((prev) =>
@@ -108,7 +132,6 @@ export default function PreferencesPage() {
           }
         : prev
     )
-    setInput('')
     setSending(true)
     setError(null)
 
@@ -393,16 +416,28 @@ export default function PreferencesPage() {
               <div ref={bottomRef} />
             </div>
 
-            {/* Eingabe */}
-            <form onSubmit={sendMessage} className="px-8 py-4 border-t border-border flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Deine Antwort…"
-                disabled={sending}
-                className="flex-1 min-w-0 px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft disabled:opacity-50"
-              />
+            {/* Eingabe — erzählende Antworten verdienen mehr als eine Zeile:
+                Enter bricht um, Strg/Cmd+Enter sendet, das Feld wächst mit */}
+            <form onSubmit={sendMessage} className="px-8 py-4 border-t border-border flex items-end gap-2">
+              <div className="flex-1 min-w-0">
+                <label htmlFor="preferences-input" className="sr-only">
+                  Deine Antwort
+                </label>
+                <textarea
+                  id="preferences-input"
+                  ref={inputRef}
+                  value={input}
+                  onChange={handleInputChange}
+                  onKeyDown={handleInputKeyDown}
+                  placeholder="Deine Antwort…"
+                  disabled={sending}
+                  rows={1}
+                  className="w-full max-h-40 px-4 py-3 rounded-xl border border-border bg-background text-foreground placeholder:text-primary-soft disabled:opacity-50 resize-none overflow-y-auto"
+                />
+                <p className="text-xs text-primary-soft mt-1">
+                  Enter für neue Zeile · Strg+Enter zum Senden
+                </p>
+              </div>
               <button
                 type="submit"
                 disabled={sending || !input.trim()}

@@ -274,7 +274,9 @@ export default function Dashboard() {
         href: '/applications',
       })
     }
-    if (savedSearches.length > 0) {
+    // Die Option zeigt auf den Anker der Sektion unten — sie darf nur
+    // erscheinen, wenn die Sektion auch rendert (im Onboarding fehlt sie)
+    if (savedSearches.length > 0 && !showOnboarding) {
       options.push({
         label: 'Gespeicherte Suchen ansehen',
         description: `${savedSearches.length} ${savedSearches.length === 1 ? 'Suche' : 'Suchen'} ${
@@ -289,12 +291,12 @@ export default function Dashboard() {
   }
 
   const newJobsTotal = savedSearches.reduce((n, s) => n + (s.lastNewJobs ?? 0), 0)
-  const launcherOptions = getLauncherOptions()
   // Onboarding nur bei sicher bekanntem Zustand — ein Resume-API-Fehler wird nicht zum
   // Onboarding umgedeutet. „Leer" heißt: wirklich leer (totalAll, alle Jobs inkl.
   // archiviert/abgelehnt) — wer eine geleerte Pipeline hat, bekommt kein Anfänger-Onboarding zurück.
   const showOnboarding =
     jobsState === 'ok' && stats != null && !resumeError && (hasResume === false || stats.totalAll === 0)
+  const launcherOptions = getLauncherOptions()
 
   // Genau ein aktueller Schritt: der erste noch offene — die Nummerierung trägt echte Ordnung
   const onboardingSteps = [
