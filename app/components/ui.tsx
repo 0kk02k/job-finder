@@ -129,6 +129,30 @@ export function StatusBadge({ status }: { status: string }) {
   )
 }
 
+// Info-Chip: Fakten-Marker (Fähigkeit, Lücke, übertragbare Stärke) — Zustand,
+// keine Handlung, also nie Ocker. Eine Variante mit Border für alle Flächen,
+// statt je Seite eine eigene Chip-Definition.
+export function InfoChip({
+  children,
+  tone = 'neutral',
+  className = '',
+}: {
+  children: ReactNode
+  tone?: 'success' | 'error' | 'neutral'
+  className?: string
+}) {
+  const tones = {
+    success: 'bg-success/10 text-success border-success/20',
+    error: 'bg-error/10 text-error border-error/20',
+    neutral: 'bg-border-soft text-foreground border-border',
+  }
+  return (
+    <span className={`inline-block px-3 py-1 text-sm rounded-full border ${tones[tone]} ${className}`}>
+      {children}
+    </span>
+  )
+}
+
 // Status-Wechsler: aktiver Zustand in Tinten-Blau (aria-pressed), inaktiv dezent —
 // Zustand, keine Handlung, also nicht Ocker (Eine Rolle, eine Farbe).
 // Genutzt in der Job-Liste (Schnell-Buttons) und auf dem Job-Detail.

@@ -3,10 +3,10 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useToast } from '../../components/Toast'
+import { useToast, UNDO_TOAST_DURATION_MS } from '../../components/Toast'
 import { MarkdownContent, structureJobDescription } from '../../components/Markdown'
-import { Button, StatusBadge, StatusButton, buttonClasses, ScoreBadge } from '../../components/ui'
-import { STATUS_LABELS } from '@/lib/status'
+import { Button, StatusBadge, StatusButton, buttonClasses, ScoreBadge, InfoChip } from '../../components/ui'
+import { STATUS_LABELS, isBacklogJob } from '@/lib/status'
 import { isDue } from '@/lib/applications'
 import { SCORE_LIMIT } from '@/lib/search'
 
@@ -102,10 +102,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [unscoredCount, setUnscoredCount] = useState(0)
 
   useEffect(() => {
+    // Der Trichter-Zähler zählt denselben Rückstand wie überall (isBacklogJob:
+    // Score fehlt UND weder archiviert noch abgelehnt). Der Fetch lädt die
+    // leichte Feldliste ohne description — ein eigener Zähler-Endpoint wäre
+    // sauberer, lohnt sich für ein Kästchen aber nicht.
     fetch('/api/jobs')
       .then((r) => (r.ok ? r.json() : []))
-      .then((data: Array<{ score: number | null }>) =>
-        setUnscoredCount(data.filter((j) => j.score == null).length)
+      .then((data: Array<{ score: number | null; status: string }>) =>
+        setUnscoredCount(data.filter(isBacklogJob).length)
       )
       .catch(() => {})
   }, [])
@@ -133,6 +137,8 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   async function updateStatus(status: string) {
     if (!job) return
+    const previous = job.status
+    if (previous === status) return
     try {
       const response = await fetch(`/api/jobs/${job.id}`, {
         method: 'PATCH',
@@ -144,8 +150,39 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         return
       }
       setJob({ ...job, status })
+      // Derselbe Vertrag wie in der Übersicht: jeder Wechsel bekommt einen
+      // Rückgängig-Weg, bevor er Realität wird
+      toast.success(`Status geändert zu ‚${STATUS_LABELS[status] ?? status}‘`, {
+        duration: UNDO_TOAST_DURATION_MS,
+        action: {
+          label: 'Rückgängig',
+          onClick: () =>
+            void revertStatus(previous, previous !== 'REJECTED' && status === 'REJECTED'),
+        },
+      })
     } catch {
       toast.error('Status konnte nicht aktualisiert werden')
+    }
+  }
+
+  // Derselbe Endpunkt wie der Wechsel selbst, nur mit dem vorherigen Status;
+  // undoRejectedAt verspricht dem Server, dass genau dieser Klick rejectedAt
+  // gesetzt hat (dann darf das Datum zurück auf null)
+  async function revertStatus(previous: string, undoRejectedAt: boolean) {
+    if (!job) return
+    try {
+      const response = await fetch(`/api/jobs/${job.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: previous, ...(undoRejectedAt ? { undoRejectedAt: true } : {}) }),
+      })
+      if (!response.ok) {
+        toast.error('Rückgängigmachen fehlgeschlagen — der Status bleibt wie er ist.')
+        return
+      }
+      setJob({ ...job, status: previous })
+    } catch {
+      toast.error('Rückgängigmachen fehlgeschlagen — der Status bleibt wie er ist.')
     }
   }
 
@@ -219,6 +256,9 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
 
   // Löschen ist unwiderruflich (Historie kaskadiert mit) — deshalb zweistufig
   const [confirmingDelete, setConfirmingDelete] = useState(false)
+  // Doppelklick-Schutz: nach dem bestätigenden Klick ist der Button 1 s
+  // gesperrt — ein reflexartiger zweiter Klick löscht nicht doppelt
+  const [deleteGuard, setDeleteGuard] = useState(false)
 
   async function handleDelete() {
     if (!job) return
@@ -465,7 +505,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <button
                 onClick={() => void updateStatus('REJECTED')}
                 aria-pressed={job.status === 'REJECTED'}
-                className={`text-sm underline underline-offset-4 transition-colors ${
+                className={`px-2 py-1.5 rounded-lg text-sm underline underline-offset-4 transition-colors ${
                   job.status === 'REJECTED'
                     ? 'text-error decoration-error/60'
                     : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
@@ -476,7 +516,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               <button
                 onClick={() => void updateStatus('ARCHIVED')}
                 aria-pressed={job.status === 'ARCHIVED'}
-                className={`text-sm underline underline-offset-4 transition-colors ${
+                className={`px-2 py-1.5 rounded-lg text-sm underline underline-offset-4 transition-colors ${
                   job.status === 'ARCHIVED'
                     ? 'text-primary-soft decoration-primary-soft/60'
                     : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
@@ -531,9 +571,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       <p className="text-sm font-medium text-foreground mb-2">Passt gut:</p>
                       <div className="flex flex-wrap gap-2">
                         {strengths.map((skill, i) => (
-                          <span key={i} className="px-3 py-1 bg-success/10 text-success text-sm rounded-full">
-                            {skill}
-                          </span>
+                          <InfoChip key={i} tone="success">{skill}</InfoChip>
                         ))}
                       </div>
                     </div>
@@ -543,9 +581,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       <p className="text-sm font-medium text-foreground mb-2">Fehlt:</p>
                       <div className="flex flex-wrap gap-2">
                         {gaps.map((gap, i) => (
-                          <span key={i} className="px-3 py-1 bg-error/10 text-error text-sm rounded-full">
-                            {gap}
-                          </span>
+                          <InfoChip key={i} tone="error">{gap}</InfoChip>
                         ))}
                       </div>
                     </div>
@@ -555,9 +591,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                       <p className="text-sm font-medium text-foreground mb-2">Übertragbare Stärken:</p>
                       <div className="flex flex-wrap gap-2">
                         {transferableSkills.map((skill, i) => (
-                          <span key={i} className="px-3 py-1 bg-border-soft text-foreground text-sm rounded-full">
-                            {skill}
-                          </span>
+                          <InfoChip key={i}>{skill}</InfoChip>
                         ))}
                       </div>
                     </div>
@@ -800,7 +834,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                     setConfirmingDiscardLetter(false)
                     setLetter(null)
                   }}
-                  className={`text-sm underline underline-offset-4 transition-colors ${
+                  className={`px-2 py-1.5 rounded-lg text-sm underline underline-offset-4 transition-colors ${
                     confirmingDiscardLetter
                       ? 'text-error decoration-error/60 hover:decoration-error'
                       : 'text-primary decoration-selection/60 hover:text-foreground hover:decoration-selection'
@@ -857,8 +891,14 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
                   Anzeige wirklich löschen? Auch die Status-Historie verschwindet.
                 </span>
                 <button
-                  onClick={() => void handleDelete()}
-                  className="text-sm font-medium text-error underline decoration-error/60 underline-offset-4 hover:decoration-error"
+                  onClick={() => {
+                    if (deleteGuard) return
+                    setDeleteGuard(true)
+                    setTimeout(() => setDeleteGuard(false), 1000)
+                    void handleDelete()
+                  }}
+                  disabled={deleteGuard}
+                  className="text-sm font-medium text-error underline decoration-error/60 underline-offset-4 hover:decoration-error disabled:opacity-50"
                 >
                   Ja, löschen
                 </button>

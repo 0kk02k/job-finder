@@ -51,6 +51,10 @@ export default function ResumePage() {
   // Ersetzen ist zweistufig: die gewählte Datei wartet auf den bestätigenden
   // Klick — bis dahin ist noch nichts passiert
   const [pendingFile, setPendingFile] = useState<{ file: File; name: string } | null>(null)
+  // Doppelklick-Schutz: nach dem bestätigenden Klick ist der Button für
+  // 1 s gesperrt — ein reflexartiger zweiter Klick auf derselben Stelle
+  // löst nichts aus
+  const [replaceGuard, setReplaceGuard] = useState(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -376,8 +380,14 @@ export default function ResumePage() {
                   „{pendingFile.name}“ als neuen Lebenslauf übernehmen?
                 </p>
                 <button
-                  onClick={() => void confirmReplace()}
-                  className="text-sm font-medium text-error underline decoration-error/60 underline-offset-4 hover:decoration-error"
+                  onClick={() => {
+                    if (replaceGuard) return
+                    setReplaceGuard(true)
+                    setTimeout(() => setReplaceGuard(false), 1000)
+                    void confirmReplace()
+                  }}
+                  disabled={replaceGuard}
+                  className="text-sm font-medium text-error underline decoration-error/60 underline-offset-4 hover:decoration-error disabled:opacity-50"
                 >
                   Ersetzen
                 </button>

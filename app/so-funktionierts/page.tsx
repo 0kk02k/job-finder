@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { SCORE_LIMIT } from '@/lib/search'
 
 export const metadata: Metadata = {
   title: 'So funktioniert’s — Job-Finder',
@@ -66,7 +67,7 @@ export default function SoFunktioniertsPage() {
         <section id="score-limit" className="scroll-mt-24">
           <h2 className="text-sm font-medium text-foreground mb-2">5 · Ehrliche Grenzen</h2>
           <p>
-            Die klassische Suche bewertet bis zu 50 Treffer pro Lauf (einer kostet nur einen
+            Die klassische Suche bewertet bis zu {SCORE_LIMIT} Treffer pro Lauf (einer kostet nur einen
             Bruchteil eines Cents) — Reste zieht ein nächtlicher Lauf nach, und auf jeder
             Job-Detailseite steht „Jetzt bewerten“ für den Einzelnen. Fällt die KI ganz aus,
             siehst du den Pool ungerankt statt einer Fehlerwand — nichts wird gespeichert, die

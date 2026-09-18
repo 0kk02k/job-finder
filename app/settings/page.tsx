@@ -381,11 +381,14 @@ export default function SettingsPage() {
   }
 
   // Ein Key-Feld pro Provider statt einer Fünf-Felder-Wand
+  // KI-Schlüssel-Erklärung gilt für alle Anbieter gleich — einmal definieren
+  const KEY_HELP = 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.'
+
   const keyFieldFor: Record<string, { key: keyof NewKeys; label: string; hint?: string | null; help: string } | null> = {
-    nebius: { key: 'nebius', label: 'KI-Schlüssel (Nebius)', hint: settings.nebiusKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
-    gemini: { key: 'gemini', label: 'KI-Schlüssel (Google Gemini)', hint: settings.geminiKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
-    openai: { key: 'openai', label: 'KI-Schlüssel (OpenAI)', hint: settings.openaiKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
-    openrouter: { key: 'openrouter', label: 'KI-Schlüssel (OpenRouter)', hint: settings.openrouterKeyHint, help: 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.' },
+    nebius: { key: 'nebius', label: 'KI-Schlüssel (Nebius)', hint: settings.nebiusKeyHint, help: KEY_HELP },
+    gemini: { key: 'gemini', label: 'KI-Schlüssel (Google Gemini)', hint: settings.geminiKeyHint, help: KEY_HELP },
+    openai: { key: 'openai', label: 'KI-Schlüssel (OpenAI)', hint: settings.openaiKeyHint, help: KEY_HELP },
+    openrouter: { key: 'openrouter', label: 'KI-Schlüssel (OpenRouter)', hint: settings.openrouterKeyHint, help: KEY_HELP },
     ollama: null,
   }
   const activeKeyField = keyFieldFor[settings.aiProvider] ?? null

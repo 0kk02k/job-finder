@@ -428,6 +428,13 @@ export default function JobsPage() {
     setShowMoreStatuses(!moreOpen)
   }
 
+  // Auswahl-Stand über die sichtbare (gefilterte) Ansicht — Grundlage für
+  // „Alle auswählen" mit Teilauswahl-Zustand
+  const allVisibleSelected =
+    filteredJobs.length > 0 && filteredJobs.every((j) => selectedIds.has(j.id))
+  const someVisibleSelected =
+    !allVisibleSelected && filteredJobs.some((j) => selectedIds.has(j.id))
+
   function statusChip(status: string) {
     const active = activeStatuses.has(status)
     return (
@@ -627,11 +634,37 @@ export default function JobsPage() {
               )}
             </section>
 
-            {/* Result Counter */}
+            {/* Result Counter — mit „Alle auswählen" für die sichtbare Ansicht
+                (drei Zustände: keine / alle / Teilauswahl via indeterminate) */}
             <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 mb-4">
-              <p className="text-sm text-primary-soft tabular-nums">
-                {filteredJobs.length} von {jobs.length} Jobs
-              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  ref={(el) => {
+                    if (el) el.indeterminate = someVisibleSelected
+                  }}
+                  checked={allVisibleSelected}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedIds(new Set(filteredJobs.map((j) => j.id)))
+                    } else {
+                      // Nur die sichtbaren abwählen — Auswahl außerhalb der
+                      // aktuellen Filter bleibt bestehen
+                      setSelectedIds((prev) => {
+                        const next = new Set(prev)
+                        filteredJobs.forEach((j) => next.delete(j.id))
+                        return next
+                      })
+                    }
+                  }}
+                  disabled={filteredJobs.length === 0}
+                  aria-label="Alle sichtbaren Jobs auswählen"
+                  className="w-4 h-4 accent-selection"
+                />
+                <p className="text-sm text-primary-soft tabular-nums">
+                  {filteredJobs.length} von {jobs.length} Jobs
+                </p>
+              </div>
               <div className="flex items-center gap-4">
                 <p className="text-xs text-primary-soft hidden sm:block">
                   Tastatur: S = Suche · J/K = vor/zurück · Enter = öffnen
@@ -658,6 +691,17 @@ export default function JobsPage() {
                   <StatusButton label={STATUS_LABELS.INTERVIEW} onClick={() => void bulkSetStatus('INTERVIEW')} active={false} />
                   {/* Handlung als Verb, der Zustand heißt „Archiviert" (Badge) */}
                   <StatusButton label="Archivieren" onClick={() => void bulkSetStatus('ARCHIVED')} active={false} />
+                  {/* Abgelehnt bleibt dezenter Textlink — und der Bulk-Undo
+                      setzt rejectedAt korrekt zurück: revertBulk schickt
+                      undoRejectedAt, der Server nullt das Datum nur, wenn
+                      genau dieser Lauf es gesetzt (jung) hat. Ein früheres
+                      rejectedAt überlebt den Rückweg unverändert. */}
+                  <button
+                    onClick={() => void bulkSetStatus('REJECTED')}
+                    className="px-2 py-1.5 rounded-lg text-sm text-primary-soft underline decoration-transparent underline-offset-4 hover:text-foreground hover:decoration-primary-soft/60 transition-colors"
+                  >
+                    Abgelehnt
+                  </button>
                 </div>
                 <button
                   onClick={() => setSelectedIds(new Set())}
@@ -760,7 +804,7 @@ export default function JobsPage() {
                         <button
                           onClick={() => updateStatus(job.id, 'REJECTED')}
                           aria-pressed={job.status === 'REJECTED'}
-                          className={`text-sm underline underline-offset-4 transition-colors ${
+                          className={`px-2 py-1.5 rounded-lg text-sm underline underline-offset-4 transition-colors ${
                             job.status === 'REJECTED'
                               ? 'text-error decoration-error/60'
                               : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
@@ -771,7 +815,7 @@ export default function JobsPage() {
                         <button
                           onClick={() => updateStatus(job.id, 'ARCHIVED')}
                           aria-pressed={job.status === 'ARCHIVED'}
-                          className={`text-sm underline underline-offset-4 transition-colors ${
+                          className={`px-2 py-1.5 rounded-lg text-sm underline underline-offset-4 transition-colors ${
                             job.status === 'ARCHIVED'
                               ? 'text-primary-soft decoration-primary-soft/60'
                               : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'

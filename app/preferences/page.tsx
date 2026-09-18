@@ -332,7 +332,7 @@ export default function PreferencesPage() {
             </div>
             <div className="h-1 bg-border-soft">
               <div
-                className="h-1 bg-primary transition-all"
+                className="h-1 bg-selection transition-all"
                 style={{ width: `${(session.completedItems.length / Math.max(session.guide.length, 1)) * 100}%` }}
               />
             </div>

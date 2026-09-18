@@ -78,6 +78,10 @@ export default function RegisterPage() {
   return (
     <div className="flex-1 bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
+        {/* Wortmarke dekorativ, die Seite trägt eine echte H1 — Muster wie Login */}
+        <p className="text-xl font-semibold text-foreground mb-2 text-center">
+          Job-Finder
+        </p>
         <h1 className="text-2xl font-light text-foreground mb-8 text-center">
           Account erstellen
         </h1>
@@ -150,7 +154,7 @@ export default function RegisterPage() {
             type="button"
             onClick={handleGoogle}
             disabled={loading}
-            className="w-full bg-surface hover:bg-border/40 disabled:opacity-50 border border-border text-foreground py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-3"
+            className="w-full bg-surface hover:bg-border-soft disabled:opacity-50 border border-border text-foreground py-3 rounded-xl font-medium transition-colors flex items-center justify-center gap-3"
           >
             <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
               <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"/>

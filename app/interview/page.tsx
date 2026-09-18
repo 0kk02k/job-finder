@@ -94,6 +94,9 @@ export default function InterviewPage() {
   }, [interview?.messages.length])
 
   const [confirmingRestart, setConfirmingRestart] = useState(false)
+  // Doppelklick-Schutz: nach dem bestätigenden Klick ist der Button 1 s
+  // gesperrt — ein reflexartiger zweiter Klick löscht das Gespräch nicht doppelt
+  const [restartGuard, setRestartGuard] = useState(false)
   const [confirmingFinish, setConfirmingFinish] = useState(false)
   const [resynthesizing, setResynthesizing] = useState(false)
 
@@ -468,14 +471,18 @@ export default function InterviewPage() {
                 {!confirmingFinish && (
                   <button
                     onClick={() => {
+                      if (restartGuard) return
                       if (confirmingRestart) {
+                        setRestartGuard(true)
+                        setTimeout(() => setRestartGuard(false), 1000)
                         void restart()
                       } else {
                         setConfirmingRestart(true)
                         setTimeout(() => setConfirmingRestart(false), 5000)
                       }
                     }}
-                    className={`text-sm transition-colors ${
+                    disabled={restartGuard}
+                    className={`px-2 py-1.5 rounded-lg text-sm transition-colors disabled:opacity-50 ${
                       confirmingRestart
                         ? 'font-medium text-error'
                         : 'text-primary-soft hover:text-error'
@@ -488,7 +495,7 @@ export default function InterviewPage() {
             </div>
             <div className="h-1 bg-border-soft">
               <div
-                className="h-1 bg-primary transition-all"
+                className="h-1 bg-selection transition-all"
                 style={{ width: `${(interview.completedItems.length / Math.max(interview.guide.length, 1)) * 100}%` }}
               />
             </div>

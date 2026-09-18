@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
-import { Button, ScoreBadge } from '../components/ui'
+import { Button, ScoreBadge, InfoChip } from '../components/ui'
 import { HIGH_MATCH_THRESHOLD } from '@/lib/matching'
 import { platformLabel } from '@/lib/sources'
 import { mergeStreamedJobs, SCORE_LIMIT } from '@/lib/search'
@@ -1024,9 +1024,7 @@ function JobCard({
               <p className="text-sm font-medium text-foreground mb-2">Passt gut:</p>
               <div className="flex flex-wrap gap-2">
                 {job.strengths.map((skill, i) => (
-                  <span key={i} className="px-3 py-1 bg-success/10 text-success text-sm rounded-full border border-success/20">
-                    {skill}
-                  </span>
+                  <InfoChip key={i} tone="success">{skill}</InfoChip>
                 ))}
               </div>
             </div>
@@ -1037,9 +1035,7 @@ function JobCard({
               <p className="text-sm font-medium text-foreground mb-2">Fehlt:</p>
               <div className="flex flex-wrap gap-2">
                 {job.gaps.map((gap, i) => (
-                  <span key={i} className="px-3 py-1 bg-error/10 text-error text-sm rounded-full border border-error/20">
-                    {gap}
-                  </span>
+                  <InfoChip key={i} tone="error">{gap}</InfoChip>
                 ))}
               </div>
             </div>
@@ -1050,9 +1046,7 @@ function JobCard({
               <p className="text-sm font-medium text-foreground mb-2">Übertragbare Stärken:</p>
               <div className="flex flex-wrap gap-2">
                 {job.transferableSkills.map((skill, i) => (
-                  <span key={i} className="px-3 py-1 bg-border-soft text-foreground text-sm rounded-full">
-                    {skill}
-                  </span>
+                  <InfoChip key={i}>{skill}</InfoChip>
                 ))}
               </div>
             </div>
