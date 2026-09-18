@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { MarkdownContent } from '../components/Markdown'
-import { Card } from '../components/ui'
+import { Button, ButtonLink, Card } from '../components/ui'
 import { COMPETENCIES } from '@/lib/competencies'
 
 interface Message {
@@ -58,6 +58,7 @@ export default function InterviewPage() {
   const [personalityType, setPersonalityType] = useState('')
   const [savedType, setSavedType] = useState<string | null>(null)
   const [showGuide, setShowGuide] = useState(false)
+  const [hasProfile, setHasProfile] = useState(false)
 
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -70,6 +71,13 @@ export default function InterviewPage() {
       })
       .catch(() => {})
       .finally(() => setLoading(false))
+
+    // Zwei-Phasen-Einstieg: Hat der Nutzer Phase 1 (Präferenz-Gespräch)
+    // schon hinter sich? Der Light-Endpoint ist die billige Quelle dafür.
+    fetch('/api/preferences?light=1')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setHasProfile(Boolean(data?.hasProfile)))
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -86,6 +94,60 @@ export default function InterviewPage() {
   }, [interview?.messages.length])
 
   const [confirmingRestart, setConfirmingRestart] = useState(false)
+  const [confirmingFinish, setConfirmingFinish] = useState(false)
+  const [resynthesizing, setResynthesizing] = useState(false)
+
+  // Abschließen ohne komplette Agenda — bewusst möglich: Der Klassifikator hakt
+  // nachsichtig ab, und die Interviewerin kann sich vorzeitig verabschiedet
+  // haben. Die Akte entsteht aus dem, was da ist; offene Themen bleiben
+  // ehrlich offen. Schlägt die Auswertung fehl, übernimmt der
+  // „Erneut versuchen“-Screen ({ resynthesize: true }).
+  async function finishInterview() {
+    setConfirmingFinish(false)
+    setSending(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ finish: true }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setInterview(data)
+      } else {
+        setError(data.error || 'Abschließen fehlgeschlagen — dein Interview bleibt unverändert.')
+      }
+    } catch {
+      setError('Abschließen fehlgeschlagen — dein Interview bleibt unverändert.')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  // Auswertung nachholen (Abschluss lief durch, aber die KI war kurz weg) —
+  // das Transkript ist komplett, also reicht das erneute Ableiten.
+  async function resynthesize() {
+    setResynthesizing(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/interview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resynthesize: true }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setInterview(data)
+      } else {
+        setError(data.error || 'Auswertung konnte nicht erstellt werden')
+      }
+    } catch {
+      setError('Auswertung konnte nicht erstellt werden')
+    } finally {
+      setResynthesizing(false)
+    }
+  }
 
   async function startInterview() {
     setSending(true)
@@ -231,7 +293,8 @@ export default function InterviewPage() {
   }
 
   const isActive = interview?.status === 'ACTIVE'
-  const isCompleted = interview?.status === 'COMPLETED' && interview.insights
+  const isCompleted = interview?.status === 'COMPLETED'
+  const openTopics = (interview?.guide ?? []).filter((item) => !item.done).map((item) => item.topic)
 
   return (
     <div className="min-h-screen bg-background">
@@ -253,8 +316,54 @@ export default function InterviewPage() {
           </section>
         )}
 
-        {/* Vorbereitungs-Tipp: 16Personalities — ruhige Erklärbox im
-            Startbereich, bevor das Gespräch läuft */}
+        {/* Zwei-Phasen-Einstieg: erst Präferenzen klären, dann das Interview —
+            es baut auf beidem auf und überspringt, was schon geklärt ist */}
+        {!isActive && !isCompleted && (
+          <section className="grid gap-6 md:grid-cols-2 mb-8">
+            <Card className="p-8 shadow-sm flex flex-col">
+              <p className="text-xs font-medium text-primary-soft mb-2">Phase 1 · etwa 10 Minuten</p>
+              <h2 className="text-lg font-medium text-foreground mb-2">Erst Präferenzen klären</h2>
+              <p className="text-sm text-primary-soft leading-relaxed mb-6 flex-1">
+                Ein kurzes Gespräch, das deine Jobsuche sofort schärft: Was dir Freude macht,
+                was dir wichtig ist, was du vermeiden willst. Das Ergebnis fließt direkt in die
+                Bewertung und Suche deiner Jobs — und das HR-Interview überspringt Themen,
+                die hier schon geklärt sind.
+              </p>
+              {hasProfile ? (
+                <div>
+                  <ButtonLink href="/preferences" variant="secondary">
+                    Profil ansehen und anpassen
+                  </ButtonLink>
+                  <p className="text-xs text-success mt-3">
+                    Dein Präferenzen-Profil liegt vor — Phase 1 ist erledigt.
+                  </p>
+                </div>
+              ) : (
+                <ButtonLink href="/preferences" variant="secondary">
+                  Zum Präferenz-Gespräch
+                </ButtonLink>
+              )}
+            </Card>
+            <Card className="p-8 shadow-sm flex flex-col">
+              <p className="text-xs font-medium text-primary-soft mb-2">Phase 2 · etwa 15–20 Minuten</p>
+              <h2 className="text-lg font-medium text-foreground mb-2">HR-Interview starten</h2>
+              <p className="text-sm text-primary-soft leading-relaxed mb-6 flex-1">
+                Das geführte Gespräch baut auf deinem Lebenslauf, deinen Präferenzen und deinen
+                Anekdoten auf — bereits geklärte Themen werden übersprungen und trotzdem in die
+                Auswertung einbezogen. Es erhebt Stärken, Schwächen und Teamverhalten mit
+                konkreten Beispielen.
+              </p>
+              <div>
+                <Button onClick={startInterview} disabled={sending}>
+                  {sending ? 'Starte…' : 'Interview starten'}
+                </Button>
+              </div>
+            </Card>
+          </section>
+        )}
+
+        {/* Vorbereitungs-Tipp: 16Personalities — dezenter Hinweis unter den
+            beiden Phasen, bevor das Gespräch läuft */}
         <Card className="p-8 mb-8 shadow-sm">
           <h2 className="text-lg font-medium text-foreground mb-2">
             Vorbereitungs-Tipp: Dein Persönlichkeitstyp
@@ -301,28 +410,6 @@ export default function InterviewPage() {
           )}
         </Card>
 
-        {/* Intro / Start */}
-        {!isActive && !isCompleted && (
-          <section className="bg-surface rounded-2xl p-16 text-center border border-border">
-            <p className="text-primary-soft mb-2">
-              Das Interview dauert etwa 15–20 Minuten.
-            </p>
-            <p className="text-sm text-primary-soft mb-6">
-              Ein freies Gespräch wie ein echtes HR-Interview. Im Hintergrund hakt die
-              Interviewerin ihre Agenda ab — Stärken, Schwächen, Teamverhalten, eine kleine
-              Praxisaufgabe, deine Ziele — sobald du einen Punkt befriedigend beantwortet hast.
-              Du kannst jederzeit aufhören — dein Stand bleibt erhalten, wenn du wiederkommst.
-            </p>
-            <button
-              onClick={startInterview}
-              disabled={sending}
-              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
-            >
-              {sending ? 'Starte…' : 'Interview starten'}
-            </button>
-          </section>
-        )}
-
         {/* Chat */}
         {isActive && interview && (
           <section className="bg-surface rounded-2xl border border-border shadow-sm overflow-hidden">
@@ -340,28 +427,57 @@ export default function InterviewPage() {
                 <span className="text-xs underline">{showGuide ? 'ausblenden' : 'anzeigen'}</span>
               </button>
               <div className="flex items-center gap-3 flex-shrink-0">
-                {confirmingRestart && (
+                {confirmingFinish ? (
+                  <>
+                    <span className="text-xs text-primary-soft max-w-xs text-right" role="status">
+                      {openTopics.length > 0
+                        ? `Noch offen: ${openTopics.join(', ')} — die Akte entsteht aus deinen bisherigen Antworten.`
+                        : 'Alle Themen abgehakt — deine Akte wird erstellt.'}
+                    </span>
+                    <button
+                      onClick={() => void finishInterview()}
+                      disabled={sending}
+                      className="text-sm font-medium text-primary hover:text-selection transition-colors disabled:opacity-50"
+                    >
+                      {sending ? 'Erstelle Akte …' : 'Wirklich abschließen'}
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setConfirmingFinish(true)
+                      setTimeout(() => setConfirmingFinish(false), 8000)
+                    }}
+                    disabled={sending}
+                    className="text-sm text-primary hover:text-selection transition-colors disabled:opacity-50"
+                  >
+                    Abschließen
+                  </button>
+                )}
+                {!confirmingFinish && confirmingRestart && (
                   <span className="text-xs text-error" role="status">
                     Antworten werden gelöscht.
                   </span>
                 )}
-                <button
-                  onClick={() => {
-                    if (confirmingRestart) {
-                      void restart()
-                    } else {
-                      setConfirmingRestart(true)
-                      setTimeout(() => setConfirmingRestart(false), 5000)
-                    }
-                  }}
-                  className={`text-sm transition-colors ${
-                    confirmingRestart
-                      ? 'font-medium text-error'
-                      : 'text-primary-soft hover:text-error'
-                  }`}
-                >
-                  {confirmingRestart ? 'Wirklich löschen' : 'Neu starten'}
-                </button>
+                {!confirmingFinish && (
+                  <button
+                    onClick={() => {
+                      if (confirmingRestart) {
+                        void restart()
+                      } else {
+                        setConfirmingRestart(true)
+                        setTimeout(() => setConfirmingRestart(false), 5000)
+                      }
+                    }}
+                    className={`text-sm transition-colors ${
+                      confirmingRestart
+                        ? 'font-medium text-error'
+                        : 'text-primary-soft hover:text-error'
+                    }`}
+                  >
+                    {confirmingRestart ? 'Wirklich löschen' : 'Neu starten'}
+                  </button>
+                )}
               </div>
             </div>
             <div className="h-1 bg-border-soft">
@@ -557,6 +673,26 @@ export default function InterviewPage() {
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {/* Abgeschlossen ohne Auswertung — die KI war beim Abschluss kurz weg.
+            Das Transkript ist komplett: Erneut versuchen, kein zweites Interview. */}
+        {isCompleted && interview && !interview.insights && (
+          <section className="bg-surface rounded-2xl p-16 text-center border border-border">
+            <p className="text-foreground mb-2">
+              Das Interview ist abgeschlossen — aber die Auswertung konnte nicht erstellt werden.
+            </p>
+            <p className="text-sm text-primary-soft mb-6">
+              Die KI war vermutlich kurz nicht erreichbar. Deine Antworten sind gespeichert.
+            </p>
+            <button
+              onClick={() => void resynthesize()}
+              disabled={resynthesizing}
+              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
+            >
+              {resynthesizing ? 'Erstelle Auswertung …' : 'Erneut versuchen'}
+            </button>
           </section>
         )}
       </main>
