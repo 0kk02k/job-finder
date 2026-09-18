@@ -165,7 +165,7 @@ export default function NewJobPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex-1 bg-accent hover:bg-accent-strong disabled:opacity-50 text-surface py-3 rounded-xl font-medium transition-colors"
+                className="flex-1 bg-accent hover:bg-accent-strong disabled:opacity-50 text-on-accent py-3 rounded-xl font-medium transition-colors"
               >
                 {loading ? 'Wird hinzugefügt …' : 'Hinzufügen'}
               </button>

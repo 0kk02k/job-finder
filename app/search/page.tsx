@@ -348,6 +348,18 @@ function SearchPageContent() {
     runSearch(saved.query, saved.location || '', saved.remote, saved.semantic, saved.id)
   }
 
+  // Leere-Suche-Hebel: dieselbe Suche mit einer gezielten Lockerung erneut
+  // laufen lassen — der Nutzer entscheidet mit einem Klick, nicht durch Tippen
+  async function rerunWith(partial: { location?: string; remote?: boolean; semantic?: boolean }) {
+    const nextLocation = partial.location ?? location
+    const nextRemote = partial.remote ?? remote
+    const nextSemantic = partial.semantic ?? semantic
+    setLocation(nextLocation)
+    setRemote(nextRemote)
+    setSemantic(nextSemantic)
+    await runSearch(query, nextLocation, nextRemote, nextSemantic)
+  }
+
   async function ignoreJob(job: SearchResult) {
     try {
       const res = await fetch('/api/jobs/ignore', {
@@ -504,7 +516,7 @@ function SearchPageContent() {
                   onChange={(e) => setSemantic(e.target.checked)}
                   className="w-4 h-4 rounded border-border accent-selection"
                 />
-                <span className="text-sm text-foreground">KI-Suche (semantisches Matching)</span>
+                <span className="text-sm text-foreground">KI-Suche — findet auch anders betitelte Jobs</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-pointer" title="Ausgeschaltet werden Treffer nur angezeigt und nicht in deine Liste übernommen">
@@ -516,6 +528,9 @@ function SearchPageContent() {
                 />
                 <span className="text-sm text-foreground">Treffer automatisch in meine Liste übernehmen</span>
               </label>
+              <Link href="/so-funktionierts" className="text-xs text-primary-soft hover:text-selection transition-colors">
+                Wie entscheidet die Suche?
+              </Link>
             </div>
           </form>
         </section>
@@ -585,7 +600,7 @@ function SearchPageContent() {
               )}
               {stages.fan && stages.fan.length > 0 && (
                 <p className="pl-6 text-sm text-primary-soft">
-                  Suchfächer: {stages.fan.join(' · ')}
+                  Auch gesucht: {stages.fan.join(' · ')}
                 </p>
               )}
               {stages.secondRound && stages.secondRound.length > 0 && (
@@ -656,7 +671,10 @@ function SearchPageContent() {
             {scoredCount > 0 && scoredCount < results.length && (
               <p className="sm:col-span-2 text-sm text-primary tabular-nums">
                 KI-Bewertung: {scoredCount} von {results.length} Treffern bewertet — bewertet
-                werden die ersten {SCORE_LIMIT} Treffer pro Suche, der Rest bleibt ohne Score.
+                werden die ersten {SCORE_LIMIT} Treffer pro Suche, der Rest bleibt ohne Score.{' '}
+                <Link href="/so-funktionierts" className="text-selection hover:text-selection-strong">
+                  Warum?
+                </Link>
               </p>
             )}
             {/* Die „Kein Score"-Wand (0 bewertet): erklären, statt schweigen —
@@ -665,7 +683,10 @@ function SearchPageContent() {
               <p className="sm:col-span-2 text-sm text-primary">
                 Kein Treffer wurde bewertet — die KI war in diesem Lauf nicht
                 erreichbar. Der nächste Suchlauf versucht es erneut; einzelne
-                Treffer kannst du in deiner Liste öffnen und „Jetzt bewerten“.
+                Treffer kannst du in deiner Liste öffnen und „Jetzt bewerten“.{' '}
+                <Link href="/so-funktionierts" className="text-selection hover:text-selection-strong">
+                  So funktioniert’s
+                </Link>
               </p>
             )}
           </section>
@@ -695,11 +716,50 @@ function SearchPageContent() {
           </section>
         )}
 
-        {/* No Results State */}
+        {/* No Results State — konkrete Hebel statt eines Ratens: jeder Knopf
+            lockert genau eine Einschränkung und startet dieselbe Suche neu */}
         {!loading && !error && searched && results.length === 0 && (
           <section className="bg-surface rounded-2xl p-16 text-center border border-border">
-            <p className="text-primary-soft">
-              Keine Jobs gefunden — versuch andere Suchbegriffe oder Orte.
+            <p className="text-primary-soft mb-6">
+              Keine Jobs gefunden — mit einer Lockerung neu versuchen:
+            </p>
+            <div className="flex flex-wrap justify-center gap-3">
+              {location && (
+                <button
+                  onClick={() => void rerunWith({ location: '' })}
+                  className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl text-sm font-medium transition-colors"
+                >
+                  Ort „{location}“ weglassen
+                </button>
+              )}
+              {remote && (
+                <button
+                  onClick={() => void rerunWith({ remote: false })}
+                  className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl text-sm font-medium transition-colors"
+                >
+                  Auch vor Ort suchen
+                </button>
+              )}
+              {!semantic && (
+                <button
+                  onClick={() => void rerunWith({ semantic: true })}
+                  className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl text-sm font-medium transition-colors"
+                >
+                  KI-Suche einschalten
+                </button>
+              )}
+              <button
+                onClick={() => runSearch(query, location, remote, semantic)}
+                className="px-5 py-2.5 bg-border-soft hover:bg-border text-foreground rounded-xl text-sm font-medium transition-colors"
+              >
+                Unverändert erneut suchen
+              </button>
+            </div>
+            <p className="text-xs text-primary-soft mt-6">
+              Die KI-Suche findet auch Jobs mit abweichenden Titeln —{' '}
+              <Link href="/so-funktionierts" className="text-selection hover:text-selection-strong">
+                so funktioniert’s
+              </Link>
             </p>
           </section>
         )}
@@ -767,6 +827,10 @@ function JobCard({
   saving?: boolean
 }) {
   const [confirming, setConfirming] = useState(false)
+  // Details (Stärken/Lücken/Übertragbares) und lange Begründungen sind
+  // einklappbar — die Karte zeigt Urteil + Begründung, der Rest wächst auf Wunsch
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const [reasonOpen, setReasonOpen] = useState(false)
   // Timer-Räumung beim Unmount — sonst setzt ein toter Timeout State ab
   const confirmTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -782,6 +846,13 @@ function JobCard({
   // Prozentwerte sind hier Vergangenheit, damit klassischer und semantischer
   // Pfad dasselbe sagen
   const scoreColor = typeof job.aiScore === 'number' ? scoreTone(job.aiScore) : 'text-primary-soft'
+  const detailCount =
+    (job.strengths?.length ?? 0) + (job.gaps?.length ?? 0) + (job.transferableSkills?.length ?? 0)
+  // Lange Begründungen werden auf zwei Zeilen gekappt — die Karte bleibt eine
+  // Karte, nicht ein Aufsatz; wer lesen will, klappt auf
+  const reasonText = job.matchReason || job.aiReason || ''
+  const reasonLabel = job.matchReason ? 'Warum dieser Job passt:' : 'KI-Einschätzung:'
+  const reasonClamped = !reasonOpen && reasonText.length > 180
 
   function handleIgnoreClick() {
     if (!confirming) {
@@ -848,13 +919,15 @@ function JobCard({
               </button>
             )
           )}
+          {/* Ignorieren ist die Ausnahme-Handlung — Textlink statt dritter
+              Button-Fläche, im Bestätigungsmoment in Ton (Ehrliches Signal) */}
           <button
             onClick={handleIgnoreClick}
             aria-label={confirming ? 'Ignorieren endgültig bestätigen' : `Job ${job.title} ignorieren`}
-            className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+            className={`px-2 py-2.5 text-sm font-medium transition-colors ${
               confirming
-                ? 'bg-error/10 text-error border border-error/20'
-                : 'bg-border-soft hover:bg-border text-foreground'
+                ? 'text-error'
+                : 'text-primary-soft hover:text-error'
             }`}
           >
             {confirming ? 'Sicher? Erneut klicken' : 'Ignorieren'}
@@ -870,57 +943,78 @@ function JobCard({
         </div>
       </div>
 
-      {job.matchReason && (
+      {reasonText && (
         <div className={`mb-4 p-4 rounded-xl border ${reasonBoxClass}`}>
-          <p className={`text-sm font-medium mb-1 ${reasonLabelClass}`}>Warum dieser Job passt:</p>
-          <p className="text-sm text-foreground">{job.matchReason}</p>
+          <p className={`text-sm font-medium mb-1 ${reasonLabelClass}`}>{reasonLabel}</p>
+          <p className={`text-sm text-foreground ${reasonClamped ? 'line-clamp-2' : ''}`}>
+            {reasonText}
+          </p>
+          {reasonText.length > 180 && (
+            <button
+              onClick={() => setReasonOpen((prev) => !prev)}
+              aria-expanded={reasonOpen}
+              className="mt-1 text-xs font-medium text-selection hover:text-selection-strong transition-colors"
+            >
+              {reasonOpen ? 'Weniger anzeigen' : 'Mehr anzeigen'}
+            </button>
+          )}
         </div>
       )}
 
-      {job.aiReason && !job.matchReason && (
-        <div className={`mb-4 p-4 rounded-xl border ${reasonBoxClass}`}>
-          <p className={`text-sm font-medium mb-1 ${reasonLabelClass}`}>KI-Einschätzung:</p>
-          <p className="text-sm text-foreground">{job.aiReason}</p>
-        </div>
+      {/* Stärken, Lücken und übertragbare Stärken wachsen auf Knopfdruck —
+          geschlossen tragen sie nichts zur Kartenlänge bei */}
+      {detailCount > 0 && (
+        <button
+          onClick={() => setDetailsOpen((prev) => !prev)}
+          aria-expanded={detailsOpen}
+          className="mb-4 text-sm font-medium text-selection hover:text-selection-strong transition-colors"
+        >
+          {detailsOpen
+            ? 'Stärken & Lücken verbergen'
+            : `Stärken & Lücken anzeigen (${detailCount})`}
+        </button>
       )}
+      {detailsOpen && (
+        <>
+          {job.strengths && job.strengths.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm font-medium text-foreground mb-2">Passt gut:</p>
+              <div className="flex flex-wrap gap-2">
+                {job.strengths.map((skill, i) => (
+                  <span key={i} className="px-3 py-1 bg-success/10 text-success text-sm rounded-full border border-success/20">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {job.strengths && job.strengths.length > 0 && (
-        <div className="mb-4">
-          <p className="text-sm font-medium text-foreground mb-2">Passt gut:</p>
-          <div className="flex flex-wrap gap-2">
-            {job.strengths.map((skill, i) => (
-              <span key={i} className="px-3 py-1 bg-success/10 text-success text-sm rounded-full border border-success/20">
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+          {job.gaps && job.gaps.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm font-medium text-foreground mb-2">Fehlt:</p>
+              <div className="flex flex-wrap gap-2">
+                {job.gaps.map((gap, i) => (
+                  <span key={i} className="px-3 py-1 bg-error/10 text-error text-sm rounded-full border border-error/20">
+                    {gap}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
-      {job.gaps && job.gaps.length > 0 && (
-        <div className="mb-4">
-          <p className="text-sm font-medium text-foreground mb-2">Fehlt:</p>
-          <div className="flex flex-wrap gap-2">
-            {job.gaps.map((gap, i) => (
-              <span key={i} className="px-3 py-1 bg-error/10 text-error text-sm rounded-full border border-error/20">
-                {gap}
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {job.transferableSkills && job.transferableSkills.length > 0 && (
-        <div className="mb-4">
-          <p className="text-sm font-medium text-foreground mb-2">Übertragbare Stärken:</p>
-          <div className="flex flex-wrap gap-2">
-            {job.transferableSkills.map((skill, i) => (
-              <span key={i} className="px-3 py-1 bg-border-soft text-foreground text-sm rounded-full">
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
+          {job.transferableSkills && job.transferableSkills.length > 0 && (
+            <div className="mb-4">
+              <p className="text-sm font-medium text-foreground mb-2">Übertragbare Stärken:</p>
+              <div className="flex flex-wrap gap-2">
+                {job.transferableSkills.map((skill, i) => (
+                  <span key={i} className="px-3 py-1 bg-border-soft text-foreground text-sm rounded-full">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       <p className="text-sm text-primary-soft line-clamp-3 leading-relaxed">

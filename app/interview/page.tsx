@@ -302,7 +302,7 @@ export default function InterviewPage() {
             <button
               onClick={startInterview}
               disabled={sending}
-              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
             >
               {sending ? 'Starte…' : 'Interview starten'}
             </button>
@@ -426,7 +426,7 @@ export default function InterviewPage() {
               <button
                 type="submit"
                 disabled={sending || !input.trim()}
-                className="px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 Senden
               </button>

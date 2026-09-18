@@ -9,6 +9,7 @@ import { Button, StatusBadge, StatusButton, buttonClasses, scoreTone } from '../
 import { scoreLabel } from '@/lib/matching'
 import { STATUS_LABELS } from '@/lib/status'
 import { isDue } from '@/lib/applications'
+import { SCORE_LIMIT } from '@/lib/search'
 
 interface Job {
   id: string
@@ -97,6 +98,18 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
   const [loadedJobId, setLoadedJobId] = useState<string | null>(null)
   const [notes, setNotes] = useState('')
   const [followUp, setFollowUp] = useState('')
+  // Rückstand für den Weiter-Hinweis nach einer Absage — ein einziger Zähler,
+  // der dem emotionalen Tief einen Ausweg anbietet
+  const [unscoredCount, setUnscoredCount] = useState(0)
+
+  useEffect(() => {
+    fetch('/api/jobs')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data: Array<{ score: number | null }>) =>
+        setUnscoredCount(data.filter((j) => j.score == null).length)
+      )
+      .catch(() => {})
+  }, [])
   if (job && job.id !== loadedJobId) {
     setLoadedJobId(job.id)
     setNotes(job.notes ?? '')
@@ -429,6 +442,31 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
         </div>
 
+        {/* Absage-Trichter: das emotional heikelste Moment der App bekommt
+            einen Ausweg — die nächste Handlung liegt einen Klick entfernt */}
+        {job.status === 'REJECTED' && (
+          <div className="mb-6 p-4 bg-surface rounded-xl border border-border flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-primary">
+              Absage notiert — Kopf hoch. Die Suche läuft weiter.
+            </p>
+            {unscoredCount > 0 ? (
+              <Link
+                href="/jobs?filter=unscored"
+                className="text-sm font-medium text-selection hover:text-selection-strong transition-colors"
+              >
+                {unscoredCount} {unscoredCount === 1 ? 'Fund' : 'Funde'} warten auf eine Bewertung →
+              </Link>
+            ) : (
+              <Link
+                href="/search"
+                className="text-sm font-medium text-selection hover:text-selection-strong transition-colors"
+              >
+                Neue Suche starten →
+              </Link>
+            )}
+          </div>
+        )}
+
         {job.score != null ? (
           <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
             <div className="flex items-baseline gap-3 mb-3">
@@ -493,7 +531,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
         ) : (
           <div className="bg-surface rounded-2xl p-6 border border-border mb-6">
             <p className="text-sm text-primary mb-4">
-              Noch keine Bewertung. Die KI bewertet bei der Suche automatisch die ersten 15
+              Noch keine Bewertung. Die KI bewertet bei der Suche automatisch bis zu {SCORE_LIMIT}
               Treffer — dieser Job lag darüber oder wurde manuell hinzugefügt.
             </p>
             <Button size="sm" variant="secondary" onClick={() => void scoreNow()} disabled={busy !== null}>

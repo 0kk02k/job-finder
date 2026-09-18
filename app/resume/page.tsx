@@ -357,7 +357,7 @@ export default function ResumePage() {
               <button
                 onClick={handlePasteSubmit}
                 disabled={loading || !pastedText.trim()}
-                className="w-full py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="w-full py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 {loading ? 'Wird gespeichert...' : 'Speichern'}
               </button>
@@ -382,7 +382,7 @@ export default function ResumePage() {
               <button
                 onClick={saveEdit}
                 disabled={loading}
-                className="px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 {loading ? 'Speichert …' : 'Speichern'}
               </button>
@@ -428,7 +428,7 @@ export default function ResumePage() {
               <div className="flex items-center gap-3 flex-shrink-0">
                 <Link
                   href="/preferences"
-                  className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium text-sm transition-colors"
+                  className="px-5 py-2.5 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium text-sm transition-colors"
                 >
                   Präferenz-Gespräch starten
                 </Link>

@@ -253,7 +253,7 @@ export default function PreferencesPage() {
             <button
               onClick={startChat}
               disabled={sending}
-              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
             >
               {sending ? 'Starte…' : 'Gespräch starten'}
             </button>
@@ -405,7 +405,7 @@ export default function PreferencesPage() {
               <button
                 type="submit"
                 disabled={sending || !input.trim()}
-                className="px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
+                className="px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
               >
                 Senden
               </button>
@@ -426,7 +426,7 @@ export default function PreferencesPage() {
             <button
               onClick={resynthesize}
               disabled={resynthesizing}
-              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors disabled:opacity-50"
+              className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors disabled:opacity-50"
             >
               {resynthesizing ? 'Erstelle Profil …' : 'Erneut versuchen'}
             </button>
@@ -497,7 +497,7 @@ export default function PreferencesPage() {
                 <div className="flex flex-wrap items-center gap-4">
                   <Link
                     href="/"
-                    className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-surface rounded-xl font-medium transition-colors"
+                    className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors"
                   >
                     Weiter im Onboarding
                   </Link>

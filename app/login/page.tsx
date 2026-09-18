@@ -42,7 +42,7 @@ export default function LoginPage() {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <h1 className="text-2xl font-light text-foreground mb-8 text-center">
-          Job Finder
+          Job-Finder
         </h1>
 
         <form onSubmit={handleSubmit} className="bg-surface rounded-2xl p-6 shadow-sm border border-border space-y-4">

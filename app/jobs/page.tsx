@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast } from '../components/Toast'
 import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, scoreTone } from '../components/ui'
 import { scoreLabel } from '@/lib/matching'
 import { STATUS_LABELS } from '@/lib/status'
+import { SCORE_LIMIT } from '@/lib/search'
 
 interface Job {
   id: string
@@ -30,14 +31,19 @@ const ALL_STATUSES = [
   'ARCHIVED',
 ] as const
 
+// Kern-Status stehen offen, der Rest hinter einer Disclosure — >12 sichtbare
+// Kontrollen an einem Entscheidungspunkt überfordern (Working Memory ≤ 4).
+// Wer einen Mehr-Status aktiv filtert, sieht die Gruppe aufgeklappt.
+const CORE_STATUSES = ['DISCOVERED', 'HIGH_MATCH', 'APPLIED', 'INTERVIEW'] as const
+const MORE_STATUSES = ALL_STATUSES.filter((s) => !(CORE_STATUSES as readonly string[]).includes(s))
+
 const DEFAULT_HIDDEN = new Set(['ARCHIVED', 'REJECTED'])
 
 type SortOption = 'newest' | 'oldest' | 'score' | 'company'
 
-// Bewertungsstand als Drei-Wege-Auswahl statt Checkbox: „unbewertet" ist ein
-// normaler Zustand des Modells (Scores entstehen bei der Suche, 15 pro Suche;
-// manuell hinzugefügte Jobs warten) — kein Mangel, den man abhaken müsste.
-type ScoreFilter = 'all' | 'scored' | 'unscored'
+// Bewertungsstand als Vier-Wege-Auswahl: „Top Matches" ersetzt die frühere
+// separate High-Match-Checkbox — ein Entscheidungspunkt statt zwei.
+type ScoreFilter = 'all' | 'top' | 'scored' | 'unscored'
 
 export default function JobsPage() {
   const router = useRouter()
@@ -46,28 +52,35 @@ export default function JobsPage() {
   const [loading, setLoading] = useState(true)
 
   const [search, setSearch] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const [activeStatuses, setActiveStatuses] = useState<Set<string>>(
     () => new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s)))
   )
+  const [showMoreStatuses, setShowMoreStatuses] = useState(false)
   // Deep-Links aus dem Dashboard: /jobs?filter=high_match · /jobs?filter=unscored
-  // (und neu: /jobs?filter=scored — „all" ist die Abwesenheit des Parameters)
-  const [highMatchOnly, setHighMatchOnly] = useState(
-    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('filter') === 'high_match'
-  )
+  // (und /jobs?filter=scored — „all" ist die Abwesenheit des Parameters)
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>(() => {
     if (typeof window === 'undefined') return 'all'
     const filter = new URLSearchParams(window.location.search).get('filter')
-    return filter === 'unscored' ? 'unscored' : filter === 'scored' ? 'scored' : 'all'
+    return filter === 'unscored' ? 'unscored' : filter === 'scored' ? 'scored' : filter === 'high_match' ? 'top' : 'all'
   })
   // Batch-Scoring: der Server begrenzt jeden Lauf, die Fläche loopt bis der
-  // Rückstand trocken ist — Fortschritt aus gezählter Antwort, nicht aus Annahme
+  // Rückstand trocken ist — Fortschritt gegen den Rückstand am Laufbeginn,
+  // nicht gegen die gefilterte Sicht (der Server bewertet global)
   const [batchRunning, setBatchRunning] = useState(false)
   const [batchDone, setBatchDone] = useState(0)
+  const [batchTotal, setBatchTotal] = useState(0)
   const [sortBy, setSortBy] = useState<SortOption>(() => {
     if (typeof window === 'undefined') return 'newest'
     // Deep-Link aus dem Dashboard: die am längsten wartenden zuerst
     return new URLSearchParams(window.location.search).get('sort') === 'oldest' ? 'oldest' : 'newest'
   })
+
+  // Mehrfachauswahl für Sammelaktionen — der Rückstand wird in Etappen abgearbeitet
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  // Tastatur-Wegweiser (j/k): der markierte Job folgt der Tastatur, Enter öffnet
+  const [highlightId, setHighlightId] = useState<string | null>(null)
 
   useEffect(() => {
     fetchJobs()
@@ -109,14 +122,38 @@ export default function JobsPage() {
     }
   }
 
+  async function bulkSetStatus(status: string) {
+    if (selectedIds.size === 0 || bulkBusy) return
+    setBulkBusy(true)
+    try {
+      await Promise.all(
+        [...selectedIds].map((id) =>
+          fetch(`/api/jobs/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status }),
+          })
+        )
+      )
+      setSelectedIds(new Set())
+      fetchJobs()
+    } catch {
+      toast.error('Sammelaktion fehlgeschlagen — bitte erneut versuchen.')
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  // Der globale Bewertungsrückstand — unabhängig von Filtern, denn der Server
+  // bewertet ebenfalls den globalen Rückstand
+  const unscoredTotal = useMemo(() => jobs.filter((job) => job.score == null).length, [jobs])
+
   const filteredJobs = useMemo(() => {
     let result = jobs.filter((job) => activeStatuses.has(job.status))
 
-    if (highMatchOnly) {
+    if (scoreFilter === 'top') {
       result = result.filter((job) => (job.score ?? 0) >= HIGH_MATCH_THRESHOLD)
-    }
-
-    if (scoreFilter === 'unscored') {
+    } else if (scoreFilter === 'unscored') {
       result = result.filter((job) => job.score == null)
     } else if (scoreFilter === 'scored') {
       result = result.filter((job) => job.score != null)
@@ -152,7 +189,42 @@ export default function JobsPage() {
     }
 
     return result
-  }, [jobs, activeStatuses, highMatchOnly, scoreFilter, search, sortBy])
+  }, [jobs, activeStatuses, scoreFilter, search, sortBy])
+
+  // Tastatur-Beschleuniger: S in die Suche, J/K den Listenfokus bewegen,
+  // Enter öffnet den markierten Job. Nie in Eingabefeldern abfangen.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, [contenteditable="true"]')) return
+      if (e.key === 's' || e.key === 'S') {
+        e.preventDefault()
+        searchInputRef.current?.focus()
+        searchInputRef.current?.select()
+        return
+      }
+      if (filteredJobs.length === 0) return
+      if (e.key === 'j' || e.key === 'J' || e.key === 'k' || e.key === 'K') {
+        e.preventDefault()
+        const index = filteredJobs.findIndex((job) => job.id === highlightId)
+        const next =
+          e.key === 'j' || e.key === 'J'
+            ? Math.min(index + 1, filteredJobs.length - 1)
+            : Math.max(index < 0 ? 0 : index - 1, 0)
+        const job = filteredJobs[next]
+        setHighlightId(job.id)
+        document.getElementById(`job-${job.id}`)?.scrollIntoView({ block: 'nearest' })
+        return
+      }
+      if (e.key === 'Enter' && highlightId) {
+        const job = filteredJobs.find((j) => j.id === highlightId)
+        if (job) router.push(`/jobs/${job.id}`)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [filteredJobs, highlightId, router])
 
   function toggleStatus(status: string) {
     setActiveStatuses((prev) => {
@@ -169,14 +241,26 @@ export default function JobsPage() {
   function resetFilters() {
     setSearch('')
     setActiveStatuses(new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s))))
-    setHighMatchOnly(false)
     setScoreFilter('all')
     setSortBy('newest')
+  }
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
   }
 
   async function runScoreBatch() {
     setBatchRunning(true)
     setBatchDone(0)
+    setBatchTotal(unscoredTotal)
     try {
       // 20 Läufe à max. 20 Jobs decken jeden Freundeskreis-Rückstand ab; Abbruch,
       // wenn nichts mehr unbewertet ist oder ein Lauf nichts schafft (nur Skipped)
@@ -230,10 +314,29 @@ export default function JobsPage() {
   const defaultActive: Set<string> = new Set(ALL_STATUSES.filter((s) => !DEFAULT_HIDDEN.has(s)))
   const hasActiveFilters =
     search.trim() !== '' ||
-    highMatchOnly ||
     scoreFilter !== 'all' ||
     activeStatuses.size !== defaultActive.size ||
     [...activeStatuses].some((s) => !defaultActive.has(s))
+  const moreActiveCount = [...activeStatuses].filter((s) => !(CORE_STATUSES as readonly string[]).includes(s)).length
+  const moreOpen = showMoreStatuses || moreActiveCount > 0
+
+  function statusChip(status: string) {
+    const active = activeStatuses.has(status)
+    return (
+      <button
+        key={status}
+        onClick={() => toggleStatus(status)}
+        aria-pressed={active}
+        className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border ${
+          active
+            ? 'bg-selection text-on-selection border-selection'
+            : 'bg-border-soft text-primary-soft border-border'
+        }`}
+      >
+        {STATUS_LABELS[status]}
+      </button>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -270,8 +373,9 @@ export default function JobsPage() {
             <section className="bg-surface rounded-2xl p-6 border border-border mb-6 space-y-4">
               <div className="flex flex-col sm:flex-row gap-3">
                 <input
+                  ref={searchInputRef}
                   type="text"
-                  placeholder="Titel oder Firma suchen..."
+                  placeholder="Titel oder Firma suchen… (Taste S)"
                   aria-label="Jobs durchsuchen"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -290,80 +394,68 @@ export default function JobsPage() {
                 </select>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {ALL_STATUSES.map((status) => {
-                  const active = activeStatuses.has(status)
+              <div className="flex flex-wrap items-center gap-2">
+                {CORE_STATUSES.map(statusChip)}
+                <button
+                  onClick={() => setShowMoreStatuses((prev) => !prev)}
+                  aria-expanded={moreOpen}
+                  className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors border border-dashed border-border text-primary-soft hover:text-foreground hover:border-primary-soft"
+                >
+                  Weitere Status{moreActiveCount > 0 ? ` (${moreActiveCount} aktiv)` : ''} {moreOpen ? '▾' : '▸'}
+                </button>
+              </div>
+              {moreOpen && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {MORE_STATUSES.map(statusChip)}
+                </div>
+              )}
+
+              {/* Eine Zeile, ein Entscheidungspunkt: Vier-Wege-Segment trägt
+                  „Top Matches" UND den Bewertungsstand — Zustand in Tinten-Blau */}
+              <div
+                role="group"
+                aria-label="Bewertungsstand"
+                className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-background p-1"
+              >
+                {(
+                  [
+                    ['all', 'Alle'],
+                    ['top', 'Top Matches'],
+                    ['scored', 'Bewertet'],
+                    ['unscored', 'Unbewertet'],
+                  ] as const
+                ).map(([value, label]) => {
+                  const active = scoreFilter === value
                   return (
                     <button
-                      key={status}
-                      onClick={() => toggleStatus(status)}
+                      key={value}
+                      onClick={() => setScoreFilter(value)}
                       aria-pressed={active}
-                      className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border ${
+                      className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
                         active
-                          ? 'bg-selection text-on-selection border-selection'
-                          : 'bg-border-soft text-primary-soft border-border'
+                          ? 'bg-selection text-on-selection'
+                          : 'text-primary-soft hover:text-foreground'
                       }`}
                     >
-                      {STATUS_LABELS[status]}
+                      {label}
                     </button>
                   )
                 })}
               </div>
 
-              <div className="flex flex-wrap items-center gap-6">
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={highMatchOnly}
-                    onChange={(e) => setHighMatchOnly(e.target.checked)}
-                    className="w-4 h-4 accent-selection"
-                  />
-                  <span className="text-sm text-foreground">
-                    Nur High Matches (≥{HIGH_MATCH_THRESHOLD})
-                  </span>
-                </label>
-
-                {/* Drei-Wege-Auswahl statt Checkbox: an/aus passt nicht zu
-                    alle/bewertet/unbewertet. Aktiv = Tinten-Blau (Zustand). */}
-                <div
-                  role="group"
-                  aria-label="Bewertungsstand"
-                  className="inline-flex items-center gap-1 rounded-xl border border-border bg-background p-1"
-                >
-                  {(
-                    [
-                      ['all', 'Alle'],
-                      ['scored', 'Bewertet'],
-                      ['unscored', 'Unbewertet'],
-                    ] as const
-                  ).map(([value, label]) => {
-                    const active = scoreFilter === value
-                    return (
-                      <button
-                        key={value}
-                        onClick={() => setScoreFilter(value)}
-                        aria-pressed={active}
-                        className={`text-sm px-3 py-1.5 rounded-lg font-medium transition-colors ${
-                          active
-                            ? 'bg-selection text-on-selection'
-                            : 'text-primary-soft hover:text-foreground'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
-              {/* Die eine Zeile, die dem Filter seinen Sinn gibt: „unbewertet" ist
-                  die Warteschlange vor dem Scoring — hier wird sie abgetragen. */}
-              {scoreFilter === 'unscored' && (
+              {/* Der Rückstand hat zwei Gesichter: in der Unbewertet-Ansicht die
+                  Abtretung mit Erklärlink, aus jeder anderen Ansicht der sichtbare
+                  Einstieg — beides derselbe globale Zähler */}
+              {scoreFilter === 'unscored' ? (
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-xs text-primary-soft">
-                    Scores entstehen bei der Suche — der Rest wartet hier auf seine Bewertung.
+                    Scores entstehen bei der Suche (bis zu {SCORE_LIMIT} pro Lauf) — der Rest
+                    wartet hier.{' '}
+                    <Link href="/so-funktionierts" className="text-selection hover:text-selection-strong">
+                      Warum gibt es Reste?
+                    </Link>
                   </p>
-                  {filteredJobs.length > 0 && (
+                  {unscoredTotal > 0 && (
                     <Button
                       size="sm"
                       variant="secondary"
@@ -371,28 +463,70 @@ export default function JobsPage() {
                       disabled={batchRunning}
                     >
                       {batchRunning
-                        ? `Bewerte … ${batchDone}/${filteredJobs.length}`
-                        : `Unbewertete bewerten (${filteredJobs.length})`}
+                        ? `Bewerte … ${batchDone}/${batchTotal}`
+                        : `Unbewertete bewerten (${unscoredTotal})`}
                     </Button>
                   )}
                 </div>
+              ) : (
+                unscoredTotal > 0 && !batchRunning && (
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-xs text-primary-soft tabular-nums">
+                      {unscoredTotal} {unscoredTotal === 1 ? 'Job wartet' : 'Jobs warten'} auf die Bewertung.
+                    </p>
+                    <Button size="sm" variant="secondary" onClick={() => void runScoreBatch()}>
+                      Rückstand bewerten
+                    </Button>
+                  </div>
+                )
+              )}
+              {batchRunning && scoreFilter !== 'unscored' && (
+                <p className="text-xs text-primary-soft tabular-nums">
+                  Bewerte … {batchDone}/{batchTotal}
+                </p>
               )}
             </section>
 
             {/* Result Counter */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 mb-4">
               <p className="text-sm text-primary-soft tabular-nums">
                 {filteredJobs.length} von {jobs.length} Jobs
               </p>
-              {hasActiveFilters && (
-                <button
-                  onClick={resetFilters}
-                  className="text-sm text-primary hover:text-selection transition-colors"
-                >
-                  Filter zurücksetzen
-                </button>
-              )}
+              <div className="flex items-center gap-4">
+                <p className="text-xs text-primary-soft hidden sm:block">
+                  Tastatur: S = Suche · J/K = vor/zurück · Enter = öffnen
+                </p>
+                {hasActiveFilters && (
+                  <button
+                    onClick={resetFilters}
+                    className="text-sm text-primary hover:text-selection transition-colors"
+                  >
+                    Filter zurücksetzen
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Sammelaktionsleiste — erscheint nur bei Auswahl, verdrängt nichts */}
+            {selectedIds.size > 0 && (
+              <div className="flex flex-wrap items-center gap-3 mb-4 bg-surface rounded-2xl p-4 border border-selection">
+                <p className="text-sm font-medium text-foreground tabular-nums">
+                  {selectedIds.size} {selectedIds.size === 1 ? 'Job' : 'Jobs'} ausgewählt
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <StatusButton label="Beworben" onClick={() => void bulkSetStatus('APPLIED')} active={false} />
+                  <StatusButton label="Gespräch" onClick={() => void bulkSetStatus('INTERVIEW')} active={false} />
+                  <StatusButton label="Archiv" onClick={() => void bulkSetStatus('ARCHIVED')} active={false} />
+                </div>
+                <button
+                  onClick={() => setSelectedIds(new Set())}
+                  disabled={bulkBusy}
+                  className="text-sm text-primary hover:text-selection transition-colors disabled:opacity-50"
+                >
+                  Abwählen
+                </button>
+              </div>
+            )}
 
             {filteredJobs.length === 0 ? (
               /* Empty State — filters yield nothing */
@@ -400,12 +534,17 @@ export default function JobsPage() {
                 <p className="text-primary-soft mb-6">
                   Keine Jobs für diese Filter.
                 </p>
-                <button
-                  onClick={resetFilters}
-                  className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors"
-                >
-                  Filter zurücksetzen
-                </button>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <button
+                    onClick={resetFilters}
+                    className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors"
+                  >
+                    Filter zurücksetzen
+                  </button>
+                  <ButtonLink href="/search" variant="secondary">
+                    Neue Suche starten
+                  </ButtonLink>
+                </div>
               </section>
             ) : (
               /* Job List */
@@ -413,23 +552,35 @@ export default function JobsPage() {
                 {filteredJobs.map((job) => (
                   <div
                     key={job.id}
-                    className="bg-surface rounded-2xl p-8 border border-border shadow-sm"
+                    id={`job-${job.id}`}
+                    className={`bg-surface rounded-2xl p-8 border shadow-sm ${
+                      highlightId === job.id ? 'border-selection' : 'border-border'
+                    }`}
                   >
-                    <div className="flex items-start justify-between mb-5">
-                      <div className="min-w-0 flex-1">
-                        <Link href={`/jobs/${job.id}`}>
-                          <h2 className="text-xl font-medium text-foreground hover:text-selection transition-colors mb-1">
-                            {job.title}
-                          </h2>
-                        </Link>
-                        <p className="text-primary-soft">
-                          {[
-                            job.company ?? null,
-                            job.location ?? null,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ') || 'Ohne Angabe'}
-                        </p>
+                    <div className="flex items-start justify-between mb-5 gap-4">
+                      <div className="min-w-0 flex-1 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(job.id)}
+                          onChange={() => toggleSelected(job.id)}
+                          aria-label={`Job „${job.title}“ auswählen`}
+                          className="mt-1.5 w-4 h-4 accent-selection flex-shrink-0"
+                        />
+                        <div className="min-w-0">
+                          <Link href={`/jobs/${job.id}`}>
+                            <h2 className="text-xl font-medium text-foreground hover:text-selection transition-colors mb-1">
+                              {job.title}
+                            </h2>
+                          </Link>
+                          <p className="text-primary-soft">
+                            {[
+                              job.company ?? null,
+                              job.location ?? null,
+                            ]
+                              .filter(Boolean)
+                              .join(' · ') || 'Ohne Angabe'}
+                          </p>
+                        </div>
                       </div>
                       {job.score != null ? (
                         <div className={`text-3xl font-light tabular-nums ${getScoreColor(job.score)}`}>
@@ -513,4 +664,3 @@ function SkeletonJobCard() {
     </div>
   )
 }
-
