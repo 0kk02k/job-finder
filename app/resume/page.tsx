@@ -48,6 +48,9 @@ export default function ResumePage() {
   // Pro Format ein eigener Zustand — ein gemeinsames Flag zeigt bei zwei
   // parallelen Klicks „Wird geladen …" auf beiden Buttons, obwohl nur einer läuft
   const [downloading, setDownloading] = useState<null | 'pdf' | 'docx'>(null)
+  // Ersetzen ist zweistufig: die gewählte Datei wartet auf den bestätigenden
+  // Klick — bis dahin ist noch nichts passiert
+  const [pendingFile, setPendingFile] = useState<{ file: File; name: string } | null>(null)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -156,10 +159,19 @@ export default function ResumePage() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    // Erst wählen, dann bestätigen: der Upload ersetzt den Lebenslauf
+    // unwiderruflich — der zweite Klick führt erst aus
+    setPendingFile({ file, name: file.name })
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function confirmReplace() {
+    const pending = pendingFile
+    if (!pending || uploading) return
     setUploading(true)
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('file', pending.file)
 
       const response = await fetch('/api/resume/upload', {
         method: 'POST',
@@ -167,6 +179,7 @@ export default function ResumePage() {
       })
 
       if (response.ok) {
+        setPendingFile(null)
         setMode('view')
         setShowPrefCta(true)
         fetchResume()
@@ -178,7 +191,6 @@ export default function ResumePage() {
       toast.error('Datei konnte nicht hochgeladen werden')
     } finally {
       setUploading(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -201,9 +213,12 @@ export default function ResumePage() {
         setPastedText('')
         setShowPrefCta(true)
         fetchResume()
+      } else {
+        // Der Text steht im State — nichts geht verloren, die Fläche bleibt
+        toast.error('Speichern fehlgeschlagen — dein Text bleibt im Feld.')
       }
     } catch {
-      toast.error('Fehler beim Speichern')
+      toast.error('Speichern fehlgeschlagen — dein Text bleibt im Feld.')
     } finally {
       setLoading(false)
     }
@@ -220,9 +235,13 @@ export default function ResumePage() {
       if (response.ok) {
         setMode('view')
         fetchResume()
+      } else {
+        // Der Text bleibt im Editor — ein verlorener Entwurf wäre der
+        // teuerste Fehler dieser Seite
+        toast.error('Speichern fehlgeschlagen — dein Text bleibt im Feld.')
       }
     } catch {
-      toast.error('Fehler beim Speichern')
+      toast.error('Speichern fehlgeschlagen — dein Text bleibt im Feld.')
     } finally {
       setLoading(false)
     }
@@ -308,6 +327,13 @@ export default function ResumePage() {
         {/* Upload Mode */}
         {mode === 'upload' && (
           <section className="space-y-8">
+            {/* Wer einen Lebenslauf ersetzt, soll es wissen — bevor die Datei
+                gewählt ist, nicht danach */}
+            {resume && (
+              <p className="text-sm text-primary bg-warning/10 rounded-xl border border-warning/20 p-3">
+                Der aktuelle Lebenslauf wird dabei ersetzt — der bisherige Text ist danach weg.
+              </p>
+            )}
             {/* File Upload — echter Button statt div onClick: Tastatur und
                 Screenreader bekommen denselben Weg wie die Maus */}
             <button
@@ -330,7 +356,7 @@ export default function ResumePage() {
               ) : (
                 <>
                   <p className="text-foreground font-medium mb-2">
-                    Datei hochladen
+                    {pendingFile ? 'Andere Datei wählen' : 'Datei hochladen'}
                   </p>
                   <p className="text-sm text-primary-soft">
                     Klicken und PDF-, DOCX-, .txt- oder .md-Datei wählen
@@ -338,6 +364,31 @@ export default function ResumePage() {
                 </>
               )}
             </button>
+
+            {/* Bestätigung vor dem unwiderruflichen Ersetzen — Muster wie die
+                anderen destruktiven Aktionen (erster Klick wählt, zweiter führt aus) */}
+            {pendingFile && !uploading && (
+              <div
+                role="status"
+                className="p-4 bg-warning/10 rounded-xl border border-warning/20 flex flex-wrap items-center gap-x-4 gap-y-2"
+              >
+                <p className="text-sm text-primary">
+                  „{pendingFile.name}“ als neuen Lebenslauf übernehmen?
+                </p>
+                <button
+                  onClick={() => void confirmReplace()}
+                  className="text-sm font-medium text-error underline decoration-error/60 underline-offset-4 hover:decoration-error"
+                >
+                  Ersetzen
+                </button>
+                <button
+                  onClick={() => setPendingFile(null)}
+                  className="text-sm text-primary underline decoration-border underline-offset-4 hover:text-foreground"
+                >
+                  Abbrechen
+                </button>
+              </div>
+            )}
 
             {/* Divider */}
             <div className="flex items-center gap-4">

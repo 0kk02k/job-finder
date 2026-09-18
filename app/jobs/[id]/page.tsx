@@ -448,16 +448,42 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
           </div>
           <div className="flex flex-col items-end gap-3">
             <StatusBadge status={job.status} />
-            {/* Status-Wechsler: dieselben Schnellstufen wie in der Übersicht */}
-            <div className="flex flex-wrap justify-end gap-2">
-              {['APPLIED', 'INTERVIEW', 'REJECTED', 'ARCHIVED'].map((status) => (
-                <StatusButton
-                  key={status}
-                  label={STATUS_LABELS[status]}
-                  onClick={() => void updateStatus(status)}
-                  active={job.status === status}
-                />
-              ))}
+            {/* Status-Wechsler: dasselbe 2+2-Gewicht wie in der Übersicht —
+                häufige Pipeline-Schritte als Flächen, seltene/destruktivere
+                Wege als dezente Textlinks (REJECTED aktiv in Ton) */}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              <StatusButton
+                label="Beworben"
+                onClick={() => void updateStatus('APPLIED')}
+                active={job.status === 'APPLIED'}
+              />
+              <StatusButton
+                label={STATUS_LABELS.INTERVIEW}
+                onClick={() => void updateStatus('INTERVIEW')}
+                active={job.status === 'INTERVIEW'}
+              />
+              <button
+                onClick={() => void updateStatus('REJECTED')}
+                aria-pressed={job.status === 'REJECTED'}
+                className={`text-sm underline underline-offset-4 transition-colors ${
+                  job.status === 'REJECTED'
+                    ? 'text-error decoration-error/60'
+                    : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
+                }`}
+              >
+                Abgelehnt
+              </button>
+              <button
+                onClick={() => void updateStatus('ARCHIVED')}
+                aria-pressed={job.status === 'ARCHIVED'}
+                className={`text-sm underline underline-offset-4 transition-colors ${
+                  job.status === 'ARCHIVED'
+                    ? 'text-primary-soft decoration-primary-soft/60'
+                    : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
+                }`}
+              >
+                Archivieren
+              </button>
             </div>
           </div>
         </div>

@@ -463,13 +463,18 @@ export default function PreferencesPage() {
                 <p className="text-sm font-medium text-foreground mb-4">Gewichtung</p>
                 <div className="flex flex-wrap gap-2">
                   {currentProfile.criteria.map((c, i) => (
-                    <span
-                      key={i}
-                      className={`px-3 py-1.5 rounded-full text-xs font-medium border ${WEIGHT_STYLES[c.weight] ?? WEIGHT_STYLES.mittel}`}
-                      title={c.note || undefined}
-                    >
-                      {c.topic} · {c.weight}
-                    </span>
+                    // Die Begründung gehört auf die Fläche, nicht ins title —
+                    // Hover ist kein tragfähiger Kanal (Touch, Tastatur)
+                    <div key={i} className="max-w-xs">
+                      <span
+                        className={`inline-block px-3 py-1.5 rounded-full text-xs font-medium border ${WEIGHT_STYLES[c.weight] ?? WEIGHT_STYLES.mittel}`}
+                      >
+                        {c.topic} · {c.weight}
+                      </span>
+                      {c.note && (
+                        <p className="text-xs text-primary-soft mt-1">{c.note}</p>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -500,7 +505,7 @@ export default function PreferencesPage() {
                     href="/"
                     className="inline-flex items-center justify-center px-6 py-3 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium transition-colors"
                   >
-                    Weiter im Onboarding
+                    Zum Dashboard
                   </Link>
                   <button
                     onClick={startChat}

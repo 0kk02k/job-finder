@@ -12,7 +12,7 @@ Geschlossener Freundeskreis der Builderin/des Builders (mehrere Personen, privat
 
 ## Product Purpose
 
-Web-App für Job-Suche und Bewerbungs-Management: Suche über mehrere Quellen (Jooble, Remotive, Arbeitnow, optional LinkedIn via Apify), KI-semantisches Matching gegen das eigene Resume (inkl. transferable Skills, Score 1–10 mit Stärken/Lücken), Pipeline-Tracking (Discovered → … → Offer), Resume-Verwaltung (Markdown, PDF-Upload/-Export inkl. Anschreiben pro Job) und Interview-Training (HR-Interview-Chat mit Resume-Kontext). Sie existiert, weil die Portale generisch sind; **Erfolg heißt: unsere Werkzeuge — Matching, Unterlagen, Interview-Vorbereitung — sind messbar besser als das, was die Großen bieten.**
+Web-App für Job-Suche und Bewerbungs-Management: Suche über mehrere Quellen (Jooble, Remotive, Arbeitnow, optional LinkedIn via Apify), KI-semantisches Matching gegen das eigene Resume (inkl. transferable Skills, Score 1–10 mit Stärken/Lücken), Pipeline-Tracking (Discovered → … → Offer), Resume-Verwaltung (Markdown, PDF-Upload/-Export inkl. Anschreiben pro Job) und Interview-Training (HR-Interview-Chat mit Resume-Kontext, Auswertungs-Akte als PDF). Sie existiert, weil die Portale generisch sind; **Erfolg heißt: unsere Werkzeuge — Matching, Unterlagen, Interview-Vorbereitung — sind messbar besser als das, was die Großen bieten.**
 
 ## Positioning
 
@@ -21,7 +21,7 @@ Privates Multi-User-Werkzeug für eine feste kleine Gruppe, ohne kommerzielles I
 ## Operating Context
 
 - Deutsche UI-Texte durchgängig; private Vercel-Instanz + Neon-Postgres; Schema-Sync via `prisma db push`.
-- Jeder Nutzer kann in den Settings einen eigenen KI-Provider hinterlegen (Default Mistral; Ollama lokal, Gemini, OpenAI, OpenRouter) — KI-Features hängen an diesen Keys.
+- Jeder Nutzer kann in den Settings einen eigenen KI-Provider hinterlegen (Default Nebius Token Factory: Kimi-K3 als Hauptmodell, Kimi-K2.6 als schnelles Scoring-Modell; alternativ Ollama lokal, Gemini, OpenAI, OpenRouter) — KI-Features hängen an diesen Keys.
 - Nutzung parallel zu LinkedIn/StepStone/Xing; gespeicherte Suchen mit „N neue Jobs"-Zähler sind der Wiederkomm-Anlass.
 - Resumes leben als Markdown in der DB; PDFs entstehen on demand (`/api/pdf`, react-pdf).
 
@@ -29,9 +29,10 @@ Privates Multi-User-Werkzeug für eine feste kleine Gruppe, ohne kommerzielles I
 
 **Fähigkeiten:** Suche klassisch + semantisch; gespeicherte Suchen; Job-CRUD + Ignore; Status-Pipeline mit Filtern/Sortierung; Dashboard mit Stats, Top Matches, „Nächster Schritt"; Resume-Editor/-Upload/-Export; Interview-Chat mit Resume-Kontext; Settings pro Nutzer (Provider, Präferenzen, minSalary); Multi-User mit strikter Datentrennung.
 
-**Grenzen (bewusst):** Auto-Bewerbung deaktiviert (HTTP 501 — nie wieder reale Bewerbungen mit Platzhalterdaten); Platform-Sync (LinkedIn/XING/StepStone via Playwright) experimentell/ungetestet; kein Rate-Limiting (Private-Instanz-Trade-off); kein automatisiertes Testsetup; semantisches Scoring auf 15 Jobs pro Suche begrenzt; `AUTH_SECRET` leitet zugleich den Credential-Verschlüsselungs-Key ab und wird nicht rotiert.
+**Grenzen (bewusst):** Auto-Bewerbung deaktiviert (HTTP 501 — nie wieder reale Bewerbungen mit Platzhalterdaten); Platform-Sync (LinkedIn/XING/StepStone via Playwright) experimentell/ungetestet; kein Rate-Limiting (Private-Instanz-Trade-off); KI-Bewertung auf die ersten 50 Treffer pro Suche begrenzt (`SCORE_LIMIT`, Ranking strömt in 15er-Chunks live an die Fläche) — unbewertete Reste zieht ein nächtlicher Cron-Drain nach (vercel.json → `/api/cron/score`); `AUTH_SECRET` leitet zugleich den Credential-Verschlüsselungs-Key ab und wird nicht rotiert.
 
-**Offen/entschieden-noch-nicht:** Interview-Auswertung als PDF (geplant, nächstes Feature); Nebius als KI-Provider (geplant, löst Mistral-Default ab); kleiner KI-Chatbot (Idee); 2FA für Platform-Sync (offen).
+**Offen/entschieden-noch-nicht:** kleiner KI-Chatbot (Idee); 2FA für Platform-Sync (offen).
+**Inzwischen umgesetzt (ehemals „geplant"):** Interview-Auswertung als PDF (Download direkt aus der Akte); Nebius als KI-Provider (ersetzt den früheren Mistral-Default); automatisierte Tests via `npm test` (node:test, 163 Tests unter `tests/`).
 
 ## Brand Commitments
 

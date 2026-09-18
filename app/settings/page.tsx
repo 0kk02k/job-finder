@@ -782,19 +782,24 @@ export default function SettingsPage() {
                       {prefProfile.criteria.length > 0 && (
                         <div className="flex flex-wrap gap-2 mb-3">
                           {prefProfile.criteria.map((c, i) => (
-                            <span
-                              key={i}
-                              title={c.note || undefined}
-                              className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
-                                c.weight === 'hoch'
-                                  ? 'border-accent/40 bg-accent-soft/30 text-foreground'
-                                  : c.weight === 'niedrig'
-                                    ? 'border-border bg-transparent text-primary-soft'
-                                    : 'border-border bg-border-soft text-foreground'
-                              }`}
-                            >
-                              {c.topic} · {c.weight}
-                            </span>
+                            // Notiz sichtbar unter dem Chip statt title-only
+                            // (Hover ist Touch- und Tastatur-unsichtbar)
+                            <div key={i} className="max-w-xs">
+                              <span
+                                className={`inline-block px-3 py-1.5 rounded-full text-xs font-medium border ${
+                                  c.weight === 'hoch'
+                                    ? 'border-accent/40 bg-accent-soft/30 text-foreground'
+                                    : c.weight === 'niedrig'
+                                      ? 'border-border bg-transparent text-primary-soft'
+                                      : 'border-border bg-border-soft text-foreground'
+                                }`}
+                              >
+                                {c.topic} · {c.weight}
+                              </span>
+                              {c.note && (
+                                <p className="text-xs text-primary-soft mt-1">{c.note}</p>
+                              )}
+                            </div>
                           ))}
                         </div>
                       )}
