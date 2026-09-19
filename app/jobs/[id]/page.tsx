@@ -565,6 +565,15 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
             <div className="flex items-baseline gap-3 mb-3">
               <ScoreBadge score={job.score} size="xl" />
               <span className="text-sm text-primary-soft">KI-Score</span>
+              {/* Ein Urteil ist kein Zustand für immer: Prompt und Profil wachsen
+                  weiter — neu bewerten darf der Nutzer selbst anstoßen */}
+              <button
+                onClick={() => void scoreNow()}
+                disabled={busy !== null}
+                className="ml-auto text-sm text-primary hover:text-selection transition-colors disabled:opacity-50"
+              >
+                {busy === 'score' ? 'Bewertung läuft …' : 'Neu bewerten'}
+              </button>
             </div>
             {job.scoreReason && (
               <p className="text-primary leading-relaxed">{job.scoreReason}</p>

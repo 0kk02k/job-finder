@@ -189,10 +189,42 @@ test('score prompt embeds preferences after the resume, before rules and job —
   assert.match(prompt, /Die Wertpräferenzen oben gelten/)
 })
 
-test('score prompt keeps salary and preferences combinable — salary stays rule 5', () => {
+test('score prompt keeps salary and preferences combinable — both as unnumbered side rules', () => {
   const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', 45000, PROFILE)
-  assert.match(prompt, /5\. Gehaltsvorstellung/)
-  assert.ok(!prompt.includes('6. '), 'die Präferenz-Regel ist bewusst unnummeriert')
+  assert.match(prompt, /Gehaltsvorstellung/)
+  assert.ok(!prompt.includes('. Gehaltsvorstellung'), 'der Gehaltszusatz ist bewusst unnummeriert — die Kriterienliste ist vollständig, ohne ihn')
+  assert.ok(!prompt.includes('6. '), 'es gibt nur fünf nummerierte Kriterien')
+})
+
+// Runde-10-Follow-up: „Senior Data Scientist, 4+ Jahre kommerzielle Erfahrung,
+// 3+ Jahre Python (muss), 3+ Jahre Databricks" bekam Score 8 — der Resume
+// enthielt weder Python noch Databricks. Der Prompt lobte „Einarbeitung" und
+// erfand Transferable Skills, statt Muss-Anforderungen als Lücken zu werten.
+test('score prompt names hard requirements as score-lowering criteria', () => {
+  const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', null)
+  assert.match(prompt, /Muss-Anforderungen/)
+  assert.match(prompt, /Jahresangaben/)
+  assert.match(prompt, /Seniorität/)
+  assert.match(prompt, /Abschlüsse/)
+  assert.match(prompt, /senkt|senken/, 'fehlende Muss-Anforderungen müssen den Score drücken')
+})
+
+test('score prompt narrows Einarbeitungspotenzial to single skills — not must-haves', () => {
+  const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', null)
+  assert.match(prompt, /Einarbeitungspotenzial/)
+  assert.match(prompt, /NICHT für Muss-Anforderungen/)
+})
+
+test('score prompt anchors skills to the resume — no invented matches', () => {
+  const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', null)
+  assert.match(prompt, /nachweisbar/)
+  assert.match(prompt, /erfinde keine/)
+})
+
+test('score prompt rates today\'s fit, not the potential', () => {
+  const prompt = buildScorePrompt('JOB', 'LEBENSLAUF', null)
+  assert.match(prompt, /Passung heute/)
+  assert.match(prompt, /Entwicklungspotenzial/)
 })
 
 test('score prompt has no preference residue when none exist', () => {

@@ -366,12 +366,13 @@ export function buildScorePrompt(
 ): string {
   const salaryLine =
     typeof minSalary === 'number' && minSalary > 0
-      ? `5. Gehaltsvorstellung: Der Nutzer sucht ab ${minSalary} — liegt das angegebene Gehalt darunter, wirkt das den Score senkend, ist aber nur ein Faktor neben den Skills.\n`
+      ? `Gehaltsvorstellung: Der Nutzer sucht ab ${minSalary} — liegt das angegebene Gehalt darunter, wirkt das den Score senkend, ist aber nur ein Faktor neben den Skills.\n`
       : ''
 
-  // Die Präferenzen stehen im Präfix (pro Nutzer konstant) und die Regelzeile
-  // bewusst unnummeriert — eine „6." klaffte, sobald minSalary fehlt. Ohne
-  // Profil bleibt der Prompt byte-identisch zur Zeit ohne dieses Feature.
+  // Die Präferenzen stehen im Präfix (pro Nutzer konstant) und beide Zusatz-
+  // regeln (Gehalt, Präferenzen) sind bewusst unnummeriert — die Kriterienliste
+  // ist in sich vollständig, und keine Nummer klafft, wenn ein Zusatz fehlt.
+  // Ohne Profil bleibt der Prompt byte-identisch zur Zeit ohne dieses Feature.
   const prefsBlock = preferences
     ? `\nWERTPREFERENZEN AUS DEM PRÄFERENZ-GESPRÄCH (vom Nutzer bestätigt):\n${renderPreferenceBlock(preferences)}\n`
     : ''
@@ -385,10 +386,11 @@ Resume:
 ${resume}
 ${prefsBlock}
 Berücksichtige dabei:
-1. Direkte Skill-Matches
+1. Direkte Skill-Matches — zähle nur Skills als Match, die im Resume nachweisbar sind; erfinde keine
 2. Transferable Skills (Skills die übertragbar sind)
-3. Potenzial zur Einarbeitung (job ist vielleicht etwas höher, aber lernbar)
-4. Kultur-Fit basierend auf Firmenbeschreibung (falls vorhanden)
+3. Einarbeitungspotenzial für einzelne fehlende Skills (lernbar) — das gilt NICHT für Muss-Anforderungen
+4. Muss-Anforderungen sind harte Kriterien: explizite Jahresangaben an Erfahrung (z. B. „4+ Jahre kommerzielle Erfahrung"), geforderte Abschlüsse und Seniorität (z. B. „Senior") — fehlt eine davon im Resume nachweislich, senkt das den Score deutlich, auch wenn verwandte Skills passen
+5. Kultur-Fit basierend auf Firmenbeschreibung (falls vorhanden)
 ${salaryLine}${prefsRule}
 Gib für den unten stehenden Job zurück als JSON:
 {
@@ -398,7 +400,7 @@ Gib für den unten stehenden Job zurück als JSON:
   "strengths": ["Stärke 1", "Stärke 2", "Transferable Skill 1"]
 }
 
-Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lücken. 5 oder weniger bedeutet großer Gap.
+Ein Score von 8+ bedeutet sehr guter Fit. 6-7 bedeutet guter Fit mit kleinen Lücken. 5 oder weniger bedeutet großer Gap. Bewerte die Passung heute — nicht das Entwicklungspotenzial: „könnte sich einarbeiten" rechtfertigt keinen Score über 7, wenn Muss-Anforderungen fehlen.
 
 Der zu bewertende Job:
 ${jobDescription}
