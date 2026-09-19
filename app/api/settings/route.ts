@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { auth } from '@/auth'
 import { z } from 'zod'
+import { resolveKeyHint } from '@/lib/keys'
 
 // Whitelist of updatable settings fields. Unknown keys (id, userId, ...) are stripped —
 // deliberately not .strict(), because the settings UI sends back the full object incl. id.
@@ -26,12 +27,9 @@ const settingsSchema = z.object({
 
 // GET liefert API-Keys nie im Klartext — nur einen Maskiert-Hinweis („••••4f2a“).
 // Ein neuer Key wird gesetzt, indem man ihn eintippt; leer lassen heißt behalten.
+// Ohne eigenen Key meldet die Umgebung (Vercel-Env) ihren Key — dieselben
+// Namen, auf die die Laufzeit ohnehin zurückfällt — mit Quelle „env“.
 const KEY_FIELDS = ['geminiApiKey', 'openaiApiKey', 'nebiusApiKey', 'openrouterApiKey', 'apifyApiKey', 'joobleApiKey', 'adzunaAppId', 'adzunaAppKey'] as const
-
-function maskKey(value: string | null | undefined): string | null {
-  if (!value) return null
-  return `••••${value.slice(-4)}`
-}
 
 // GET /api/settings - get user settings (Keys maskiert)
 export async function GET() {
@@ -55,16 +53,34 @@ export async function GET() {
     apifyApiKey: _a, joobleApiKey: _j, adzunaAppId: _ai, adzunaAppKey: _ak,
     ...rest
   } = settings
+  const slots = {
+    geminiKey: resolveKeyHint(_g, process.env.GEMINI_API_KEY),
+    openaiKey: resolveKeyHint(_o, process.env.OPENAI_API_KEY),
+    nebiusKey: resolveKeyHint(_n, process.env.NEBIUS_API_KEY),
+    openrouterKey: resolveKeyHint(_r, process.env.OPENROUTER_API_KEY),
+    apifyKey: resolveKeyHint(_a, process.env.APIFY_API_KEY),
+    joobleKey: resolveKeyHint(_j, process.env.JOOBLE_API_KEY),
+    adzunaAppId: resolveKeyHint(_ai, process.env.ADZUNA_APP_ID),
+    adzunaAppKey: resolveKeyHint(_ak, process.env.ADZUNA_APP_KEY),
+  }
   return NextResponse.json({
     ...rest,
-    geminiKeyHint: maskKey(_g),
-    openaiKeyHint: maskKey(_o),
-    nebiusKeyHint: maskKey(_n),
-    openrouterKeyHint: maskKey(_r),
-    apifyKeyHint: maskKey(_a),
-    joobleKeyHint: maskKey(_j),
-    adzunaAppIdHint: maskKey(_ai),
-    adzunaAppKeyHint: maskKey(_ak),
+    geminiKeyHint: slots.geminiKey.hint,
+    geminiKeySource: slots.geminiKey.source,
+    openaiKeyHint: slots.openaiKey.hint,
+    openaiKeySource: slots.openaiKey.source,
+    nebiusKeyHint: slots.nebiusKey.hint,
+    nebiusKeySource: slots.nebiusKey.source,
+    openrouterKeyHint: slots.openrouterKey.hint,
+    openrouterKeySource: slots.openrouterKey.source,
+    apifyKeyHint: slots.apifyKey.hint,
+    apifyKeySource: slots.apifyKey.source,
+    joobleKeyHint: slots.joobleKey.hint,
+    joobleKeySource: slots.joobleKey.source,
+    adzunaAppIdHint: slots.adzunaAppId.hint,
+    adzunaAppIdSource: slots.adzunaAppId.source,
+    adzunaAppKeyHint: slots.adzunaAppKey.hint,
+    adzunaAppKeySource: slots.adzunaAppKey.source,
   })
 }
 

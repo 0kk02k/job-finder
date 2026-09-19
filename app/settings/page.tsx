@@ -13,6 +13,7 @@ import {
   EMPTY_PROFILE_FIELDS,
   type ProfileFormFields,
 } from '@/lib/settings-dirty'
+import { keyPlaceholder, type KeySource } from '@/lib/keys'
 
 interface Settings {
   id: string
@@ -36,6 +37,16 @@ interface Settings {
   joobleKeyHint?: string | null
   adzunaAppIdHint?: string | null
   adzunaAppKeyHint?: string | null
+  // Woher der Hinweis stammt — 'env' heißt: die Umgebung (Vercel) fängt auf,
+  // das eigene Feld überschreibt sie
+  nebiusKeySource?: KeySource | null
+  geminiKeySource?: KeySource | null
+  openaiKeySource?: KeySource | null
+  openrouterKeySource?: KeySource | null
+  apifyKeySource?: KeySource | null
+  joobleKeySource?: KeySource | null
+  adzunaAppIdSource?: KeySource | null
+  adzunaAppKeySource?: KeySource | null
 }
 
 // Neu getippte Keys — leer heißt: gespeicherten Key behalten
@@ -433,11 +444,11 @@ export default function SettingsPage() {
   // KI-Schlüssel-Erklärung gilt für alle Anbieter gleich — einmal definieren
   const KEY_HELP = 'Ein API-Key ist der Zugangsschlüssel für die KI — du bekommst ihn einmalig bei deinem Anbieter und trägst ihn hier ein. Damit laufen Suche, Bewertung und Anschreiben. Er wird verschlüsselt gespeichert und nie wieder angezeigt.'
 
-  const keyFieldFor: Record<string, { key: keyof NewKeys; label: string; hint?: string | null; help: string } | null> = {
-    nebius: { key: 'nebius', label: 'KI-Schlüssel (Nebius)', hint: settings.nebiusKeyHint, help: KEY_HELP },
-    gemini: { key: 'gemini', label: 'KI-Schlüssel (Google Gemini)', hint: settings.geminiKeyHint, help: KEY_HELP },
-    openai: { key: 'openai', label: 'KI-Schlüssel (OpenAI)', hint: settings.openaiKeyHint, help: KEY_HELP },
-    openrouter: { key: 'openrouter', label: 'KI-Schlüssel (OpenRouter)', hint: settings.openrouterKeyHint, help: KEY_HELP },
+  const keyFieldFor: Record<string, { key: keyof NewKeys; label: string; hint?: string | null; source?: KeySource | null; help: string } | null> = {
+    nebius: { key: 'nebius', label: 'KI-Schlüssel (Nebius)', hint: settings.nebiusKeyHint, source: settings.nebiusKeySource, help: KEY_HELP },
+    gemini: { key: 'gemini', label: 'KI-Schlüssel (Google Gemini)', hint: settings.geminiKeyHint, source: settings.geminiKeySource, help: KEY_HELP },
+    openai: { key: 'openai', label: 'KI-Schlüssel (OpenAI)', hint: settings.openaiKeyHint, source: settings.openaiKeySource, help: KEY_HELP },
+    openrouter: { key: 'openrouter', label: 'KI-Schlüssel (OpenRouter)', hint: settings.openrouterKeyHint, source: settings.openrouterKeySource, help: KEY_HELP },
     ollama: null,
   }
   const activeKeyField = keyFieldFor[settings.aiProvider] ?? null
@@ -497,11 +508,7 @@ export default function SettingsPage() {
                   type="password"
                   value={newKeys[activeKeyField.key]}
                   onChange={(v) => setNewKeys({ ...newKeys, [activeKeyField.key]: v })}
-                  placeholder={
-                    activeKeyField.hint
-                      ? `Bereits hinterlegt: ${activeKeyField.hint} — zum Behalten leer lassen`
-                      : 'Noch kein Schlüssel hinterlegt'
-                  }
+                  placeholder={keyPlaceholder(activeKeyField.hint, activeKeyField.source)}
                   help={activeKeyField.help}
                 />
               )}
@@ -511,7 +518,7 @@ export default function SettingsPage() {
                 type="password"
                 value={newKeys.apify}
                 onChange={(v) => setNewKeys({ ...newKeys, apify: v })}
-                placeholder={settings.apifyKeyHint ? `Bereits hinterlegt: ${settings.apifyKeyHint} — zum Behalten leer lassen` : 'Noch kein Schlüssel hinterlegt'}
+                placeholder={keyPlaceholder(settings.apifyKeyHint, settings.apifyKeySource)}
                 help="Apify ist ein Dienst, der LinkedIn und XING nach Stellen durchsucht und dein Profil abgleicht (versuchsweise). Den Schlüssel bekommst du kostenlos auf apify.com."
               />
 
@@ -951,7 +958,7 @@ export default function SettingsPage() {
                 type="password"
                 value={newKeys.jooble}
                 onChange={(v) => setNewKeys({ ...newKeys, jooble: v })}
-                placeholder={settings.joobleKeyHint ? `Bereits hinterlegt: ${settings.joobleKeyHint} — zum Behalten leer lassen` : 'Noch kein Schlüssel hinterlegt'}
+                placeholder={keyPlaceholder(settings.joobleKeyHint, settings.joobleKeySource)}
                 help="Jooble sammelt Stellen aus hunderten deutschen Jobbörsen an einem Ort. Den Schlüssel bekommst du kostenlos auf jooble.org/api — dort heißt er „API key“, gemeint ist genau das."
               />
               <InputField
@@ -959,7 +966,7 @@ export default function SettingsPage() {
                 type="text"
                 value={newKeys.adzunaAppId}
                 onChange={(v) => setNewKeys({ ...newKeys, adzunaAppId: v })}
-                placeholder={settings.adzunaAppIdHint ? `Bereits hinterlegt: ${settings.adzunaAppIdHint} — zum Behalten leer lassen` : 'Noch keine App-ID hinterlegt'}
+                placeholder={keyPlaceholder(settings.adzunaAppIdHint, settings.adzunaAppIdSource, 'Noch keine App-ID hinterlegt')}
                 help="Adzuna bringt deutsche Stellen mit Gehaltsangaben in die Suche. Du bekommst zwei Angaben, die zusammengehören: diese ID und den Schlüssel darunter. Die ID ist kein Geheimnis — aber erst beide zusammen schalten die Quelle frei."
               />
               <InputField
@@ -967,7 +974,7 @@ export default function SettingsPage() {
                 type="password"
                 value={newKeys.adzunaAppKey}
                 onChange={(v) => setNewKeys({ ...newKeys, adzunaAppKey: v })}
-                placeholder={settings.adzunaAppKeyHint ? `Bereits hinterlegt: ${settings.adzunaAppKeyHint} — zum Behalten leer lassen` : 'Noch kein Schlüssel hinterlegt'}
+                placeholder={keyPlaceholder(settings.adzunaAppKeyHint, settings.adzunaAppKeySource)}
                 help="Der zweite Teil des Adzuna-Zugangs — gemeinsam mit der ID oben. Kostenlos auf developer.adzuna.com."
               />
             </div>
