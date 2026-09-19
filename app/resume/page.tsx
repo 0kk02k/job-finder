@@ -6,6 +6,7 @@ import { useToast } from '../components/Toast'
 import { MarkdownContent } from '../components/Markdown'
 import { Button } from '../components/ui'
 import { EXTRACT_QUESTIONS, parseSkills } from '@/lib/anecdotes'
+import { resumeLoadState } from '@/lib/resume-load'
 
 interface Resume {
   id: string
@@ -41,6 +42,9 @@ export default function ResumePage() {
   const toast = useToast()
   const [resume, setResume] = useState<Resume | null>(null)
   const [loading, setLoading] = useState(true)
+  // Netz-/Serverfehler beim Laden — nicht mit „kein Lebenslauf“ verwechseln:
+  // der Upload-Modus ist nur die ehrliche Antwort, wenn wirklich keiner da ist
+  const [loadError, setLoadError] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [mode, setMode] = useState<'view' | 'upload' | 'edit'>('view')
   const [content, setContent] = useState('')
@@ -91,14 +95,19 @@ export default function ResumePage() {
     try {
       const response = await fetch('/api/resume')
       const data = await response.json()
-      if (data?.id) {
+      const state = resumeLoadState(response.ok, Boolean(data?.id))
+      if (state === 'view') {
         setResume(data)
         setContent(data.content)
-      } else {
+      } else if (state === 'upload') {
         setMode('upload')
+      } else {
+        // Kein stiller Leerstand: der Server hat nicht sauber geantwortet
+        setLoadError(true)
       }
     } catch (error) {
       console.error('Failed to fetch resume:', error)
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -327,6 +336,27 @@ export default function ResumePage() {
             </div>
           )}
         </section>
+
+        {/* Ladefehler: ehrlich benennen und erneut anbieten — dieselbe Form wie
+            die Anekdoten-Sektion, damit Fehler auf der Seite gleich klingen */}
+        {loadError && (
+          <div
+            role="status"
+            className="mb-10 p-4 bg-warning/10 rounded-xl border border-warning/20 flex flex-wrap items-center justify-between gap-3"
+          >
+            <p className="text-sm text-primary">Lebenslauf konnte nicht geladen werden — er ist nicht weg.</p>
+            <button
+              onClick={() => {
+                setLoadError(false)
+                setLoading(true)
+                void fetchResume()
+              }}
+              className="text-sm font-medium text-primary hover:text-selection transition-colors"
+            >
+              Erneut versuchen
+            </button>
+          </div>
+        )}
 
         {/* Upload Mode */}
         {mode === 'upload' && (

@@ -45,3 +45,18 @@ export function pickUnscoredBatch<T extends BatchCandidate>(jobs: T[], limit: nu
     )
     .slice(0, limit)
 }
+
+// Sichtbarkeit und Aktion des Rückstand-Kastens — dieselbe Entscheidung in
+// beiden Filter-Zweigen. Ein laufender Batch bleibt bedienbar („Stoppen“),
+// solange er läuft, auch wenn der Zähler zwischendurch auf 0 fällt. Vor Runde 10
+// gab es „Stoppen“ nur im Unbewertet-Zweig — ein Lauf in der Bewertet-Ansicht
+// war nicht abbrechbar.
+export function batchControlState(
+  running: boolean,
+  backlog: number
+): { visible: boolean; action: 'stop' | 'start' } {
+  return {
+    visible: backlog > 0 || running,
+    action: running ? 'stop' : 'start',
+  }
+}

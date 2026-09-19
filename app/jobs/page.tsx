@@ -7,6 +7,7 @@ import { useToast, UNDO_TOAST_DURATION_MS } from '../components/Toast'
 import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, ScoreBadge } from '../components/ui'
 import { STATUS_LABELS, isBacklogJob } from '@/lib/status'
 import { SCORE_LIMIT } from '@/lib/search'
+import { batchControlState } from '@/lib/scoring'
 
 interface Job {
   id: string
@@ -248,6 +249,11 @@ export default function JobsPage() {
   // bewertet ebenfalls den globalen Rückstand (dasselbe Zählprinzip wie die
   // score-batch-Route: score null und weder archiviert noch abgelehnt)
   const unscoredTotal = useMemo(() => jobs.filter(isBacklogJob).length, [jobs])
+  // Eine Entscheidung für beide Filter-Ansichten: solange Rückstand ODER ein
+  // laufender Batch existiert, bleibt der Kasten sichtbar — im Lauf heißt die
+  // Aktion „Stoppen“ (vor Runde 10 war ein Lauf in der Bewertet-Ansicht
+  // nicht abbrechbar)
+  const batchControl = batchControlState(batchRunning, unscoredTotal)
 
   const filteredJobs = useMemo(() => {
     let result = jobs.filter((job) => activeStatuses.has(job.status))
@@ -586,40 +592,49 @@ export default function JobsPage() {
                       Warum gibt es Reste?
                     </Link>
                   </p>
-                  {unscoredTotal > 0 && (
+                  {batchControl.visible && (
                     <Button
                       size="sm"
                       variant="secondary"
                       onClick={() => {
-                        if (batchRunning) {
+                        if (batchControl.action === 'stop') {
                           batchAbortRef.current = true
                         } else {
                           void runScoreBatch()
                         }
                       }}
                     >
-                      {batchRunning
+                      {batchControl.action === 'stop'
                         ? `Stoppen (${batchDone}/${batchTotal})`
                         : `Rückstand bewerten (${unscoredTotal})`}
                     </Button>
                   )}
                 </div>
               ) : (
-                unscoredTotal > 0 && !batchRunning && (
+                batchControl.visible && (
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-xs text-primary-soft tabular-nums">
-                      {unscoredTotal} {unscoredTotal === 1 ? 'Job wartet' : 'Jobs warten'} auf die Bewertung.
+                      {batchRunning
+                        ? `Bewerte … ${batchDone}/${batchTotal}`
+                        : `${unscoredTotal} ${unscoredTotal === 1 ? 'Job wartet' : 'Jobs warten'} auf die Bewertung.`}
                     </p>
-                    <Button size="sm" variant="secondary" onClick={() => void runScoreBatch()}>
-                      Rückstand bewerten
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => {
+                        if (batchControl.action === 'stop') {
+                          batchAbortRef.current = true
+                        } else {
+                          void runScoreBatch()
+                        }
+                      }}
+                    >
+                      {batchControl.action === 'stop'
+                        ? `Stoppen (${batchDone}/${batchTotal})`
+                        : 'Rückstand bewerten'}
                     </Button>
                   </div>
                 )
-              )}
-              {batchRunning && scoreFilter !== 'unscored' && (
-                <p className="text-xs text-primary-soft tabular-nums">
-                  Bewerte … {batchDone}/{batchTotal}
-                </p>
               )}
               {/* Hartgrenze erreicht oder manuell gestoppt: der Rest wird
                   benannt statt still abzubrechen — ein Klick startet die nächste Etappe */}

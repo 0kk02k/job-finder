@@ -3,7 +3,7 @@
 // für den Rückstand (unbewertet, älteste zuerst, begrenzt).
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { scoreUpdatePayload, pickUnscoredBatch } from '../../lib/scoring'
+import { scoreUpdatePayload, pickUnscoredBatch, batchControlState } from '../../lib/scoring'
 
 const THRESHOLD = 8
 
@@ -73,4 +73,20 @@ test('pickUnscoredBatch returns everything unscored when under the limit', () =>
 
 test('pickUnscoredBatch on an empty pool is empty', () => {
   assert.deepEqual(pickUnscoredBatch<BatchJob>([], 20), [])
+})
+
+// Der Rückstand-Kasten teilt sich eine Entscheidung zwischen beiden Filter-
+// Zweigen: sichtbar, solange Rückstand ODER laufender Batch existiert; im Lauf
+// heißt die Aktion „Stoppen“. Vor Runde 10 (P2) war ein laufender Batch in der
+// Bewertet-Ansicht nicht abbrechbar — „Stoppen“ gab es nur im Unbewertet-Zweig.
+test('laufender Batch bleibt sichtbar und stoppbar, auch bei Zählerstand 0', () => {
+  assert.deepEqual(batchControlState(true, 0), { visible: true, action: 'stop' })
+})
+
+test('Rückstand ohne laufenden Batch: sichtbar, Aktion Start', () => {
+  assert.deepEqual(batchControlState(false, 3), { visible: true, action: 'start' })
+})
+
+test('ohne Rückstand und ohne Batch: kein Kasten', () => {
+  assert.deepEqual(batchControlState(false, 0), { visible: false, action: 'start' })
 })

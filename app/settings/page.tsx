@@ -6,6 +6,13 @@ import { useToast } from '../components/Toast'
 // Pure Kern-Modul (ohne AI-SDK) — Client-sicher, wie lib/anecdotes auf der
 // Resume-Seite
 import { parseStoredProfile } from '@/lib/preference-profile'
+import {
+  isProfileDirty,
+  isSettingsDirty,
+  isSettingsFormDirty,
+  EMPTY_PROFILE_FIELDS,
+  type ProfileFormFields,
+} from '@/lib/settings-dirty'
 
 interface Settings {
   id: string
@@ -172,22 +179,33 @@ export default function SettingsPage() {
       const profiles = await response.json()
       const profile = Array.isArray(profiles) ? profiles[0] : null
       if (profile) {
-        setProfileName(profile.name || '')
-        setProfileHeadline(profile.headline || '')
-        setProfileAbout(profile.about || '')
-        setProfileLocation(profile.location || '')
+        let skills = EMPTY_PROFILE_FIELDS.skills
         try {
-          const skills = profile.skills ? JSON.parse(profile.skills) : []
-          setProfileSkills(Array.isArray(skills) ? skills.join(', ') : '')
+          const parsed = profile.skills ? JSON.parse(profile.skills) : []
+          if (Array.isArray(parsed)) skills = parsed.join(', ')
         } catch {
-          setProfileSkills('')
+          // Kein gültiges Skills-JSON → leerer Stand
         }
+        const loaded: ProfileFormFields = {
+          name: profile.name || '',
+          headline: profile.headline || '',
+          about: profile.about || '',
+          location: profile.location || '',
+          skills,
+        }
+        setProfileName(loaded.name)
+        setProfileHeadline(loaded.headline)
+        setProfileAbout(loaded.about)
+        setProfileLocation(loaded.location)
+        setProfileSkills(loaded.skills)
+        setProfileBaseline(loaded)
       } else {
-        setProfileName('')
-        setProfileHeadline('')
-        setProfileAbout('')
-        setProfileLocation('')
-        setProfileSkills('')
+        setProfileName(EMPTY_PROFILE_FIELDS.name)
+        setProfileHeadline(EMPTY_PROFILE_FIELDS.headline)
+        setProfileAbout(EMPTY_PROFILE_FIELDS.about)
+        setProfileLocation(EMPTY_PROFILE_FIELDS.location)
+        setProfileSkills(EMPTY_PROFILE_FIELDS.skills)
+        setProfileBaseline(EMPTY_PROFILE_FIELDS)
       }
     } catch {
       // Kein stiller Leerstand: Felder bleiben leer, die Sektion meldet den Fehler
@@ -205,6 +223,11 @@ export default function SettingsPage() {
   // und „Verbindung testen“ (der prüft bewusst nur die gespeicherte Welt);
   // gesetzt wird er in fetchSettings, nicht per Effect
   const [baseline, setBaseline] = useState<Settings | null>(null)
+  // Baseline des geladenen Profils — der Dirty-Vergleich rechnet echte Differenz
+  // gegen diesen Stand, nicht gegen leer. Vor Runde 10 hielt jedes geladene
+  // Profil die Fläche dauerhaft dirty: Banner klebte, beforeunload nagte,
+  // und Speichern löste es nie.
+  const [profileBaseline, setProfileBaseline] = useState<ProfileFormFields | null>(null)
 
   function hasUnsavedChanges(): boolean {
     return dirty
@@ -212,21 +235,23 @@ export default function SettingsPage() {
 
   // Ein Dirty-Zustand für alles: Guard, Verbindungstest UND die Fläche teilen
   // sich dieselbe Rechnung — was der Nutzer sieht, ist was der Browser schützt
-  const dirty = useMemo(() => {
-    if (!settings || !baseline) return false
-    return (
-      settings.aiProvider !== baseline.aiProvider ||
-      (settings.aiModel ?? '') !== (baseline.aiModel ?? '') ||
-      (settings.ollamaUrl ?? '') !== (baseline.ollamaUrl ?? '') ||
-      (settings.targetTitles ?? '') !== (baseline.targetTitles ?? '') ||
-      (settings.targetLocations ?? '') !== (baseline.targetLocations ?? '') ||
-      (settings.minSalary ?? null) !== (baseline.minSalary ?? null) ||
-      (settings.docTemplate ?? '') !== (baseline.docTemplate ?? '') ||
-      settings.remote !== baseline.remote ||
-      JSON.stringify(newKeys) !== JSON.stringify(EMPTY_KEYS) ||
-      [profileName, profileHeadline, profileAbout, profileLocation, profileSkills].some((v) => v !== '')
-    )
-  }, [settings, baseline, newKeys, profileName, profileHeadline, profileAbout, profileLocation, profileSkills])
+  const dirty = useMemo(
+    () =>
+      isSettingsDirty({
+        settings,
+        baseline,
+        newKeys,
+        profile: {
+          name: profileName,
+          headline: profileHeadline,
+          about: profileAbout,
+          location: profileLocation,
+          skills: profileSkills,
+        },
+        profileBaseline,
+      }),
+    [settings, baseline, newKeys, profileName, profileHeadline, profileAbout, profileLocation, profileSkills, profileBaseline]
+  )
 
   useEffect(() => {
     if (!dirty) return
@@ -282,6 +307,26 @@ export default function SettingsPage() {
     }
   }
 
+  // Der eine Save-Punkt der Seite speichert genau die Bereiche, die geändert
+  // sind — ein Banner, das nur Profil-Änderungen meldet, endet mit deren Speichern
+  async function saveAll() {
+    if (isSettingsFormDirty(settings, baseline, newKeys)) await saveSettings()
+    if (
+      isProfileDirty(
+        {
+          name: profileName,
+          headline: profileHeadline,
+          about: profileAbout,
+          location: profileLocation,
+          skills: profileSkills,
+        },
+        profileBaseline
+      )
+    ) {
+      await saveProfile()
+    }
+  }
+
   async function testConnection() {
     if (hasUnsavedChanges()) {
       setTestResult({ ok: false, message: 'Ungespeicherte Änderungen — erst speichern, dann testen.' })
@@ -321,6 +366,10 @@ export default function SettingsPage() {
       })
 
       if (response.ok) {
+        // Server-Stand nachladen statt den Formular-Text als Baseline zu nehmen —
+        // die Skills werden beim Speichern normalisiert, und dirty soll nach dem
+        // Speichern garantiert enden
+        await fetchProfile()
         toast.success('Profil gespeichert')
       } else {
         toast.error('Speichern fehlgeschlagen — versuch es erneut.')
@@ -927,12 +976,12 @@ export default function SettingsPage() {
           {/* Der eine Save-Punkt der Seite: erscheint, sobald es ungespeicherte
               Änderungen gibt, und klebt am unteren Rand — egal wie weit unten die
               bearbeitete Sektion liegt. Nach dem Speichern verschwindet er. */}
-          {dirty && !saving && (
+          {dirty && !saving && !savingProfile && (
             <div className="sticky bottom-4 z-10 flex justify-end">
               <div className="flex items-center gap-3 bg-surface rounded-2xl border border-border shadow-sm px-4 py-3">
                 <span className="text-xs text-warning">Ungespeicherte Änderungen</span>
                 <button
-                  onClick={saveSettings}
+                  onClick={saveAll}
                   className="px-5 py-2 bg-accent hover:bg-accent-strong text-on-accent rounded-xl font-medium text-sm transition-colors"
                 >
                   Speichern
