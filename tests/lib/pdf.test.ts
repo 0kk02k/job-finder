@@ -3,7 +3,7 @@
 // Struktur ziehen und darf niemals ein leeres Dokument zulassen.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseResumeMarkdown, resumeDataHasSubstance, generateCoverLetterFromJob } from '../../lib/pdf'
+import { parseResumeMarkdown, resumeDataHasSubstance, generateCoverLetterFromJob, resumeDateRange } from '../../lib/pdf'
 
 // Realistischer unpdf-Extrakt: Kontaktkopf, Abschnitte als Überschriftenzeilen,
 // Einträge als Titelzeile + „Firma | Von – Bis", Bullets als •-Zeilen.
@@ -196,4 +196,44 @@ test('static cover letter template stays German for German ads', () => {
   const letter = generateCoverLetterFromJob(resume, 'Wir suchen eine Softwareentwicklerin.', 'ACME GmbH', 'Softwareentwickler', 'de')
   assert.match(letter.salutation, /^Sehr geehrte/)
   assert.match(letter.closing, /Mit freundlichen Grüßen/)
+})
+
+// Datumszeile im Lebenslauf: „03/2021Heute“ war der sichtbare Bug — die
+// Renderer-Verkettung verschluckte den Strich. Eine Funktion, ein Vertrag.
+test('resumeDateRange baut die Zeile mit Strich und Heute-Ersatz', () => {
+  assert.equal(resumeDateRange('03/2021', '02/2024'), '03/2021 – 02/2024')
+  assert.equal(resumeDateRange('03/2021'), '03/2021 – Heute')
+  assert.equal(resumeDateRange('03/2021', undefined), '03/2021 – Heute')
+  assert.equal(resumeDateRange('', '2021'), '2021')
+  assert.equal(resumeDateRange(''), '')
+})
+
+// Anschreiben ohne Betreff und ohne erreichbare Absenderin sind
+// unvollständige Bewerbungsunterlagen — beides gehört auf das Blatt
+const CONTACT_RESUME = {
+  name: 'Max Mustermann',
+  title: 'Datenanalyst',
+  email: 'max@mustermann.de',
+  phone: '+49 170 1234567',
+  location: 'Berlin',
+  summary: '',
+  experience: [],
+  education: [],
+  skills: ['SQL'],
+}
+
+test('generateCoverLetterFromJob setzt Betreff und Kontaktzeile (de)', () => {
+  const letter = generateCoverLetterFromJob(CONTACT_RESUME, 'Sie analysieren Daten bei uns.', 'Muster GmbH', 'Datenanalyst', 'de')
+  assert.equal(letter.subject, 'Bewerbung als Datenanalyst')
+  assert.equal(letter.contactLine, 'max@mustermann.de · +49 170 1234567 · Berlin')
+})
+
+test('generateCoverLetterFromJob ohne Titel: schlichter Betreff (de)', () => {
+  const letter = generateCoverLetterFromJob({ ...CONTACT_RESUME, title: '' }, 'Sie analysieren Daten bei uns.', 'Muster GmbH', '', 'de')
+  assert.equal(letter.subject, 'Bewerbung')
+})
+
+test('generateCoverLetterFromJob setzt Betreff auf Englisch', () => {
+  const letter = generateCoverLetterFromJob(CONTACT_RESUME, 'You analyse data with us.', 'Muster GmbH', 'Data Analyst', 'en')
+  assert.equal(letter.subject, 'Application as Data Analyst')
 })

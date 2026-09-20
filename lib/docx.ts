@@ -35,9 +35,9 @@ export const DOCX_THEMES: Record<DocTemplateId, DocxTheme> = {
     baseSize: 20,
     smallSize: 18,
     headingSize: 22,
-    nameColor: '1E3A8A',
-    accentColor: '2563EB',
-    mutedColor: '64748B',
+    nameColor: '1C1917',
+    accentColor: 'B45309',
+    mutedColor: '6B645E',
     spacingAfter: 160,
   },
   klassisch: {
@@ -47,9 +47,9 @@ export const DOCX_THEMES: Record<DocTemplateId, DocxTheme> = {
     baseSize: 21,
     smallSize: 19,
     headingSize: 23,
-    nameColor: '1A1A1A',
-    accentColor: '1A1A1A',
-    mutedColor: '525252',
+    nameColor: '1C1917',
+    accentColor: '1C1917',
+    mutedColor: '57534E',
     spacingAfter: 140,
   },
   kompakt: {
@@ -59,9 +59,9 @@ export const DOCX_THEMES: Record<DocTemplateId, DocxTheme> = {
     baseSize: 18,
     smallSize: 16,
     headingSize: 20,
-    nameColor: '111827',
-    accentColor: '111827',
-    mutedColor: '4B5563',
+    nameColor: '1C1917',
+    accentColor: 'B45309',
+    mutedColor: '6B645E',
     spacingAfter: 80,
   },
 }
@@ -171,17 +171,32 @@ function letterParagraphs(data: CoverLetterData, t: DocxTheme): Paragraph[] {
       spacing: { after: 40 },
       children: [new TextRun({ text: data.name, bold: true, size: t.baseSize, font: t.font })],
     }),
-    new Paragraph({
-      spacing: { after: t.spacingAfter },
-      children: [new TextRun({ text: data.date, size: t.baseSize, font: t.font, color: t.mutedColor })],
-    }),
   ]
+  if (data.contactLine) {
+    out.push(new Paragraph({
+      spacing: { after: 40 },
+      children: [new TextRun({ text: data.contactLine, size: t.baseSize, font: t.font, color: t.mutedColor })],
+    }))
+  }
+  // DIN 5008: das Datum steht rechtsbündig
+  out.push(new Paragraph({
+    alignment: AlignmentType.RIGHT,
+    spacing: { after: t.spacingAfter },
+    children: [new TextRun({ text: data.date, size: t.baseSize, font: t.font, color: t.mutedColor })],
+  }))
 
   const recipientLines = [data.recipientName, data.recipientTitle, data.recipientCompany].filter(Boolean) as string[]
   for (const line of recipientLines) {
     out.push(new Paragraph({ spacing: { after: 20 }, children: [new TextRun({ text: line, size: t.baseSize, font: t.font })] }))
   }
   out.push(new Paragraph({ spacing: { after: t.spacingAfter }, children: [] }))
+
+  if (data.subject) {
+    out.push(new Paragraph({
+      spacing: { after: t.spacingAfter },
+      children: [new TextRun({ text: data.subject, bold: true, size: t.baseSize, font: t.font })],
+    }))
+  }
 
   out.push(new Paragraph({
     spacing: { after: t.spacingAfter },

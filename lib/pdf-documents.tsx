@@ -1,9 +1,29 @@
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import type { ResumeData, CoverLetterData, InterviewReport } from './pdf'
+import { resumeDateRange } from './pdf'
 import { DEFAULT_DOC_TEMPLATE, type DocTemplateId } from './documents'
+
+// Werkstatt-Set: dieselbe Welt wie die App (DESIGN.md) — Tusche auf Weiß,
+// Ocker als der eine Akzent, Tinten-Blau für Messwerte, Salbei für Etiketten.
+// Die frühere Bootstrap-Palette (#2563eb, #1e3a8a, #dbeafe) ist draußen; die
+// Dokumente sprechen jetzt dieselbe Sprache wie das Werkzeug, das sie baut.
+const INK = '#1c1917'
+const STONE = '#57534e'
+const STONE_SOFT = '#6b645e'
+const OCHRE = '#b45309'
+const INK_BLUE = '#3f5873'
+const HAIRLINE = '#e7e5e4'
+const SAGE = '#e3e8d4'
+const SAGE_INK = '#3c4a32'
+const MOSS = '#55724f'
+const MOSS_TINT = '#eef2ec'
+const TON = '#96553f'
+const TON_TINT = '#f6ece7'
 
 // Theme-Basiswerte für die drei Dokumenten-Designs (siehe lib/documents.ts).
 // Die Layout-Struktur bleibt gleich — Schrift, Farben, Dichte ändern sich.
+// modern: Ocker-Regel + Salbei-Etiketten. klassisch: monochrom Tusche.
+// kompakt: dicht, Ocker-Haarkante.
 interface DocTheme {
   fontFamily: 'Helvetica' | 'Times-Roman'
   nameSize: number
@@ -26,13 +46,13 @@ const THEMES: Record<DocTemplateId, DocTheme> = {
   modern: {
     fontFamily: 'Helvetica',
     nameSize: 28,
-    nameColor: '#1e3a8a',
-    accentColor: '#2563eb',
+    nameColor: INK,
+    accentColor: OCHRE,
     headerBorderWidth: 2,
-    textColor: '#1a1a1a',
-    mutedColor: '#64748b',
-    skillBg: '#dbeafe',
-    skillColor: '#1e40af',
+    textColor: INK,
+    mutedColor: STONE_SOFT,
+    skillBg: SAGE,
+    skillColor: SAGE_INK,
     baseFontSize: 10,
     sectionGap: 20,
     itemGap: 12,
@@ -43,13 +63,13 @@ const THEMES: Record<DocTemplateId, DocTheme> = {
   klassisch: {
     fontFamily: 'Times-Roman',
     nameSize: 26,
-    nameColor: '#1a1a1a',
-    accentColor: '#1a1a1a',
+    nameColor: INK,
+    accentColor: INK,
     headerBorderWidth: 1,
-    textColor: '#1a1a1a',
-    mutedColor: '#525252',
-    skillBg: '#e5e5e5',
-    skillColor: '#171717',
+    textColor: INK,
+    mutedColor: STONE,
+    skillBg: '#f5f5f4',
+    skillColor: STONE,
     baseFontSize: 10.5,
     sectionGap: 18,
     itemGap: 10,
@@ -60,13 +80,13 @@ const THEMES: Record<DocTemplateId, DocTheme> = {
   kompakt: {
     fontFamily: 'Helvetica',
     nameSize: 22,
-    nameColor: '#111827',
-    accentColor: '#111827',
+    nameColor: INK,
+    accentColor: OCHRE,
     headerBorderWidth: 1,
-    textColor: '#111827',
-    mutedColor: '#4b5563',
-    skillBg: '#f3f4f6',
-    skillColor: '#1f2937',
+    textColor: INK,
+    mutedColor: STONE_SOFT,
+    skillBg: SAGE,
+    skillColor: SAGE_INK,
     baseFontSize: 9,
     sectionGap: 12,
     itemGap: 8,
@@ -154,9 +174,7 @@ function ResumeDocument({ data, template }: { data: ResumeData; template: DocTem
               <View style={s.itemHeader}>
                 {exp.company ? <Text style={s.company}>{exp.company}</Text> : null}
                 {exp.startDate || exp.endDate ? (
-                  <Text style={s.date}>
-                    {exp.startDate}{exp.startDate && exp.endDate ? ' – ' : ''}{exp.startDate && !exp.endDate ? 'Heute' : ''}{exp.endDate}
-                  </Text>
+                  <Text style={s.date}>{resumeDateRange(exp.startDate, exp.endDate)}</Text>
                 ) : null}
               </View>
               <Text style={s.itemTitle}>{exp.title}</Text>
@@ -208,8 +226,12 @@ function createLetterStyles(t: DocTheme) {
       color: t.textColor,
     },
     sender: { fontWeight: 'bold', marginBottom: 3 },
-    date: { color: t.mutedColor, marginBottom: 15 },
+    contact: { color: t.mutedColor, fontSize: t.baseFontSize - 0.5 },
+    // DIN 5008: das Datum steht rechtsbündig
+    date: { color: t.mutedColor, marginTop: 12, marginBottom: 15, textAlign: 'right' },
     recipient: { marginBottom: 15 },
+    // Betreff: fett, ohne das Wort „Betreff" davor
+    subject: { fontWeight: 'bold', marginBottom: 15 },
     salutation: { marginBottom: 15 },
     bodyParagraph: { marginBottom: 12, textAlign: 'justify' },
     closing: { marginTop: 20 },
@@ -223,6 +245,7 @@ function CoverLetterDocument({ data, template }: { data: CoverLetterData; templa
     <Document>
       <Page size="A4" style={s.page}>
         <Text style={s.sender}>{data.name}</Text>
+        {data.contactLine ? <Text style={s.contact}>{data.contactLine}</Text> : null}
         <Text style={s.date}>{data.date}</Text>
         <View style={s.recipient}>
           {data.recipientName ? <Text>{data.recipientName}</Text> : null}
@@ -230,6 +253,7 @@ function CoverLetterDocument({ data, template }: { data: CoverLetterData; templa
           <Text>{data.recipientCompany}</Text>
         </View>
 
+        {data.subject ? <Text style={s.subject}>{data.subject}</Text> : null}
         <Text style={s.salutation}>{data.salutation}</Text>
 
         {data.body.map((para, i) => (
@@ -262,22 +286,24 @@ const reportStyles = StyleSheet.create({
   block: { marginBottom: 16 },
   blockTitle: { fontSize: 11, fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
   paragraph: { fontSize: 10.5, lineHeight: 1.5 },
-  item: { marginBottom: 8, paddingLeft: 10, borderLeftWidth: 2 },
+  // Stärken/Entwicklungsfelder als Tint-Flächen statt Farbritze am Rand —
+  // Bedeutung gedämpft (Honest Signal), der Text bleibt in Tusche lesbar.
+  item: { marginBottom: 8, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 4 },
   itemName: { fontSize: 10, fontWeight: 'bold' },
   itemText: { fontSize: 9.5, lineHeight: 1.4 },
   barRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
   barLabel: { width: 110, fontSize: 9.5 },
-  barTrack: { flex: 1, height: 6, backgroundColor: '#e5e7eb', borderRadius: 3 },
+  barTrack: { flex: 1, height: 6, backgroundColor: HAIRLINE, borderRadius: 3 },
   barFill: { height: 6, borderRadius: 3 },
-  barValue: { width: 30, fontSize: 9, textAlign: 'right', color: '#6b7280' },
-  scoreChip: { marginRight: 6, fontSize: 9, backgroundColor: '#f3f4f6', paddingVertical: 3, paddingHorizontal: 8, borderRadius: 3 },
-  footnote: { marginTop: 24, fontSize: 8, color: '#9ca3af' },
+  barValue: { width: 30, fontSize: 9, textAlign: 'right', color: STONE_SOFT },
+  scoreChip: { marginRight: 6, fontSize: 9, backgroundColor: '#f5f5f4', paddingVertical: 3, paddingHorizontal: 8, borderRadius: 3, color: STONE_SOFT },
+  footnote: { marginTop: 24, fontSize: 8, color: '#8a837c' },
 })
 
-// Stärken/Entwicklungsfelder als dezente Rand-Akzente — bleibt in jedem Theme
-// und in Graustufen lesbar.
-const TONE_SUCCESS = { borderLeftColor: '#15803d', color: '#15803d' }
-const TONE_WARNING = { borderLeftColor: '#b45309', color: '#b45309' }
+// Bedeutung trägt die Fläche, nicht der Rand: Moos für Stärken, Ton für
+// Entwicklungsfelder — jeweils als 10%-Tint, der Name in Vollton.
+const TONE_SUCCESS = { backgroundColor: MOSS_TINT }
+const TONE_WARNING = { backgroundColor: TON_TINT }
 
 function InterviewReportDocument({ report, template }: { report: InterviewReport; template: DocTemplateId }) {
   const t = THEMES[template]
@@ -308,7 +334,8 @@ function InterviewReportDocument({ report, template }: { report: InterviewReport
             <View key={c.key} style={s.barRow}>
               <Text style={s.barLabel}>{c.label}</Text>
               <View style={s.barTrack}>
-                <View style={[s.barFill, { width: `${(c.value / 5) * 100}%`, backgroundColor: t.accentColor }]} />
+                {/* Messwerte tragen Tinten-Blau (Zustand), nicht den Ocker-Akzent */}
+                <View style={[s.barFill, { width: `${(c.value / 5) * 100}%`, backgroundColor: INK_BLUE }]} />
               </View>
               <Text style={s.barValue}>{c.value}/5</Text>
             </View>
@@ -320,7 +347,7 @@ function InterviewReportDocument({ report, template }: { report: InterviewReport
             <Text style={[s.blockTitle, { color: t.nameColor }]}>Stärken mit Belegen</Text>
             {report.strengths.map((item, i) => (
               <View key={i} style={[s.item, TONE_SUCCESS]}>
-                <Text style={[s.itemName, { color: TONE_SUCCESS.color }]}>{item.name}</Text>
+                <Text style={[s.itemName, { color: MOSS }]}>{item.name}</Text>
                 <Text style={s.itemText}>{item.starExample}</Text>
               </View>
             ))}
@@ -332,7 +359,7 @@ function InterviewReportDocument({ report, template }: { report: InterviewReport
             <Text style={[s.blockTitle, { color: t.nameColor }]}>Entwicklungsfelder</Text>
             {report.weaknesses.map((item, i) => (
               <View key={i} style={[s.item, TONE_WARNING]}>
-                <Text style={[s.itemName, { color: TONE_WARNING.color }]}>{item.name}</Text>
+                <Text style={[s.itemName, { color: TON }]}>{item.name}</Text>
                 <Text style={s.itemText}>Gegenmaßnahme: {item.mitigation}</Text>
               </View>
             ))}

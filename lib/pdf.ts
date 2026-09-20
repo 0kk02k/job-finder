@@ -31,6 +31,11 @@ export interface CoverLetterData {
   recipientName?: string
   recipientCompany: string
   recipientTitle?: string
+  // Betreffzeile (DIN: fett, ohne das Wort „Betreff") — optional, bestehende
+  // Briefe ohne subject bleiben gültig
+  subject?: string
+  // Kontaktzeile unter dem Absendernamen („mail · Telefon · Ort")
+  contactLine?: string
   date: string
   salutation: string
   body: string[]
@@ -73,6 +78,20 @@ export interface InterviewReportInput {
 
 const clampScore = (value: unknown): number =>
   Math.min(5, Math.max(1, Math.round(typeof value === 'number' && Number.isFinite(value) ? value : 1)))
+
+// Datumszeile eines Erfahrungseintrags: bislang verklebte die Renderer-
+// Verkettung „03/2021Heute“ — ein Strich, ein Vertrag (getestet).
+export function resumeDateRange(startDate: string, endDate?: string): string {
+  if (!startDate) return endDate ?? ''
+  if (!endDate) return `${startDate} – Heute`
+  return `${startDate} – ${endDate}`
+}
+
+// Kontaktzeile fürs Anschreiben — nur, was da ist, ohne leere Trenner
+function contactLineFrom(resumeData: ResumeData): string | undefined {
+  const line = [resumeData.email, resumeData.phone, resumeData.location].filter(Boolean).join(' · ')
+  return line || undefined
+}
 
 // Normalisiert die rohen KI-Insights in den Report: nur bekannte Kompetenzen
 // in fester Reihenfolge, Scores geklemmt, deutsches Datum. Alles, was die KI
@@ -543,6 +562,8 @@ export function generateCoverLetterFromJob(
     return {
       name: resumeData.name,
       recipientCompany: company,
+      subject: jobTitle ? `Application as ${jobTitle}` : 'Application',
+      contactLine: contactLineFrom(resumeData),
       date: today,
       salutation: 'Dear Hiring Team,',
       body: [
@@ -559,6 +580,8 @@ export function generateCoverLetterFromJob(
   return {
     name: resumeData.name,
     recipientCompany: company,
+    subject: jobTitle ? `Bewerbung als ${jobTitle}` : 'Bewerbung',
+    contactLine: contactLineFrom(resumeData),
     date: today,
     salutation: 'Sehr geehrte Damen und Herren,',
     body: [
