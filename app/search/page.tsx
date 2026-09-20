@@ -929,13 +929,13 @@ function JobCard({
               .join(' · ') || 'Ohne Angabe'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-medium border border-sage-line bg-sage text-sage-ink tabular-nums">
-              {typeof job.aiScore === 'number' ? (
-                <ScoreBadge score={job.aiScore} size="sm" />
-              ) : (
-                'Kein Score'
-              )}
-            </span>
+            {/* Der Score ist Bedeutung, nicht Etikett — er steht solo in seiner
+                Signalfarbe, ohne Grau-/Salbei-Schale drumherum */}
+            {typeof job.aiScore === 'number' ? (
+              <ScoreBadge score={job.aiScore} size="sm" />
+            ) : (
+              <span className="text-xs text-primary-soft">Kein Score</span>
+            )}
             {/* Die Herkunft ist die schwächste Info der Karte („Score vor Quelle“)
                 — auf dem Handy weggelassen, damit die Pillenreihe ruhig bleibt */}
             <span className="hidden sm:inline-block px-3 py-1 rounded-full text-xs font-medium border border-sage-line bg-sage text-sage-ink">

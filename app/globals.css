@@ -43,11 +43,12 @@
   --clay: #96553f;
 
   /* Salbei — Material-Etikett für neutrale Fakten-Pillen (Suchergebnisse,
-     Info-Chips): ruhiges Notizbuch-Grün, das nichts bedeutet (Erfolg ist
-     Moos, Zustand ist Tinten-Blau). Dunkles Salbei-Grün auf dem Tint ≥ 7:1. */
-  --sage: #eef0e6;
-  --sage-line: #b9c2a8;
-  --sage-ink: #44513a;
+     Info-Chips, neutrale Status-Badges): ein klares, aber gedämpftes
+     Notizbuch-Grün, das nichts bedeutet (Erfolg ist Moos, Zustand ist
+     Tinten-Blau). Dunkles Salbei-Grün auf dem Tint ≥ 7:1. */
+  --sage: #e3e8d4;
+  --sage-line: #9fae86;
+  --sage-ink: #3c4a32;
 
   --app-font-sans: var(--font-geist-sans);
   --app-font-mono: var(--font-geist-mono);

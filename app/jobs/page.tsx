@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { useToast, UNDO_TOAST_DURATION_MS } from '../components/Toast'
-import { Button, ButtonLink, StatusBadge, StatusButton, HIGH_MATCH_THRESHOLD, ScoreBadge } from '../components/ui'
+import { Button, ButtonLink, StatusButton, HIGH_MATCH_THRESHOLD, ScoreBadge } from '../components/ui'
 import { STATUS_LABELS, isBacklogJob } from '@/lib/status'
 import { SCORE_LIMIT } from '@/lib/search'
 import { batchControlState } from '@/lib/scoring'
@@ -88,6 +88,8 @@ export default function JobsPage() {
   const [bulkBusy, setBulkBusy] = useState(false)
   // Tastatur-Wegweiser (j/k): der markierte Job folgt der Tastatur, Enter öffnet
   const [highlightId, setHighlightId] = useState<string | null>(null)
+  // Die offene Status-Pille — pro Karte genau eine (die zweite schließt die erste)
+  const [statusMenuId, setStatusMenuId] = useState<string | null>(null)
   // Batch-Abbruch auf Wunsch — der Rückstand wird in Etappen abgearbeitet,
   // aber nie gegen den Willen der Nutzerin
   const batchAbortRef = useRef(false)
@@ -793,9 +795,29 @@ export default function JobsPage() {
                       )}
                     </div>
 
+                    {/* Eine Status-Pille statt Badge plus Dauerbuttons: der Status
+                        steht genau einmal — als Salbei-Etikett, das die volle
+                        Pipeline aufklappt (der aktive Eintrag trägt Tinten-Blau) */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <StatusBadge status={job.status} />
+                        <button
+                          onClick={() => setStatusMenuId(statusMenuId === job.id ? null : job.id)}
+                          aria-expanded={statusMenuId === job.id}
+                          aria-label={`Status ändern — aktuell: ${STATUS_LABELS[job.status] ?? job.status}`}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border border-sage-line bg-sage text-sage-ink transition-colors hover:border-primary-soft"
+                        >
+                          {STATUS_LABELS[job.status] ?? job.status}
+                          <svg
+                            width="10"
+                            height="10"
+                            viewBox="0 0 10 10"
+                            fill="none"
+                            aria-hidden="true"
+                            className={`transition-transform ${statusMenuId === job.id ? 'rotate-180' : ''}`}
+                          >
+                            <path d="M2 3.5 5 6.5 8 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        </button>
                         <a
                           href={job.url}
                           target="_blank"
@@ -805,46 +827,31 @@ export default function JobsPage() {
                           Job ansehen <span aria-hidden="true">→</span>
                         </a>
                       </div>
-
-                      {/* 2+2-Gewichtung: die häufigsten Pipeline-Schritte bleiben
-                          Buttons, die seltenen/destruktiveren Wege werden
-                          dezente Textlinks — vier gleichgewichtige Flächen
-                          laden zu Fehlklicken ein */}
-                      <div className="flex items-center gap-2">
-                        <StatusButton
-                          label="Beworben"
-                          onClick={() => updateStatus(job.id, 'APPLIED')}
-                          active={job.status === 'APPLIED'}
-                        />
-                        <StatusButton
-                          label={STATUS_LABELS.INTERVIEW}
-                          onClick={() => updateStatus(job.id, 'INTERVIEW')}
-                          active={job.status === 'INTERVIEW'}
-                        />
-                        <button
-                          onClick={() => updateStatus(job.id, 'REJECTED')}
-                          aria-pressed={job.status === 'REJECTED'}
-                          className={`px-2 py-1.5 rounded-lg text-sm underline underline-offset-4 transition-colors ${
-                            job.status === 'REJECTED'
-                              ? 'text-error decoration-error/60'
-                              : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
-                          }`}
-                        >
-                          Abgelehnt
-                        </button>
-                        <button
-                          onClick={() => updateStatus(job.id, 'ARCHIVED')}
-                          aria-pressed={job.status === 'ARCHIVED'}
-                          className={`px-2 py-1.5 rounded-lg text-sm underline underline-offset-4 transition-colors ${
-                            job.status === 'ARCHIVED'
-                              ? 'text-primary-soft decoration-primary-soft/60'
-                              : 'text-primary-soft decoration-transparent hover:text-foreground hover:decoration-primary-soft/60'
-                          }`}
-                        >
-                          Archivieren
-                        </button>
-                      </div>
                     </div>
+                    {statusMenuId === job.id && (
+                      <div role="group" aria-label="Status setzen" className="mt-3 flex flex-wrap gap-2">
+                        {ALL_STATUSES.map((s) => {
+                          const active = s === job.status
+                          return (
+                            <button
+                              key={s}
+                              onClick={() => {
+                                setStatusMenuId(null)
+                                void updateStatus(job.id, s)
+                              }}
+                              aria-pressed={active}
+                              className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                                active
+                                  ? 'bg-selection text-on-selection border-selection'
+                                  : 'bg-border-soft text-primary-soft border-transparent hover:text-foreground hover:border-border'
+                              }`}
+                            >
+                              {STATUS_LABELS[s] ?? s}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
                 ))}
               </section>

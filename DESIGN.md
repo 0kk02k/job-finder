@@ -17,9 +17,9 @@ colors:
   ink-blue: "#3f5873"
   ink-blue-strong: "#32485f"
   on-ink-blue: "#ffffff"
-  sage: "#eef0e6"
-  sage-line: "#b9c2a8"
-  sage-ink: "#44513a"
+  sage: "#e3e8d4"
+  sage-line: "#9fae86"
+  sage-ink: "#3c4a32"
   moss: "#55724f"
   khaki: "#7d6740"
   clay: "#96553f"
@@ -133,7 +133,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 | `ochre-tint` / `on-ochre` | `#f0e2cd` / `#ffffff` |
 | `ink-blue` / `ink-blue-strong` | `#3f5873` / `#32485f` |
 | `on-ink-blue` | `#ffffff` |
-| `sage` / `sage-line` / `sage-ink` | `#eef0e6` / `#b9c2a8` / `#44513a` |
+| `sage` / `sage-line` / `sage-ink` | `#e3e8d4` / `#9fae86` / `#3c4a32` |
 | `moss` / `khaki` / `clay` | `#55724f` / `#7d6740` / `#96553f` |
 
 ### Primary (Handlung)
@@ -148,7 +148,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 - **Blatt Weiß** (`#ffffff`): Karten und Nav-Fläche (`bg-surface`), mit Blur über dem Inhalt.
 - **Haarkante** (`#e7e5e4`) und **Papiernaht** (`#f5f5f4`): 1px-Borders erster und zweiter Ordnung; Papiernaht ist auch die Sekundär-Button-Füllung.
 - **Stein** (`#57534e`) und **Weicher Stein** (`#6b645e`): Sekundär- und Tertiärtext — Hierarchie über drei Textstufen, nie über Grau-Willkür. Weicher Stein hält auf Papier, Weiß und den gedämpften Tints ≥ 4.5:1 (AA).
-- **Salbei** (`#eef0e6`-Tint, Kante `#b9c2a8`, Text `#44513a`): das Material-Etikett — neutrale Fakten-Pillen (Suchergebnis-Etiketten, Info-Chips, Skill-Tags, Score-Chips der Interview-Akte). Ein gedämpftes Notizbuch-Grün, das nichts bedeutet.
+- **Salbei** (`#e3e8d4`-Tint, Kante `#9fae86`, Text `#3c4a32`): das Material-Etikett — neutrale Fakten-Pillen (Suchergebnis-Etiketten, Info-Chips, Skill-Tags, Score-Chips der Interview-Akte) und die neutralen Pipeline-Status (Entdeckt, Bewertet, Archiviert). Ein klares, aber gedämpftes Notizbuch-Grün, das nichts bedeutet.
 
 ### Semantic (Muted Signals)
 - **Moos** (`#55724f`): Erfolg — Score ≥ 8, „Top Match", „Angebot".
@@ -217,7 +217,8 @@ Etiketten mit Filter-Funktion, `aria-pressed` als Pflicht.
 ### Status Badges (Signature)
 Der beschreibende Kern der App: acht deutsche Status-Pills, die Bedeutung über gedämpfte Tints tragen (`px-3 py-1.5`, 0.75rem, 500).
 - **Struktur:** 10%-Tint-Fläche, 20%-Border derselben Farbe, Vollton-Text.
-- **Zuordnung:** Top Match & Angebot → Moos; Interview → Khaki; Abgelehnt → Ton; Beworben → Ocker-Tint mit Tusche-Text; Entdeckt/Bewertet/Archiviert → neutraler Papiernaht/Haarkante.
+- **Zuordnung:** Top Match & Angebot → Moos; Interview → Khaki; Abgelehnt → Ton; Beworben → Ocker-Tint mit Tusche-Text; Entdeckt/Bewertet/Archiviert → Salbei-Etikett (Material, keine Bedeutung).
+- **In der Job-Liste:** der Status steht genau einmal pro Karte — als interaktive Salbei-Pille mit Chevron; ein Tipp klappt die volle Pipeline darunter auf, der aktive Eintrag trägt Tinten-Blau. Kein Badge plus Dauerbuttons in Doppelung.
 
 ### Cards / Containers
 - **Corner Style:** 16px Blatt-Ecke.

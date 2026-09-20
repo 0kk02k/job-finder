@@ -110,14 +110,14 @@ export function ScoreBadge({
 }
 
 const STATUS_BADGES: Record<string, { label: string; className: string }> = {
-  DISCOVERED: { label: 'Entdeckt', className: 'bg-border-soft text-foreground border-border' },
-  SCORED: { label: 'Bewertet', className: 'bg-border-soft text-foreground border-border' },
+  DISCOVERED: { label: 'Entdeckt', className: 'bg-sage text-sage-ink border-sage-line' },
+  SCORED: { label: 'Bewertet', className: 'bg-sage text-sage-ink border-sage-line' },
   HIGH_MATCH: { label: 'Top Match', className: 'bg-success/10 text-success border-success/20' },
   APPLIED: { label: 'Beworben', className: 'bg-accent-soft/30 text-foreground border-border' },
   INTERVIEW: { label: 'Interview', className: 'bg-warning/10 text-warning border-warning/20' },
   OFFER: { label: 'Angebot', className: 'bg-success/10 text-success border-success/20' },
   REJECTED: { label: 'Abgelehnt', className: 'bg-error/10 text-error border-error/20' },
-  ARCHIVED: { label: 'Archiviert', className: 'bg-border-soft text-primary-soft border-border' },
+  ARCHIVED: { label: 'Archiviert', className: 'bg-sage text-sage-ink border-sage-line' },
 }
 
 export function StatusBadge({ status }: { status: string }) {
