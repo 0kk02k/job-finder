@@ -3,7 +3,7 @@
 // Ordnungsfunktionen hier sind rein — sie entscheiden, was gefetcht und gerankt wird.
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mapWithConcurrency, mergeJobsByUrl, mergeStreamedJobs, phaseFitsInBudget, pickFuzzyTerms, pickQueryFan } from '../../lib/search'
+import { cleanDescription, mapWithConcurrency, mergeJobsByUrl, mergeStreamedJobs, phaseFitsInBudget, pickFuzzyTerms, pickQueryFan } from '../../lib/search'
 
 test('pickQueryFan trims, dedupes against the original and itself, caps at max', () => {
   const fan = pickQueryFan(
@@ -106,4 +106,27 @@ test('mergeStreamedJobs drops url-less entries and survives empty inputs', () =>
   assert.deepEqual(mergeStreamedJobs([], [a]), [a])
   assert.deepEqual(mergeStreamedJobs([a], []), [a])
   assert.deepEqual(mergeStreamedJobs([], [{ url: '', title: 'X' }]), [])
+})
+
+// Anzeigentexte: Portale liefern HTML-Wust, und harte Zeichenkappen schnitten
+// Sektionsweise mitten im Satz durch — „Ihre Perspektive" der Bundesagentur
+// stand sonst buchstabenweise am Stück-Ende.
+test('cleanDescription strips tags and keeps short texts untouched', () => {
+  assert.equal(cleanDescription('<p>Erste Zeile.</p><p>Zweite Zeile.</p>'), 'Erste Zeile.Zweite Zeile.')
+  assert.equal(cleanDescription(null), '')
+  assert.equal(cleanDescription('   '), '')
+})
+
+test('cleanDescription caps long texts at the last sentence boundary, not mid-sentence', () => {
+  const long = 'Vollständiger Satz. '.repeat(400) + 'Ihre Perspektive: Wir bieten dir Sicherheit.'
+  const out = cleanDescription(long)
+  assert.ok(out.length <= 6100, `Kappung bleibt nah am Limit: ${out.length}`)
+  assert.ok(out.endsWith('. …'), 'die Kante fällt auf eine Satzgrenze — mitten im Satz endet nichts')
+  assert.ok(!out.includes('Sicherheit.'), 'der unvollständige Rest hinter der Kante fällt ganz weg')
+})
+
+test('cleanDescription falls back to a hard cut when no sentence boundary exists', () => {
+  const out = cleanDescription('x'.repeat(7000))
+  assert.equal(out.length, 6002)
+  assert.ok(out.endsWith(' …'))
 })

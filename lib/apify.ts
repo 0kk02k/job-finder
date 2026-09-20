@@ -1,6 +1,8 @@
 // Apify integration for LinkedIn/XING/StepStone scraping
 // Requires APIFY_API_KEY in env or user settings
 
+import { cleanDescription } from './search'
+
 export interface ApifyJob {
   title: string
   company: string
@@ -56,7 +58,7 @@ export async function searchLinkedInJobs(
       title: item.title || '',
       company: item.companyName || item.company || '',
       location: item.location || '',
-      description: (item.description || '').substring(0, 2000),
+      description: cleanDescription(item.description),
       url: item.url || item.link || '',
       platform: 'linkedin',
     }))

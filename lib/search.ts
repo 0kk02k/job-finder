@@ -100,3 +100,24 @@ export async function mapWithConcurrency<T, R>(
   await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, () => worker()))
   return results
 }
+
+// Anzeigentexte: Tags weg, und die Kappe fällt an der letzten Satzgrenze statt
+// mitten im Satz. Bisher schnitt substring(0, 2000) sektionsweise durch — die
+// „Ihre Perspektive" der Bundesagentur stand sonst buchstabenweise am Ende.
+export const MAX_DESCRIPTION_LENGTH = 6000
+
+export function cleanDescription(raw: string | null | undefined): string {
+  const text = (raw ?? '').replace(/<[^>]+>/g, '').trim()
+  if (text.length <= MAX_DESCRIPTION_LENGTH) return text
+  const cut = text.slice(0, MAX_DESCRIPTION_LENGTH)
+  const boundary = Math.max(
+    cut.lastIndexOf('. '),
+    cut.lastIndexOf('! '),
+    cut.lastIndexOf('? '),
+    cut.lastIndexOf('\n'),
+  )
+  // Ohne brauchbare Grenze (z. B. ein Riesen-Word) hart kappen, statt halbe
+  // Anzeige zu opfern
+  if (boundary < MAX_DESCRIPTION_LENGTH * 0.5) return cut + ' …'
+  return text.slice(0, boundary + 1).trimEnd() + ' …'
+}

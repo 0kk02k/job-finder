@@ -847,7 +847,7 @@ function AnecdoteCard({
       {skills.length > 0 && (
         <ul className="flex flex-wrap gap-2" aria-label="Belegte Qualitäten">
           {skills.map((skill) => (
-            <li key={skill} className="px-2.5 py-1 rounded-full text-xs border border-border text-primary-soft">
+            <li key={skill} className="px-2.5 py-1 rounded-full text-xs border border-sage-line bg-sage text-sage-ink">
               {skill}
             </li>
           ))}

@@ -36,8 +36,8 @@ function LogoutIcon() {
   )
 }
 
-function linkClasses(active: boolean) {
-  return `text-sm font-medium transition-colors ${
+function linkClasses(active: boolean, large = false) {
+  return `${large ? 'text-base' : 'text-sm'} font-medium transition-colors ${
     active
       // „Wo bin ich" ist Zustand — die Unterlinie trägt Tinten-Blau, nicht Ocker
       ? 'text-foreground underline decoration-selection decoration-2 underline-offset-8'
@@ -140,23 +140,24 @@ export function Nav() {
         </div>
       </div>
 
-      {/* Mobile menu panel — Tap-Targets ≥ 40px (WCAG 2.5.8) */}
+      {/* Mobile menu panel — rechtsbündig unter dem Toggle, eine Stufe größer
+          als die Desktop-Labels (Daumen-Ziel), Tap-Targets ≥ 40px (WCAG 2.5.8) */}
       {open && (
-        <div className="sm:hidden border-t border-border-soft px-6 py-4 flex flex-col gap-1">
+        <div className="sm:hidden border-t border-border-soft px-6 py-4 flex flex-col items-end gap-1 text-right">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               onClick={() => setOpen(false)}
               aria-current={pathname.startsWith(link.href) ? 'page' : undefined}
-              className={`py-2.5 ${linkClasses(pathname.startsWith(link.href))}`}
+              className={`py-2.5 ${linkClasses(pathname.startsWith(link.href), true)}`}
             >
               {link.label}
             </Link>
           ))}
           <button
             onClick={() => signOut({ callbackUrl: '/login' })}
-            className="flex items-center gap-3 text-left py-2.5 text-primary-soft hover:text-foreground text-sm font-medium transition-colors"
+            className="flex items-center gap-3 text-right py-2.5 text-primary-soft hover:text-foreground text-base font-medium transition-colors"
           >
             <LogoutIcon />
             Abmelden

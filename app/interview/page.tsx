@@ -750,7 +750,7 @@ export default function InterviewPage() {
 
 function ScoreChip({ label, value }: { label: string; value: number }) {
   return (
-    <span className="px-3 py-1.5 rounded-full text-xs font-medium border border-border bg-border-soft text-foreground">
+    <span className="px-3 py-1.5 rounded-full text-xs font-medium border border-sage-line bg-sage text-sage-ink">
       {label}: {value}/5
     </span>
   )

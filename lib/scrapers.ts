@@ -1,7 +1,7 @@
 // Job search via multiple APIs + AI-powered single-URL extraction
 
 import { extractJobFromHTML, semanticJobSearch } from './ai'
-import { mergeJobsByUrl, phaseFitsInBudget, pickFuzzyTerms } from './search'
+import { cleanDescription, mergeJobsByUrl, phaseFitsInBudget, pickFuzzyTerms } from './search'
 import type { PreferenceProfile } from './preferences'
 
 export interface ScrapedJob {
@@ -154,7 +154,7 @@ async function searchRemotive(query: string): Promise<ScrapedJob[]> {
       title: job.title || '',
       company: job.company_name || '',
       location: job.candidate_required_location || 'Remote',
-      description: (job.description || '').replace(/<[^>]+>/g, '').trim().substring(0, 2000),
+      description: cleanDescription(job.description),
       url: job.url || '',
       postedAt: job.publication_date ? new Date(job.publication_date) : undefined,
       salary: job.salary || undefined,
@@ -186,7 +186,7 @@ async function searchArbeitnow(query: string): Promise<ScrapedJob[]> {
         title: job.title || '',
         company: job.company_name || '',
         location: job.location || '',
-        description: (job.description || '').replace(/<[^>]+>/g, '').trim().substring(0, 2000),
+        description: cleanDescription(job.description),
         url: job.url || '',
         postedAt: job.created_at ? new Date(job.created_at * 1000) : undefined,
         salary: undefined,
@@ -269,7 +269,7 @@ async function searchArbeitsagentur(
 
     return items.map((job): ScrapedJob => {
       const adresse = job.stellenlokationen?.[0]?.adresse
-      let description = (descriptions.get(job.referenznummer || '') || '').substring(0, 2000)
+      let description = cleanDescription(descriptions.get(job.referenznummer || ''))
       // Home-Office-Fakt ehrlich dazuschreiben: fließt in die KI-Bewertung ein
       // und trifft den Remote-Filter, ohne den Ort zu verfälschen
       if (job.homeofficemoeglich) {
@@ -324,7 +324,7 @@ async function searchAdzuna(
       title: (job.title || '').replace(/<[^>]+>/g, '').trim(),
       company: job.company?.display_name || '',
       location: job.location?.display_name || '',
-      description: (job.description || '').trim().substring(0, 2000),
+      description: cleanDescription(job.description),
       url: job.redirect_url || '',
       postedAt: job.created ? new Date(job.created) : undefined,
       salary:

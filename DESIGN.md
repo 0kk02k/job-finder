@@ -17,6 +17,9 @@ colors:
   ink-blue: "#3f5873"
   ink-blue-strong: "#32485f"
   on-ink-blue: "#ffffff"
+  sage: "#eef0e6"
+  sage-line: "#b9c2a8"
+  sage-ink: "#44513a"
   moss: "#55724f"
   khaki: "#7d6740"
   clay: "#96553f"
@@ -118,25 +121,26 @@ Die Atmosphäre ist ehrlich und ungeschminkt — sie zeigt Lücken, Ablehnungen 
 
 ## Colors
 
-Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Ocker und ein Tinten-Blau als Werkzeuge, drei gedämpfte Signalfarben für Bedeutung. Jeder Token hat einen Dark-Mode-Partner im selben Farbton (nur Hell/Dunkel verschiebt sich, nie der Charakter):
+Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Ocker und ein Tinten-Blau als Werkzeuge, drei gedämpfte Signalfarben für Bedeutung, ein Salbei-Tint fürs Etikett. Der Dark Mode ist bewusst deaktiviert — das Notizbuch ist immer hell, Papier kennt kein Kerzenlicht; die App erzwingt die Light-Palette und kennt keine `prefers-color-scheme`-Alternative:
 
-| Token | Light | Dark |
-|---|---|---|
-| `paper` / `ink` | `#faf9f7` / `#1c1917` | getauscht |
-| `surface` / `surface-elevated` | `#ffffff` / `#ffffff` | `#292524` / `#2d2a28` |
-| `border` / `border-soft` | `#e7e5e4` / `#f5f5f4` | `#44403c` / `#292524` |
-| `stone` / `stone-soft` | `#57534e` / `#6b645e` | `#d6d3d1` / `#9d968f` |
-| `ochre` / `ochre-deep` | `#b45309` / `#92400e` | `#dfa04e` / `#ecb668` |
-| `ochre-tint` / `on-ochre` | `#f0e2cd` / `#ffffff` | `#5c452a` / `#1c1917` |
-| `ink-blue` / `ink-blue-strong` | `#3f5873` / `#32485f` | `#93b2cc` / `#a9c3d9` |
-| `on-ink-blue` | `#ffffff` | `#1c1917` |
-| `moss` / `khaki` / `clay` | `#55724f` / `#7d6740` / `#96553f` | `#89ab84` / `#b5a077` / `#c99284` |
+| Token | Wert |
+|---|---|
+| `paper` / `ink` | `#faf9f7` / `#1c1917` |
+| `surface` / `surface-elevated` | `#ffffff` / `#ffffff` |
+| `border` / `border-soft` | `#e7e5e4` / `#f5f5f4` |
+| `stone` / `stone-soft` | `#57534e` / `#6b645e` |
+| `ochre` / `ochre-deep` | `#b45309` / `#92400e` |
+| `ochre-tint` / `on-ochre` | `#f0e2cd` / `#ffffff` |
+| `ink-blue` / `ink-blue-strong` | `#3f5873` / `#32485f` |
+| `on-ink-blue` | `#ffffff` |
+| `sage` / `sage-line` / `sage-ink` | `#eef0e6` / `#b9c2a8` / `#44513a` |
+| `moss` / `khaki` / `clay` | `#55724f` / `#7d6740` / `#96553f` |
 
 ### Primary (Handlung)
-- **Gebrannter Ocker** (`#b45309`, dunkel `#dfa04e`): ausschließlich Handlung und Aufmerksamkeit im Gebrauch — Primär-Buttons und Fokusring, sonst nirgends. Im Dark Mode wird sie heller und wärmer, nicht kräftiger — derselbe Bleistift bei Kerzenlicht.
+- **Gebrannter Ocker** (`#b45309`, dunkel `#92400e`): ausschließlich Handlung und Aufmerksamkeit im Gebrauch — Primär-Buttons und Fokusring, sonst nirgends.
 
 ### Selection (Auswahl/Zustand)
-- **Tinten-Blau** (`#3f5873`, dunkel `#93b2cc`, Hover `#32485f`/`#a9c3d9`): der zweite Stift — alles, was einen Zustand markiert statt eine Aktion auslöst: aktive Filter-Chips, aktive Segmente, gesetzte Checkboxen, Text-Links, die aktive Nav-Unterlinie, der aktuelle Schritt. Entsättigt und petrol geneigt, damit es im warmen Heft bleibt und nicht nach SaaS schmeckt. Im Dark Mode heller, nie kräftiger.
+- **Tinten-Blau** (`#3f5873`, Hover `#32485f`): der zweite Stift — alles, was einen Zustand markiert statt eine Aktion auslöst: aktive Filter-Chips, aktive Segmente, gesetzte Checkboxen, Text-Links, die aktive Nav-Unterlinie, der aktuelle Schritt. Entsättigt und petrol geneigt, damit es im warmen Heft bleibt und nicht nach SaaS schmeckt.
 
 ### Neutral
 - **Warm Stone Papier** (`#faf9f7`): Seitenhintergrund, Input-Füllung (inset in Karten).
@@ -144,6 +148,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 - **Blatt Weiß** (`#ffffff`): Karten und Nav-Fläche (`bg-surface`), mit Blur über dem Inhalt.
 - **Haarkante** (`#e7e5e4`) und **Papiernaht** (`#f5f5f4`): 1px-Borders erster und zweiter Ordnung; Papiernaht ist auch die Sekundär-Button-Füllung.
 - **Stein** (`#57534e`) und **Weicher Stein** (`#6b645e`): Sekundär- und Tertiärtext — Hierarchie über drei Textstufen, nie über Grau-Willkür. Weicher Stein hält auf Papier, Weiß und den gedämpften Tints ≥ 4.5:1 (AA).
+- **Salbei** (`#eef0e6`-Tint, Kante `#b9c2a8`, Text `#44513a`): das Material-Etikett — neutrale Fakten-Pillen (Suchergebnis-Etiketten, Info-Chips, Skill-Tags, Score-Chips der Interview-Akte). Ein gedämpftes Notizbuch-Grün, das nichts bedeutet.
 
 ### Semantic (Muted Signals)
 - **Moos** (`#55724f`): Erfolg — Score ≥ 8, „Top Match", „Angebot".
@@ -151,7 +156,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 - **Ton** (`#96553f`): Abgeschminkt — „Abgelehnt", Score < 6. Ein warmes, nicht feueriges Rot.
 
 ### Named Rules
-**The One Role Per Color Rule.** Eine Farbe, eine Rolle: Ocker löst aus (CTA, Fokus), Tinten-Blau markiert Zustand (Auswahl, aktive Filter, Links, aktive Nav), semantische Farben bedeuten (Score, Pipeline-Status). Keine Farbe leiht sich die Rolle der anderen — wer eine Fläche setzt, fragt zuerst: Handlung, Zustand oder Bedeutung? Seltenheit bleibt die Aussage beider Stifte; zusammen machen sie auch in filterreichen Toolbars nur einen kleinen Bruchteil der Fläche aus.
+**The One Role Per Color Rule.** Eine Farbe, eine Rolle: Ocker löst aus (CTA, Fokus), Tinten-Blau markiert Zustand (Auswahl, aktive Filter, Links, aktive Nav), semantische Farben bedeuten (Score, Pipeline-Status). Salbei ist Material, kein dritter Stift: es trägt neutrale Fakten-Pillen und bedeutet nichts — kein Erfolg (das ist Moos), kein Zustand (das ist Tinten-Blau). Keine Farbe leiht sich die Rolle der anderen — wer eine Fläche setzt, fragt zuerst: Handlung, Zustand, Bedeutung oder bloß Etikett? Seltenheit bleibt die Aussage beider Stifte; zusammen machen sie auch in filterreichen Toolbars nur einen kleinen Bruchteil der Fläche aus.
 
 **The Honest Signal Rule.** Bedeutung wird gedämpft ausgedrückt: semantische Farben erscheinen als 10%-Tint-Fläche mit 20%-Border, nie als Vollfläche. Ein „Abgelehnt" darf lesbar sein, ohne den Nutzer anzuschreien.
 
@@ -176,7 +181,7 @@ Die Palette ist ein Werkstoff-Set: warme Steintöne als Papier und Tinte, ein Oc
 
 ## Layout
 
-Eine zentrierte Einzel-Spalte (max. 1024px) mit 24px Seitenrand und 64px Vertikalatmen — ein Schreibtisch, kein Dashboard-Grid. Dichte entsteht innerhalb der Karten, nie durch mehr Spaltenbreite. Das Raster ist der 4px-Basiswert. Sticky Nav (64px-Bereich, `py-5` 20px) mit `backdrop-blur` über dem Inhalt; ab 640px (`sm`) klappt sie auf ein Hamburger-Menü mit vollem Panel. Sektionen folgen aufeinander mit großzügigen `mb`-Abständen (32–64px), Karteninhalte atmen mit 24px Padding.
+Eine zentrierte Einzel-Spalte (max. 1024px) mit 24px Seitenrand und 64px Vertikalatmen — ein Schreibtisch, kein Dashboard-Grid. Dichte entsteht innerhalb der Karten, nie durch mehr Spaltenbreite. Das Raster ist der 4px-Basiswert. Sticky Nav (64px-Bereich, `py-5` 20px) mit `backdrop-blur` über dem Inhalt; unter 640px klappt sie auf ein Hamburger-Menü mit vollem Panel. Sektionen folgen aufeinander mit großzügigen `mb`-Abständen (32–64px), Karteninhalte atmen mit 24px Padding.
 
 **The 1024px Desk Rule.** Die Canvas bleibt ein Schreibtisch (max-w-5xl). Mehr Inhalt bedeutet mehr Karten in der Spalte, keine breitere Spalte.
 
@@ -216,7 +221,7 @@ Der beschreibende Kern der App: acht deutsche Status-Pills, die Bedeutung über 
 
 ### Cards / Containers
 - **Corner Style:** 16px Blatt-Ecke.
-- **Background:** Blatt Weiß; in Dark Mode dunkler Stein.
+- **Background:** Blatt Weiß.
 - **Shadow Strategy:** nur `shadow-sm` als Hauch (siehe Elevation).
 - **Border:** 1px Haarkante.
 - **Internal Padding:** 24px; Inputs darin liegen inset auf Papier, nicht auf Weiß.
@@ -226,7 +231,7 @@ Der beschreibende Kern der App: acht deutsche Status-Pills, die Bedeutung über 
 - **Focus:** Ocker-Ring; kein Glow, kein Farbwechsel des Feldes.
 
 ### Navigation
-Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtbar. Die Wortmarke „Job-Finder" trägt Gewicht 600 — die eine bewusste Ausnahme zur Light-at-Scale-Regel, weil eine Marke kein Überschriftentext ist. Links sind Label (0.875rem, 500): inaktiv Weicher Stein mit Hover zu Tusche, aktiv Tusche mit 2px-Tinten-Blau-Unterlinie (offset 8px) und `aria-current="page"` — „wo bin ich" ist Zustand, also der blauen Tinte. Abmelden ist ein Icon-Button (40×40, gezeichnetes Exit-SVG, `aria-label` Pflicht) — eine Geste, kein Text im Arbeitsweg. Mobil: 40px-Icon-Button (12px Radius), Panel mit vollem Link-Set.
+Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtbar. Die Wortmarke „Job-Finder" trägt Gewicht 600 — die eine bewusste Ausnahme zur Light-at-Scale-Regel, weil eine Marke kein Überschriftentext ist. Links sind Label (0.875rem, 500): inaktiv Weicher Stein mit Hover zu Tusche, aktiv Tusche mit 2px-Tinten-Blau-Unterlinie (offset 8px) und `aria-current="page"` — „wo bin ich" ist Zustand, also der blauen Tinte. Abmelden ist ein Icon-Button (40×40, gezeichnetes Exit-SVG, `aria-label` Pflicht) — eine Geste, kein Text im Arbeitsweg. Mobil: 40px-Icon-Button (12px Radius), Panel rechtsbündig unter dem Toggle mit vollem Link-Set, eine Stufe größer (1rem) — Daumen-Ziel und Herkunft vom Desktop-Label.
 
 ### Footer
 Die ruhige Schmalseite: Blatt Weiß mit Haarkante oben, Wortmarke klein (600) mit dem einen Positionierungssatz, rechts die Verweis-Links in Weichem Stein — Einstellungen, Impressum, Datenschutz. Auch auf Login/Register sichtbar: Rechtsseiten kennen keine Anmeldung. Der Footer ist fürs Nachschlagen, die Nav-Leiste fürs Arbeiten.
@@ -246,5 +251,5 @@ Die ruhige Schmalseite: Blatt Weiß mit Haarkante oben, Wortmarke klein (600) mi
 - **Don't** Gradients, gestapelte Schatten oder Glow-Effekte verwenden — Tiefe kommt aus Kanten und Hell/Dunkel.
 - **Don't** `alert()` oder Browser-Dialoge — Feedback läuft über das Toast-System.
 - **Don't** fette (≥600) Überschriften oder dünne Button-Texte — das Gewichtsgefälle ist 300 groß / 500 klein.
-- **Don't** `dark:`-Tailwind-Klassen verwenden — Dark Mode läuft ausschließlich über die `prefers-color-scheme`-Tokens in `app/globals.css`.
+- **Don't** `dark:`-Tailwind-Klassen oder `prefers-color-scheme`-Alternativebenen verwenden — der Dark Mode ist bewusst deaktiviert, das Notizbuch bleibt immer hell.
 - **Don't** semantische Vollflächen (z. B. rote Badges) — Bedeutung bleibt gedämpft.

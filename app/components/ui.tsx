@@ -144,7 +144,7 @@ export function InfoChip({
   const tones = {
     success: 'bg-success/10 text-success border-success/20',
     error: 'bg-error/10 text-error border-error/20',
-    neutral: 'bg-border-soft text-foreground border-border',
+    neutral: 'bg-sage text-sage-ink border-sage-line',
   }
   return (
     <span className={`inline-block px-3 py-1 text-sm rounded-full border ${tones[tone]} ${className}`}>

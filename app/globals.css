@@ -32,7 +32,7 @@
 
   /* Ink-blue selection — der zweite Stift: Auswahl/Zustand (aktive Filter,
      Checkboxen, Segments, Links, aktive Nav). Kontraste: Weiß auf #3f5873
-     7.3:1, Tusche auf #93b2cc 7.8:1, Link-Blau auf paper 6.7:1 — alles ≥ AA. */
+     7.3:1, Link-Blau auf paper 6.7:1 — alles ≥ AA. */
   --ink-blue: #3f5873;
   --ink-blue-strong: #32485f;
   --on-ink-blue: #ffffff;
@@ -42,37 +42,15 @@
   --khaki: #7d6740;
   --clay: #96553f;
 
+  /* Salbei — Material-Etikett für neutrale Fakten-Pillen (Suchergebnisse,
+     Info-Chips): ruhiges Notizbuch-Grün, das nichts bedeutet (Erfolg ist
+     Moos, Zustand ist Tinten-Blau). Dunkles Salbei-Grün auf dem Tint ≥ 7:1. */
+  --sage: #eef0e6;
+  --sage-line: #b9c2a8;
+  --sage-ink: #44513a;
+
   --app-font-sans: var(--font-geist-sans);
   --app-font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #1c1917;
-    --ink: #faf9f7;
-
-    --surface: #292524;
-    --surface-elevated: #2d2a28;
-
-    --border-line: #44403c;
-    --border-soft: #292524;
-
-    --stone: #d6d3d1;
-    --stone-soft: #9d968f;
-
-    --ochre: #dfa04e;
-    --ochre-deep: #ecb668;
-    --ochre-tint: #5c452a;
-    --on-ochre: #1c1917;
-
-    --ink-blue: #93b2cc;
-    --ink-blue-strong: #a9c3d9;
-    --on-ink-blue: #1c1917;
-
-    --moss: #89ab84;
-    --khaki: #b5a077;
-    --clay: #c99284;
-  }
 }
 
 @theme inline {
@@ -94,6 +72,9 @@
   --color-success: var(--moss);
   --color-warning: var(--khaki);
   --color-error: var(--clay);
+  --color-sage: var(--sage);
+  --color-sage-line: var(--sage-line);
+  --color-sage-ink: var(--sage-ink);
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
 }

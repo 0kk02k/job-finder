@@ -913,8 +913,8 @@ function JobCard({
 
   return (
     <div className="bg-surface rounded-2xl p-8 border border-border shadow-sm">
-      <div className="flex items-start justify-between gap-4 mb-5">
-        <div className="min-w-0 flex-1">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-5">
+        <div className="min-w-0 sm:flex-1">
           {/* Der Titel ist die Botschaft — Badges (Meta) kommen nach unten,
               Score vor Quelle: das Urteil zählt mehr als die Herkunft */}
           <h3 className="text-xl font-medium text-foreground mb-1">
@@ -929,19 +929,21 @@ function JobCard({
               .join(' · ') || 'Ohne Angabe'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft tabular-nums">
+            <span className="px-3 py-1 rounded-full text-xs font-medium border border-sage-line bg-sage text-sage-ink tabular-nums">
               {typeof job.aiScore === 'number' ? (
                 <ScoreBadge score={job.aiScore} size="sm" />
               ) : (
                 'Kein Score'
               )}
             </span>
-            <span className="px-3 py-1 rounded-full text-xs font-medium border border-border bg-border-soft text-foreground">
+            {/* Die Herkunft ist die schwächste Info der Karte („Score vor Quelle“)
+                — auf dem Handy weggelassen, damit die Pillenreihe ruhig bleibt */}
+            <span className="hidden sm:inline-block px-3 py-1 rounded-full text-xs font-medium border border-sage-line bg-sage text-sage-ink">
               {platformLabel(job.platform)}
             </span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end sm:flex-shrink-0">
           {jobId ? (
             <Link
               href={`/jobs/${jobId}`}
