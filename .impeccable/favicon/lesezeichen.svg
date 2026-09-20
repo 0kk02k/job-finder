@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- „Das Lesezeichen": die gemerkte Stelle im Notizbuch -->
+  <rect x="2" y="2" width="28" height="28" rx="7" fill="#ffffff" stroke="#d6d3d1" stroke-width="1.5"/>
+  <path d="M11 7 h10 v19 l-5 -4.2 -5 4.2 z" fill="#b45309"/>
+  <line x1="13.5" y1="11.5" x2="18.5" y2="11.5" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" opacity="0.85"/>
+</svg>

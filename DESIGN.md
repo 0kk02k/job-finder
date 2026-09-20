@@ -238,6 +238,9 @@ Sticky Leiste aus Blatt Weiß mit 80%-Opazität und Blur, darunter Inhalt sichtb
 ### Footer
 Die ruhige Schmalseite: Blatt Weiß mit Haarkante oben, Wortmarke klein (600) mit dem einen Positionierungssatz, rechts die Verweis-Links in Weichem Stein — Einstellungen, Impressum, Datenschutz. Auch auf Login/Register sichtbar: Rechtsseiten kennen keine Anmeldung. Der Footer ist fürs Nachschlagen, die Nav-Leiste fürs Arbeiten.
 
+### Favicon
+Das Lesezeichen: Ocker-Ribbon mit Einkerbung auf weißem Blatt (Haarkante) — „die gemerkte Stelle", die Kernhandlung der App. Eigene Fläche statt transparentem Motiv, damit es in hellen und dunklen Tab-Leisten steht; kein Text (16px-Test). Dateikonvention: `app/icon.svg` (modern), `app/favicon.ico` (16+32, Legacy), `app/apple-icon.png` (180px, Vollfläche Weiß — iOS maskiert selbst). Quellen und Größenvorschau: `.impeccable/favicon/`.
+
 ## Do's and Don'ts
 
 ### Do:
