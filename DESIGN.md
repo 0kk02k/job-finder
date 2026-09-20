@@ -213,6 +213,7 @@ Zurückhaltend-selbstsicher: Primär ist die eine Ocker-Fläche im Viewport, Sek
 Etiketten mit Filter-Funktion, `aria-pressed` als Pflicht.
 - **Style:** rund (9999px), 6×12px, 0.75rem, 1px-Border in Haarkante, Stein-Text.
 - **State:** aktiv = Tinten-Blau-Fläche mit Weiß-Text (dunkel: Tusche-Text); inaktiv = transparent mit Stein-Text. Border-los in beiden Fällen? Nein — inaktiv zeigt die Haarkante, aktiv braucht sie nicht.
+- **Seltenheit wahren:** in der Job-Liste stehen die acht Status-Chips hinter einer Status-Disclosure — die offene Chip-Reihe zeigt der Nutzer nur auf Wunsch. Die Disclosure selbst bleibt neutral, solange die Grundauswahl läuft; erst echte Eingrenzung tint sie Tinten-Blau. Eine halbe Toolbar aktiver Chips wäre Blau als Dauerzustand — das ist keine Seltenheit mehr.
 
 ### Status Badges (Signature)
 Der beschreibende Kern der App: acht deutsche Status-Pills, die Bedeutung über gedämpfte Tints tragen (`px-3 py-1.5`, 0.75rem, 500).

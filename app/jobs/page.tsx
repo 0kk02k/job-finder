@@ -34,9 +34,6 @@ const ALL_STATUSES = [
 // Kern-Status stehen offen, der Rest hinter einer Disclosure — >12 sichtbare
 // Kontrollen an einem Entscheidungspunkt überfordern (Working Memory ≤ 4).
 // Wer einen Mehr-Status aktiv filtert, sieht die Gruppe aufgeklappt.
-const CORE_STATUSES = ['DISCOVERED', 'HIGH_MATCH', 'APPLIED', 'INTERVIEW'] as const
-const MORE_STATUSES = ALL_STATUSES.filter((s) => !(CORE_STATUSES as readonly string[]).includes(s))
-
 const DEFAULT_HIDDEN = new Set(['ARCHIVED', 'REJECTED'])
 
 type SortOption = 'newest' | 'oldest' | 'score' | 'company'
@@ -61,7 +58,7 @@ export default function JobsPage() {
   // null = automatisch (aufgeklappt, sobald ein Mehr-Status aktiv ist);
   // true/false = explizite Wahl. aria-expanded spiegelt damit immer den
   // tatsächlich sichtbaren Zustand, und der Button klappt wirklich zu.
-  const [showMoreStatuses, setShowMoreStatuses] = useState<boolean | null>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
   // Deep-Links aus dem Dashboard: /jobs?filter=high_match · /jobs?filter=unscored
   // (und /jobs?filter=scored — „all" ist die Abwesenheit des Parameters)
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>(() => {
@@ -433,12 +430,11 @@ export default function JobsPage() {
     scoreFilter !== 'all' ||
     activeStatuses.size !== defaultActive.size ||
     [...activeStatuses].some((s) => !defaultActive.has(s))
-  const moreActiveCount = [...activeStatuses].filter((s) => !(CORE_STATUSES as readonly string[]).includes(s)).length
-  const moreOpen = showMoreStatuses ?? moreActiveCount > 0
-
-  function toggleMoreStatuses() {
-    setShowMoreStatuses(!moreOpen)
-  }
+  // Echte Eingrenzung erkennbar: abweichend von der Grundauswahl (alles außer
+  // Abgelehnt/Archiviert) zeigt die Disclosure einen Zähler statt Blau-Wand
+  const filterIsDefault =
+    activeStatuses.size === defaultActive.size &&
+    [...activeStatuses].every((s) => defaultActive.has(s))
 
   // Auswahl-Stand über die sichtbare (gefilterte) Ansicht — Grundlage für
   // „Alle auswählen" mit Teilauswahl-Zustand
@@ -533,19 +529,26 @@ export default function JobsPage() {
                 </select>
               </div>
 
+              {/* Eine Status-Disclosure statt acht offener Chips: sechs von acht
+                  Filtern stehen an — eine blaue Wand würde den Zustand zum
+                  Hintergrund machen. Nur echte Eingrenzung färbt den Knopf. */}
               <div className="flex flex-wrap items-center gap-2">
-                {CORE_STATUSES.map(statusChip)}
                 <button
-                  onClick={toggleMoreStatuses}
-                  aria-expanded={moreOpen}
-                  className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors border border-dashed border-border text-primary-soft hover:text-foreground hover:border-primary-soft"
+                  onClick={() => setFilterOpen(!filterOpen)}
+                  aria-expanded={filterOpen}
+                  className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors border border-dashed ${
+                    filterIsDefault
+                      ? 'border-border text-primary-soft hover:text-foreground hover:border-primary-soft'
+                      : 'border-selection/50 text-selection'
+                  }`}
                 >
-                  Weitere Status{moreActiveCount > 0 ? ` (${moreActiveCount} aktiv)` : ''} {moreOpen ? '▾' : '▸'}
+                  Status-Filter{filterIsDefault ? '' : ` · ${activeStatuses.size}/${ALL_STATUSES.length}`}{' '}
+                  {filterOpen ? '▾' : '▸'}
                 </button>
               </div>
-              {moreOpen && (
+              {filterOpen && (
                 <div className="flex flex-wrap gap-2 pt-1">
-                  {MORE_STATUSES.map(statusChip)}
+                  {ALL_STATUSES.map(statusChip)}
                 </div>
               )}
 
