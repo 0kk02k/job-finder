@@ -309,3 +309,37 @@ test('generateCoverLetterFromJob setzt Betreff auf Englisch', () => {
   const letter = generateCoverLetterFromJob(CONTACT_RESUME, 'You analyse data with us.', 'Muster GmbH', 'Data Analyst', 'en')
   assert.equal(letter.subject, 'Application as Data Analyst')
 })
+
+// Label-Kenntnisse („Betriebssysteme: Linux …") dürfen nicht wörtlich in den
+// Anschreiben-Fließtext gerollt werden — der Brief soll lesen wie ein Brief.
+const LABEL_SKILLS_RESUME = {
+  ...CONTACT_RESUME,
+  title: '',
+  skills: [
+    'Betriebssysteme: Linux (Ubuntu, Pop!_OS, Zorin OS), SteamOS',
+    'Technologien & Tools: Docker, Git, CLI',
+    'KI & Machine Learning: Lokale Agent-Runtimes',
+    'Methoden & Frameworks: Datenanalyse, Kanban',
+  ],
+}
+
+test('static cover letter reads label skills as prose, not as raw labels', () => {
+  const letter = generateCoverLetterFromJob(LABEL_SKILLS_RESUME, 'Sie analysieren Daten bei uns.', 'Muster GmbH', 'Datenanalyst', 'de')
+  const body = letter.body.join(' ')
+  assert.ok(!body.includes('Betriebssysteme:'), 'Label-Präfixe gehören nicht in den Brief')
+  assert.ok(!body.includes('Technologien & Tools:'), 'Label-Präfixe gehören nicht in den Brief')
+  assert.ok(body.includes('Docker'), 'die Kenntnisse selbst müssen bleiben')
+  assert.match(body, /CLI und Lokale Agent-Runtimes/, 'Aufzählung bekommt ein „und" vor dem letzten Glied')
+})
+
+test('static cover letter without job title produces no doubled fallback sentence', () => {
+  const letter = generateCoverLetterFromJob(LABEL_SKILLS_RESUME, 'Sie analysieren Daten bei uns.', 'Muster GmbH', '', 'de')
+  assert.ok(!letter.body[0].includes('als die ausgeschriebene Stelle'), 'kein „Stelle als Stelle"')
+  assert.match(letter.body[0], /Muster GmbH/)
+})
+
+test('English cover letter carries an English date, not a German one', () => {
+  const letter = generateCoverLetterFromJob(CONTACT_RESUME, 'You analyse data with us.', 'Muster Ltd', 'Data Analyst', 'en')
+  assert.ok(!/(Januar|Februar|März|Mai|Juni|Juli|Oktober|Dezember)/.test(letter.date), `deutsches Datum im englischen Brief: ${letter.date}`)
+  assert.match(letter.body[0], /position of Data Analyst/)
+})

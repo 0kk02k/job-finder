@@ -1,7 +1,19 @@
 import { renderToBuffer, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import type { ResumeData, CoverLetterData, InterviewReport } from './pdf'
 import { resumeDateRange } from './pdf'
-import { DEFAULT_DOC_TEMPLATE, type DocTemplateId } from './documents'
+import { DEFAULT_DOC_TEMPLATE, sectionLabelsFor, type DocTemplateId } from './documents'
+
+// Sprache des Inhalts bestimmen — über alles, was Fließtext trägt (der Name
+// taugt nicht: „Müller" verrät keine Sprache). deciding nur die Abschnitts-Köpfe.
+function resumeText(data: ResumeData): string {
+  return [
+    data.summary,
+    ...data.experience.flatMap((e) => [e.title, ...e.description]),
+    ...data.education.map((e) => e.degree),
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
 
 // Werkstatt-Set: dieselbe Welt wie die App (DESIGN.md) — Tusche auf Weiß,
 // Ocker als der eine Akzent, Tinten-Blau für Messwerte, Salbei für Etiketten.
@@ -147,68 +159,82 @@ function createResumeStyles(t: DocTheme) {
 function ResumeDocument({ data, template }: { data: ResumeData; template: DocTemplateId }) {
   const t = THEMES[template]
   const s = createResumeStyles(t)
+  const labels = sectionLabelsFor(resumeText(data))
+  const hasHeader = Boolean(data.name || data.title || data.email || data.phone || data.location)
+  const contact = [data.email, data.phone, data.location].filter(Boolean)
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <View style={s.header}>
-          <Text style={s.name}>{data.name}</Text>
-          <Text style={s.title}>{data.title}</Text>
-          <View style={s.contact}>
-            <Text>{data.email}</Text>
-            <Text>{data.phone}</Text>
-            <Text>{data.location}</Text>
+        {/* Kopf nur, wenn er etwas zeigt — ohne Name/Kontakt ist eine Akzentlinie über leerer Fläche nur ein Loch */}
+        {hasHeader ? (
+          <View style={s.header}>
+            {data.name ? <Text style={s.name}>{data.name}</Text> : null}
+            {data.title ? <Text style={s.title}>{data.title}</Text> : null}
+            {contact.length > 0 ? (
+              <View style={s.contact}>
+                {contact.map((line, i) => (
+                  <Text key={i}>{line}</Text>
+                ))}
+              </View>
+            ) : null}
           </View>
-        </View>
+        ) : null}
 
         {data.summary ? (
           <View style={s.section}>
-            <Text style={s.sectionTitle}>Profil</Text>
+            <Text style={s.sectionTitle}>{labels.profile}</Text>
             <Text>{data.summary}</Text>
           </View>
         ) : null}
 
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Berufserfahrung</Text>
-          {data.experience.map((exp, i) => (
-            <View key={i} style={{ marginBottom: t.itemGap }}>
-              <View style={s.itemHeader}>
-                {exp.company ? <Text style={s.company}>{exp.company}</Text> : null}
-                {exp.startDate || exp.endDate ? (
-                  <Text style={s.date}>{resumeDateRange(exp.startDate, exp.endDate)}</Text>
-                ) : null}
-              </View>
-              <Text style={s.itemTitle}>{exp.title}</Text>
-              {exp.description.map((d, j) => (
-                <View key={j} style={s.bullet}>
-                  <Text style={s.bulletDot}>•</Text>
-                  <Text style={s.bulletText}>{d}</Text>
+        {data.experience.length > 0 ? (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>{labels.experience}</Text>
+            {data.experience.map((exp, i) => (
+              <View key={i} style={{ marginBottom: t.itemGap }}>
+                <View style={s.itemHeader}>
+                  {exp.company ? <Text style={s.company}>{exp.company}</Text> : null}
+                  {exp.startDate || exp.endDate ? (
+                    <Text style={s.date}>{resumeDateRange(exp.startDate, exp.endDate)}</Text>
+                  ) : null}
                 </View>
-              ))}
-            </View>
-          ))}
-        </View>
-
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Ausbildung</Text>
-          {data.education.map((edu, i) => (
-            <View key={i} style={s.educationItem}>
-              <View style={s.itemHeader}>
-                <Text style={s.company}>{edu.school}</Text>
-                <Text style={s.date}>{edu.graduationYear}</Text>
+                <Text style={s.itemTitle}>{exp.title}</Text>
+                {exp.description.map((d, j) => (
+                  <View key={j} style={s.bullet}>
+                    <Text style={s.bulletDot}>•</Text>
+                    <Text style={s.bulletText}>{d}</Text>
+                  </View>
+                ))}
               </View>
-              <Text style={s.itemTitle}>{edu.degree}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={s.section}>
-          <Text style={s.sectionTitle}>Skills</Text>
-          <View style={s.skills}>
-            {data.skills.map((skill, i) => (
-              <Text key={i} style={s.skill}>{skill}</Text>
             ))}
           </View>
-        </View>
+        ) : null}
+
+        {data.education.length > 0 ? (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>{labels.education}</Text>
+            {data.education.map((edu, i) => (
+              <View key={i} style={s.educationItem}>
+                <View style={s.itemHeader}>
+                  {edu.school ? <Text style={s.company}>{edu.school}</Text> : null}
+                  {edu.graduationYear ? <Text style={s.date}>{edu.graduationYear}</Text> : null}
+                </View>
+                <Text style={s.itemTitle}>{edu.degree}</Text>
+              </View>
+            ))}
+          </View>
+        ) : null}
+
+        {data.skills.length > 0 ? (
+          <View style={s.section}>
+            <Text style={s.sectionTitle}>{labels.skills}</Text>
+            <View style={s.skills}>
+              {data.skills.map((skill, i) => (
+                <Text key={i} style={s.skill}>{skill}</Text>
+              ))}
+            </View>
+          </View>
+        ) : null}
       </Page>
     </Document>
   )
@@ -244,7 +270,7 @@ function CoverLetterDocument({ data, template }: { data: CoverLetterData; templa
   return (
     <Document>
       <Page size="A4" style={s.page}>
-        <Text style={s.sender}>{data.name}</Text>
+        {data.name ? <Text style={s.sender}>{data.name}</Text> : null}
         {data.contactLine ? <Text style={s.contact}>{data.contactLine}</Text> : null}
         <Text style={s.date}>{data.date}</Text>
         <View style={s.recipient}>
@@ -261,7 +287,7 @@ function CoverLetterDocument({ data, template }: { data: CoverLetterData; templa
         ))}
 
         <Text style={s.closing}>{data.closing}</Text>
-        <Text style={s.signature}>{data.name}</Text>
+        {data.name ? <Text style={s.signature}>{data.name}</Text> : null}
       </Page>
     </Document>
   )

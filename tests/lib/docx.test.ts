@@ -61,6 +61,63 @@ test('themes produce different documents', async () => {
   assert.notEqual(modern.length, klassisch.length)
 })
 
+// Abschnitts-Labels folgen der Dokumentsprache — ein übersetzter Lebenslauf
+// rendert keine deutschen Köpfe, und PDF/DOCX nennen dieselbe Sektion gleich.
+test('section labels follow the document language', () => {
+  const german = JSON.stringify(resumeParagraphs(SAMPLE_RESUME, DOCX_THEMES.modern))
+  assert.ok(german.includes('KENNTNISSE'), 'deutsches Dokument sagt Kenntnisse')
+  assert.ok(german.includes('BERUFSERFAHRUNG'))
+
+  const english: ResumeData = {
+    ...SAMPLE_RESUME,
+    summary: 'Experienced web developer with a strong background in modern applications.',
+    experience: [
+      {
+        company: 'Tech Solutions GmbH',
+        title: 'Software Developer',
+        startDate: '01/2020',
+        endDate: 'present',
+        description: ['Built web applications with React and TypeScript'],
+      },
+    ],
+    education: [{ school: 'TU Berlin', degree: 'B.Sc. Computer Science', graduationYear: '2013 – 2016' }],
+  }
+  const en = JSON.stringify(resumeParagraphs(english, DOCX_THEMES.modern))
+  assert.ok(en.includes('PROFILE'), 'englisches Dokument sagt Profile')
+  assert.ok(en.includes('EXPERIENCE'))
+  assert.ok(en.includes('EDUCATION'))
+  assert.ok(en.includes('SKILLS'))
+  assert.ok(!en.includes('BERUFSERFAHRUNG'), 'keine deutschen Köpfe im englischen Dokument')
+})
+
+// Sichtbarer Text eines Paragraphen über den XML-Baum — Strings sind dort die
+// Blätter. Ein Paragraph ohne Blatt wäre eine sichtbare Leerzeile im Dokument.
+function paragraphText(p: unknown): string {
+  const walk = (node: unknown): string => {
+    if (typeof node === 'string') return node
+    if (Array.isArray(node)) return node.map(walk).join('')
+    if (node && typeof node === 'object' && 'root' in (node as Record<string, unknown>)) {
+      return walk((node as Record<string, unknown>).root)
+    }
+    return ''
+  }
+  return walk((p as { root?: unknown }).root).trim()
+}
+
+// Leere Kopfzeilen sind sichtbare Löcher im Dokument — fehlt Name oder Kontakt,
+// wird die Zeile weggelassen statt leer gesetzt.
+test('missing name or contact lines leave no empty paragraphs', () => {
+  const stripped: ResumeData = { ...SAMPLE_RESUME, name: '', email: '', phone: '', location: '' }
+  const empties = resumeParagraphs(stripped, DOCX_THEMES.modern).filter((p) => paragraphText(p) === '')
+  assert.deepEqual(empties, [], 'keine leeren Paragraphen im Kopf')
+})
+
+test('education entry without school leaves no empty paragraph', () => {
+  const data: ResumeData = { ...SAMPLE_RESUME, education: [{ school: '', degree: 'B.Sc. Informatik', graduationYear: '' }] }
+  const empties = resumeParagraphs(data, DOCX_THEMES.modern).filter((p) => paragraphText(p) === '')
+  assert.deepEqual(empties, [], 'keine leeren Paragraphen in der Ausbildung')
+})
+
 test('project-style entries without dates get no invented „Heute"', () => {
   const data: ResumeData = {
     ...SAMPLE_RESUME,

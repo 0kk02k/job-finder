@@ -67,9 +67,9 @@ export async function POST(request: NextRequest) {
   if (type === 'resume') {
     return generateResume(userId, format, body.jobId)
   } else if (type === 'coverletter') {
-    return generateCoverLetter(userId, body.jobId, format, body.content)
+    return generateCoverLetter(userId, body.jobId, format, body.content, session.user.name ?? '')
   } else if (type === 'coverletter-template') {
-    return coverLetterTemplate(userId, body.jobId)
+    return coverLetterTemplate(userId, body.jobId, session.user.name ?? '')
   } else if (type === 'interview-report') {
     // Die Akte lebt im Client-State — sie kommt als Payload, wird gerendert
     // und nie gespeichert (gleiche Linie wie das Anschreiben)
@@ -129,7 +129,7 @@ async function generateResume(userId: string, format: ExportFormat, jobId?: stri
   }
 }
 
-async function generateCoverLetter(userId: string, jobId: string, format: ExportFormat, content?: string) {
+async function generateCoverLetter(userId: string, jobId: string, format: ExportFormat, content?: string, senderName?: string) {
   const [resume, template] = await Promise.all([
     prisma.resume.findFirst({ where: { userId, isActive: true } }),
     docTemplateFor(userId),
@@ -149,6 +149,9 @@ async function generateCoverLetter(userId: string, jobId: string, format: Export
 
   try {
     const resumeData = parseResumeMarkdown(resume.content)
+    // Absender-Fallback: fehlt der Name im Lebenslauf (Header-freie Dokumente),
+    // trägt der Account-Name den Brief — ein Bewerbungsschreiben ohne Absender geht nicht raus.
+    resumeData.name = resumeData.name || senderName || ''
     const company = job.company || 'Firma'
     const adLanguage = detectLanguage(job.description ?? '')
     const coverLetterData =
@@ -172,7 +175,7 @@ async function generateCoverLetter(userId: string, jobId: string, format: Export
 
 // Statische Vorlage als Text (Stufe 1 des Anschreiben-Flows): editierbar in der
 // Vorschau, ausdrücklich als „bitte prüfen“ markiert — kein direkter PDF-Download.
-async function coverLetterTemplate(userId: string, jobId: string) {
+async function coverLetterTemplate(userId: string, jobId: string, senderName?: string) {
   const [resume, job] = await Promise.all([
     prisma.resume.findFirst({ where: { userId, isActive: true } }),
     prisma.job.findFirst({ where: { id: jobId, userId } }),
@@ -183,6 +186,9 @@ async function coverLetterTemplate(userId: string, jobId: string) {
   }
 
   const resumeData = parseResumeMarkdown(resume.content)
+  // Derselbe Absender-Fallback wie im Download — die Vorlage zeigt den Brief so,
+  // wie er später rausgeht
+  resumeData.name = resumeData.name || senderName || ''
   const letter = generateCoverLetterFromJob(
     resumeData,
     job.description ?? '',

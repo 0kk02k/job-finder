@@ -93,6 +93,23 @@ function contactLineFrom(resumeData: ResumeData): string | undefined {
   return line || undefined
 }
 
+// Kenntnisse als Lesesatz für den Brief: Label-Präfixe („Betriebssysteme: …")
+// fallen weg — ein Aufzählungssatz verträgt keine Kategorien-Labels — und die
+// Aufzählung bekommt ein „und" vor dem letzten Glied.
+function skillsPhrase(skills: string[], language: 'de' | 'en'): string {
+  const values = skills
+    .map((skill) => {
+      const sep = skill.indexOf(': ')
+      return sep > 0 ? skill.slice(sep + 2).trim() : skill.trim()
+    })
+    .filter(Boolean)
+    .slice(0, 3)
+  if (values.length === 0) return ''
+  if (values.length === 1) return values[0]
+  const and = language === 'de' ? ' und ' : ' and '
+  return values.slice(0, -1).join(', ') + and + values[values.length - 1]
+}
+
 // Normalisiert die rohen KI-Insights in den Report: nur bekannte Kompetenzen
 // in fester Reihenfolge, Scores geklemmt, deutsches Datum. Alles, was die KI
 // extra erfindet, fällt weg.
@@ -570,19 +587,19 @@ export function generateCoverLetterFromJob(
   jobTitle: string,
   language: 'de' | 'en' = 'de'
 ): CoverLetterData {
-  const today = new Date().toLocaleDateString('de-DE', {
+  // Datum in der Sprache des Briefs — ein englischer Brief trägt kein deutsches Datum
+  const today = new Date().toLocaleDateString(language === 'en' ? 'en-GB' : 'de-DE', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   })
 
-  const role = jobTitle || 'die ausgeschriebene Stelle'
+  const skills = skillsPhrase(resumeData.skills, language)
   const profile = resumeData.title
-    ? `Als ${resumeData.title} bringe ich Erfahrung mit ${resumeData.skills.slice(0, 3).join(', ')} mit.`
-    : `Meine Schwerpunkte liegen in ${resumeData.skills.slice(0, 3).join(', ')}.`
+    ? `Als ${resumeData.title} bringe ich Erfahrung mit ${skills} mit.`
+    : `Meine Schwerpunkte liegen in ${skills}.`
 
   if (language === 'en') {
-    const skills = resumeData.skills.slice(0, 3).join(', ')
     return {
       name: resumeData.name,
       recipientCompany: company,
@@ -591,7 +608,7 @@ export function generateCoverLetterFromJob(
       date: today,
       salutation: 'Dear Hiring Team,',
       body: [
-        `I am applying to ${company} for the position as ${jobTitle || 'advertised'}.`,
+        `I am applying to ${company} for the position of ${jobTitle || 'the advertised role'}.`,
         resumeData.title
           ? `As a ${resumeData.title}, I bring experience with ${skills}. My background is summarised in the attached resume.`
           : `My core strengths lie in ${skills}; my background is summarised in the attached resume.`,
@@ -609,7 +626,10 @@ export function generateCoverLetterFromJob(
     date: today,
     salutation: 'Sehr geehrte Damen und Herren,',
     body: [
-      `mit großem Interesse bewerbe ich mich bei ${company} auf die Stelle als ${role}.`,
+      // Ohne Jobtitel kein „Stelle als die ausgeschriebene Stelle" — dann heißt es schlicht „Stelle"
+      jobTitle
+        ? `mit großem Interesse bewerbe ich mich bei ${company} auf die Stelle als ${jobTitle}.`
+        : `mit großem Interesse bewerbe ich mich bei ${company} auf die ausgeschriebene Stelle.`,
       `${profile} Wie meine Erfahrung zu Ihren Anforderungen passt, habe ich im Lebenslauf zusammengefasst.`,
       `Über ein persönliches Gespräch, in dem ich meinen Hintergrund erläutern kann, freue ich mich sehr.`,
     ],

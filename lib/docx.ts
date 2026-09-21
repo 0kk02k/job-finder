@@ -9,8 +9,20 @@ import {
   Paragraph,
   TextRun,
 } from 'docx'
-import { DEFAULT_DOC_TEMPLATE, type DocTemplateId } from './documents'
+import { DEFAULT_DOC_TEMPLATE, sectionLabelsFor, type DocTemplateId } from './documents'
 import type { ResumeData, CoverLetterData } from './pdf'
+
+// Sprache des Inhalts für die Abschnitts-Köpfe — dieselbe Logik wie im PDF
+// (lib/pdf-documents.tsx), damit beide Formate gleich heißen.
+function resumeText(data: ResumeData): string {
+  return [
+    data.summary,
+    ...data.experience.flatMap((e) => [e.title, ...e.description]),
+    ...data.education.map((e) => e.degree),
+  ]
+    .filter(Boolean)
+    .join(' ')
+}
 
 // docx rechnet in Half-Points (2 → 1pt); Helvetica ↔ Arial, Times-Roman ↔ Times New Roman
 interface DocxTheme {
@@ -68,27 +80,33 @@ export const DOCX_THEMES: Record<DocTemplateId, DocxTheme> = {
 
 // Exportiert für Tests: dieselben Paragraphen, die Packer in das Dokument schreibt.
 export function resumeParagraphs(data: ResumeData, t: DocxTheme): Paragraph[] {
-  const out: Paragraph[] = [
-    new Paragraph({
+  const labels = sectionLabelsFor(resumeText(data))
+  const out: Paragraph[] = []
+  // Kopfzeilen nur, wenn sie etwas zeigen — leere Absenderzeilen sind Löcher
+  if (data.name) {
+    out.push(new Paragraph({
       spacing: { after: 40 },
       children: [new TextRun({ text: data.name, bold: true, size: t.nameSize, font: t.font, color: t.nameColor })],
-    }),
-  ]
+    }))
+  }
   if (data.title) {
     out.push(new Paragraph({
       spacing: { after: 60 },
       children: [new TextRun({ text: data.title, size: t.titleSize, font: t.font, color: t.mutedColor })],
     }))
   }
-  out.push(new Paragraph({
-    spacing: { after: t.spacingAfter },
-    children: [new TextRun({
-      text: [data.email, data.phone, data.location].filter(Boolean).join('  ·  '),
-      size: t.smallSize,
-      font: t.font,
-      color: t.mutedColor,
-    })],
-  }))
+  const contact = [data.email, data.phone, data.location].filter(Boolean)
+  if (contact.length > 0) {
+    out.push(new Paragraph({
+      spacing: { after: t.spacingAfter },
+      children: [new TextRun({
+        text: contact.join('  ·  '),
+        size: t.smallSize,
+        font: t.font,
+        color: t.mutedColor,
+      })],
+    }))
+  }
 
   const sectionTitle = (title: string) =>
     new Paragraph({
@@ -98,12 +116,12 @@ export function resumeParagraphs(data: ResumeData, t: DocxTheme): Paragraph[] {
     })
 
   if (data.summary) {
-    out.push(sectionTitle('Profil'))
+    out.push(sectionTitle(labels.profile))
     out.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: data.summary, size: t.baseSize, font: t.font })] }))
   }
 
   if (data.experience.length) {
-    out.push(sectionTitle('Berufserfahrung'))
+    out.push(sectionTitle(labels.experience))
     for (const exp of data.experience) {
       if (exp.company) {
         out.push(new Paragraph({
@@ -136,12 +154,14 @@ export function resumeParagraphs(data: ResumeData, t: DocxTheme): Paragraph[] {
   }
 
   if (data.education.length) {
-    out.push(sectionTitle('Ausbildung'))
+    out.push(sectionTitle(labels.education))
     for (const edu of data.education) {
-      out.push(new Paragraph({
-        spacing: { after: 20 },
-        children: [new TextRun({ text: edu.school, bold: true, size: t.baseSize + 2, font: t.font })],
-      }))
+      if (edu.school) {
+        out.push(new Paragraph({
+          spacing: { after: 20 },
+          children: [new TextRun({ text: edu.school, bold: true, size: t.baseSize + 2, font: t.font })],
+        }))
+      }
       out.push(new Paragraph({
         spacing: { after: 60 },
         children: [new TextRun({
@@ -155,7 +175,7 @@ export function resumeParagraphs(data: ResumeData, t: DocxTheme): Paragraph[] {
   }
 
   if (data.skills.length) {
-    out.push(sectionTitle('Kenntnisse'))
+    out.push(sectionTitle(labels.skills))
     out.push(new Paragraph({
       spacing: { after: 60 },
       children: [new TextRun({ text: data.skills.join(', '), size: t.baseSize, font: t.font })],
@@ -166,12 +186,13 @@ export function resumeParagraphs(data: ResumeData, t: DocxTheme): Paragraph[] {
 }
 
 function letterParagraphs(data: CoverLetterData, t: DocxTheme): Paragraph[] {
-  const out: Paragraph[] = [
-    new Paragraph({
+  const out: Paragraph[] = []
+  if (data.name) {
+    out.push(new Paragraph({
       spacing: { after: 40 },
       children: [new TextRun({ text: data.name, bold: true, size: t.baseSize, font: t.font })],
-    }),
-  ]
+    }))
+  }
   if (data.contactLine) {
     out.push(new Paragraph({
       spacing: { after: 40 },
@@ -210,7 +231,9 @@ function letterParagraphs(data: CoverLetterData, t: DocxTheme): Paragraph[] {
     }))
   }
   out.push(new Paragraph({ spacing: { before: 200 }, children: [new TextRun({ text: data.closing, size: t.baseSize, font: t.font })] }))
-  out.push(new Paragraph({ spacing: { before: 300 }, children: [new TextRun({ text: data.name, size: t.baseSize, font: t.font })] }))
+  if (data.name) {
+    out.push(new Paragraph({ spacing: { before: 300 }, children: [new TextRun({ text: data.name, size: t.baseSize, font: t.font })] }))
+  }
 
   return out
 }
