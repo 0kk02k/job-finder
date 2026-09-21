@@ -158,6 +158,20 @@ const SECTION_ALIASES: Record<string, 'profil' | 'erfahrung' | 'ausbildung' | 's
   kompetenzen: 'skills',
   skills: 'skills',
   sprachen: 'skills',
+  // Englische Pendants — der Übersetzungs-Export (fremdsprachige Anzeige)
+  // liefert dieselben Abschnitte in der Sprache der Anzeige. Ohne sie rutscht
+  // der ganze übersetzte Lebenslauf ins Profil und die Sektionen rendern leer.
+  experience: 'erfahrung',
+  'work experience': 'erfahrung',
+  'professional experience': 'erfahrung',
+  'employment history': 'erfahrung',
+  'career history': 'erfahrung',
+  'selected projects': 'erfahrung',
+  education: 'ausbildung',
+  'technical skills': 'skills',
+  'it skills': 'skills',
+  'knowledge & skills': 'skills',
+  languages: 'skills',
 }
 
 // Abschnittstitel erkennen — exakt („Profil") oder mit Zusatz („Kenntnisse &
@@ -178,6 +192,8 @@ const SKILL_LABEL_WORDS = new Set([
   'betriebssysteme', 'technologien', 'tools', 'programmiersprachen', 'sprachen',
   'frameworks', 'methoden', 'ki', 'ai', 'machine learning', 'datenbanken',
   'softskills', 'hardware', 'cloud', 'devops', 'kenntnisse', 'kompetenzen',
+  'operating systems', 'technologies', 'programming languages', 'languages',
+  'methods',
 ])
 
 function skillLabelOf(line: string): { label: string; value: string } | null {
@@ -359,8 +375,6 @@ function parsePlainTextResume(text: string): ResumeData {
     if (pendingExperienceTitle) {
       experience = { title: pendingExperienceTitle, company: '', startDate: '', description: [] }
       data.experience.push(experience)
-      // Erststation als Berufstitel, wenn der Kopfbereich keinen hergab
-      if (!data.title) data.title = pendingExperienceTitle
       pendingExperienceTitle = ''
       return experience
     }
@@ -531,6 +545,16 @@ function parsePlainTextResume(text: string): ResumeData {
 
   flushPendingExperience()
   flushPendingEducation()
+
+  // Erststation als Berufstitel, wenn der Kopfbereich keinen hergab — aber nur,
+  // wenn die Station wie ein Job aussieht (Firma oder Zeitraum). Projektförmige
+  // Gruppierungen (nur Bullets unter einer Gruppen-Überschrift) liefern keinen
+  // Berufstitel und würden sonst als Schlagzeile über dem ganzen Dokument stehen.
+  const firstStation = data.experience[0]
+  if (!data.title && firstStation && (firstStation.company || firstStation.startDate)) {
+    data.title = firstStation.title
+  }
+
   return data
 }
 

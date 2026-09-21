@@ -182,6 +182,78 @@ test('plain skills split on commas, but not inside parentheses', () => {
   assert.deepEqual(data.skills, ['React (inkl. Hooks, Context)', 'Node.js'])
 })
 
+// Export-Form für fremdsprachige Anzeigen: translateResume liefert den
+// Lebenslauf in der Sprache der Anzeige — hier Englisch. Der Klartext-Parser
+// muss dieselben Abschnitte erkennen wie im Deutschen, sonst rutscht alles in
+// das Profil und der Export wird zum Textblob über leeren Sektionen.
+const TRANSLATED_EN_RESUME = [
+  'Profile',
+  'Fully qualified IT specialist for data and process analysis with a university background in psychology. Specialized in the development of local AI applications.',
+  '',
+  'Selected Projects & Experience',
+  'Development of Local AI Workflows & Automation',
+  '• Implementation and provisioning of isolated local agent runtimes (Hermes, OpenClaw, Vix CLI)',
+  '• Use of LLMs (incl. Zhipu AI GLM 5.1) for automated script processing and workflow optimization',
+  '',
+  'Infrastructure & Server Management',
+  '• Design and setup of a bare-metal home server stack (Lenovo ThinkCentre, 16GB RAM upgrade)',
+  '',
+  'Full-Stack & Database Development',
+  '• Conception of a local database web application for managing billing, document scans, and Kanban ticketing',
+  '',
+  'Knowledge & Skills',
+  'Operating Systems Linux (Ubuntu, Pop!_OS, Zorin OS), SteamOS',
+  'Technologies & Tools Docker, Git, CLI, ARM64/x86 architectures (e.g., LM Studio on ARM64)',
+  'Methods & Frameworks Data analysis, process optimization, Kanban, JSON schema design',
+  '',
+  'Education',
+  'Vocational training as an IT specialist',
+  'Specialization: Data and process analysis (completed)',
+  'University studies',
+  'Degree program: Psychology (degree: university degree)',
+].join('\n')
+
+test('translated export: English sections do not collapse into the profile', () => {
+  const data = parseResumeMarkdown(TRANSLATED_EN_RESUME)
+  assert.match(data.summary, /^Fully qualified IT specialist/)
+  assert.ok(!data.summary.includes('Hermes'), 'Projekt-Inhalte dürfen nicht im Profil landen')
+  assert.ok(!data.summary.includes('Vocational training'), 'Bildung darf nicht im Profil landen')
+})
+
+test('translated export: project groups become experience entries', () => {
+  const data = parseResumeMarkdown(TRANSLATED_EN_RESUME)
+  assert.deepEqual(data.experience.map((e) => e.title), [
+    'Development of Local AI Workflows & Automation',
+    'Infrastructure & Server Management',
+    'Full-Stack & Database Development',
+  ])
+  assert.equal(data.experience[0].description.length, 2)
+})
+
+test('translated export: English label skills and education survive', () => {
+  const data = parseResumeMarkdown(TRANSLATED_EN_RESUME)
+  assert.ok(data.skills.includes('Operating Systems: Linux (Ubuntu, Pop!_OS, Zorin OS), SteamOS'))
+  assert.ok(data.skills.some((s) => s.startsWith('Technologies & Tools: Docker')))
+  assert.ok(data.skills.some((s) => s.startsWith('Methods & Frameworks: Data analysis')))
+  assert.equal(data.education.length, 2)
+  assert.match(data.education[0].degree, /^Vocational training as an IT specialist · Specialization:/)
+  assert.match(data.education[1].degree, /^University studies · Degree program:/)
+})
+
+// Projektförmige Lebensläufe ohne Kopfzeile: Die erste Station ist eine
+// Projekt-Gruppe (Bullets, keine Firma, kein Zeitraum) — die darf nicht als
+// Berufstitel über das Dokument gesetzt werden. Echte Jobs haben Firma/Zeitraum.
+test('project-style first station without company or dates is not the professional title', () => {
+  const data = parseResumeMarkdown(TRANSLATED_EN_RESUME)
+  assert.notEqual(data.title, 'Development of Local AI Workflows & Automation')
+  assert.equal(data.title, '')
+})
+
+test('first real job (with company) still becomes the professional title', () => {
+  const data = parseResumeMarkdown(PLAIN_TEXT_RESUME)
+  assert.equal(data.title, 'Softwareentwickler')
+})
+
 test('static cover letter template follows the ad language (English variant)', () => {
   const resume = parseResumeMarkdown(PLAIN_TEXT_RESUME)
   const letter = generateCoverLetterFromJob(resume, 'We are hiring a software engineer.', 'ACME Ltd', 'Software Engineer', 'en')
